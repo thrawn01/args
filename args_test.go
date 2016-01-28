@@ -12,18 +12,50 @@ func TestArgs(t *testing.T) {
 	RunSpecs(t, "Args Parser")
 }
 
-var _ = Describe("Opt()", func() {
-	/*BeforeEach(func() {
-	})*/
+var _ = Describe("ArgParser", func() {
 
-	Describe("Should provide valid config", func() {
-		Describe("When", func() {
-			Context("blah blah", func() {
-				It("blah blah", func() {
-					parser := args.Parser()
-					parser.Opt("argument", args.Alias("-a"))
-				})
+	Describe("Options.Convert()", func() {
+		It("Should convert options to integers", func() {
+			opts := args.Options{"one": 1}
+			var result int
+			opts.Convert("one", func(value interface{}) {
+				result = value.(int)
 			})
+			Expect(result).To(Equal(1))
+		})
+
+		It("Should raise panic if unable to cast an option", func() {
+			opts := args.Options{"one": ""}
+			panicCaught := false
+			result := 0
+
+			defer func() {
+				msg := recover()
+				Expect(msg).ToNot(BeNil())
+				Expect(msg).To(ContainSubstring("Refusing"))
+				panicCaught = true
+			}()
+
+			opts.Convert("one", func(value interface{}) {
+				result = value.(int)
+			})
+			Expect(panicCaught).To(Equal(true))
+		})
+
+	})
+
+	Describe("ParseArgs()", func() {
+		cmdLine := []string{"--one", "--two", "--three"}
+		parser := args.Parser()
+		It("Should return error if Opt() was never called", func() {
+			_, err := parser.ParseArgs(cmdLine)
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Must create some options to parse with args.Opt() before calling arg.Parse()"))
+		})
+		It("Should count arguments", func() {
+			parser.Opt("--one", args.Count())
+			opt, _ := parser.ParseArgs(cmdLine)
+			Expect(opt.Int("one")).To(Equal(1))
 		})
 	})
 })
