@@ -49,7 +49,6 @@ func (self *Rule) MatchesAlias(args []string, idx *int) bool {
 }
 
 func (self *Rule) Match(args []string, idx *int) (bool, error) {
-	fmt.Printf("Rule.Match(%s)\n", args[*idx])
 	if !self.MatchesAlias(args, idx) {
 		return false, nil
 	}
@@ -166,6 +165,7 @@ func (self *ArgParser) ParseArgs(args []string) (Options, error) {
 }
 
 func (self *ArgParser) ParseUntil(args []string, terminator string) (Options, error) {
+	self.results = make(Options)
 	self.args = args
 	self.idx = 0
 
@@ -185,12 +185,12 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (Options, er
 
 	// Process command line arguments until we find our terminator
 	for ; self.idx < len(self.args); self.idx++ {
-		fmt.Printf("Looking at: %d:%s\n", self.idx, self.args[self.idx])
 		if self.args[self.idx] == terminator {
 			fmt.Printf("Terminator Reached\n")
 			return self.results, nil
 		}
 		// Match our arguments with rules expected
+		fmt.Printf("Attempting to match: %d:%s - ", self.idx, self.args[self.idx])
 		matched, err := self.match(self.rules)
 		if err != nil {
 			return self.results, err
@@ -199,7 +199,7 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (Options, er
 		if matched {
 			continue
 		}
-
+		fmt.Printf("Failed to Match\n")
 		// TODO: If we didn't match either and user asked us to fail on
 		// unmatched arguments return an error here
 	}
@@ -215,7 +215,7 @@ func (self *ArgParser) match(rules Rules) (bool, error) {
 			return true, err
 		}
 		if matched {
-			fmt.Printf("Matched '%s'", rule.Name)
+			fmt.Printf("Matched '%s'\n", rule.Name)
 			// This Rule matched our argument
 			self.results[rule.Name] = rule.Value
 			return true, nil

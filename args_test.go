@@ -44,22 +44,17 @@ var _ = Describe("ArgParser", func() {
 
 	})
 
-	/*Describe("ParseArgs()", func() {
-		cmdLine := []string{"--one", "--two", "--three"}
+	Describe("args.Parse()", func() {
 		parser := args.Parser()
 		It("Should return error if Opt() was never called", func() {
-			_, err := parser.ParseArgs(cmdLine)
+			_, err := parser.Parse()
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Must create some options to parse with args.Opt() before calling arg.Parse()"))
 		})
-		It("Should count arguments", func() {
-			parser.Opt("--one", args.Count())
-			opt, _ := parser.ParseArgs(cmdLine)
-			Expect(opt.Int("one")).To(Equal(1))
-		})
-	})*/
+	})
 
-	Describe("Opt()", func() {
+	Describe("args.Opt()", func() {
+		cmdLine := []string{"--one", "-two", "++three", "+four"}
 		parser := args.Parser()
 
 		It("Should create optional rule --one", func() {
@@ -89,5 +84,45 @@ var _ = Describe("ArgParser", func() {
 			Expect(rule.Name).To(Equal("one"))
 			Expect(rule.IsPos).To(Equal(0))
 		})
+
+		It("Should match --one", func() {
+			parser.Opt("--one", args.Count())
+			opt, _ := parser.ParseArgs(cmdLine)
+			Expect(opt.Int("one")).To(Equal(1))
+		})
+		It("Should match -two", func() {
+			parser.Opt("-two", args.Count())
+			opt, _ := parser.ParseArgs(cmdLine)
+			Expect(opt.Int("two")).To(Equal(1))
+		})
+		It("Should match ++three", func() {
+			parser.Opt("++three", args.Count())
+			opt, _ := parser.ParseArgs(cmdLine)
+			Expect(opt.Int("three")).To(Equal(1))
+		})
+		It("Should match +four", func() {
+			parser.Opt("+four", args.Count())
+			opt, _ := parser.ParseArgs(cmdLine)
+			Expect(opt.Int("four")).To(Equal(1))
+		})
+	})
+
+	Describe("args.Count()", func() {
+
+		It("Should count one", func() {
+			parser := args.Parser()
+			cmdLine := []string{"--verbose"}
+			parser.Opt("--verbose", args.Count())
+			opt, _ := parser.ParseArgs(cmdLine)
+			Expect(opt.Int("verbose")).To(Equal(1))
+		})
+		It("Should count three times", func() {
+			parser := args.Parser()
+			cmdLine := []string{"--verbose", "--verbose", "--verbose"}
+			parser.Opt("--verbose", args.Count())
+			opt, _ := parser.ParseArgs(cmdLine)
+			Expect(opt.Int("verbose")).To(Equal(3))
+		})
+
 	})
 })
