@@ -121,26 +121,27 @@ type ArgParser struct {
 	idx     int
 }
 
-var isOptional = regexp.MustCompile(`^\W?.*$`)
-var extractName = regexp.MustCompile(`([\W]):(\w*)`)
+var isOptional = regexp.MustCompile(`^(\W+)(\w*)$`)
+var extractName = regexp.MustCompile(`^(\W+)(\w*)$`)
 
 func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
+	rule := Rule{}
 	// If name begins with a non word charater, assume it's an optional argument
 	if isOptional.MatchString(name) {
 		// Attempt to extract the name
-		group := extractName.FindStringSubmatch(name)
+		group := isOptional.FindStringSubmatch(name)
 		if group == nil {
-			fmt.Println("No Match")
+			self.err = errors.New(fmt.Sprintf("Invalid Optional argument name '%s'", name))
+			return
 		} else {
-			fmt.Println(string(group[0]))
-			fmt.Println()
-			fmt.Println(string(group[1]))
-			fmt.Println(string(group[2]))
+			rule.Aliases = append(rule.Aliases, name)
+			rule.Name = group[2]
 		}
+	} else {
+		rule.IsPos = 1
+		rule.Name = name
 	}
-	//self.IsPos = 1
 
-	rule := Rule{Name: name}
 	for _, modify := range modifiers {
 		// The modifiers know how to modify a rule
 		modify(&rule)
@@ -149,6 +150,10 @@ func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
 	self.err = rule.Validate()
 	// Append our rules to the list
 	self.rules = append(self.rules, rule)
+}
+
+func (self *ArgParser) GetRules() Rules {
+	return self.rules
 }
 
 // Parses command line arguments using os.Args
@@ -238,6 +243,6 @@ func Alias(optName string) RuleModifier {
 
 func Count() RuleModifier {
 	return func(rule *Rule) {
-		fmt.Printf("Count()\n")
+		//fmt.Printf("Count()\n")
 	}
 }

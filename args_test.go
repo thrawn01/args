@@ -44,7 +44,7 @@ var _ = Describe("ArgParser", func() {
 
 	})
 
-	Describe("ParseArgs()", func() {
+	/*Describe("ParseArgs()", func() {
 		cmdLine := []string{"--one", "--two", "--three"}
 		parser := args.Parser()
 		It("Should return error if Opt() was never called", func() {
@@ -56,6 +56,38 @@ var _ = Describe("ArgParser", func() {
 			parser.Opt("--one", args.Count())
 			opt, _ := parser.ParseArgs(cmdLine)
 			Expect(opt.Int("one")).To(Equal(1))
+		})
+	})*/
+
+	Describe("Opt()", func() {
+		parser := args.Parser()
+
+		It("Should create optional rule --one", func() {
+			parser.Opt("--one", args.Count())
+			rule := parser.GetRules()[0]
+			Expect(rule.Name).To(Equal("one"))
+			Expect(rule.IsPos).To(Equal(0))
+		})
+
+		It("Should create optional rule ++one", func() {
+			parser.Opt("++one", args.Count())
+			rule := parser.GetRules()[0]
+			Expect(rule.Name).To(Equal("one"))
+			Expect(rule.IsPos).To(Equal(0))
+		})
+
+		It("Should create optional rule -one", func() {
+			parser.Opt("-one", args.Count())
+			rule := parser.GetRules()[0]
+			Expect(rule.Name).To(Equal("one"))
+			Expect(rule.IsPos).To(Equal(0))
+		})
+
+		It("Should create optional rule +one", func() {
+			parser.Opt("+one", args.Count())
+			rule := parser.GetRules()[0]
+			Expect(rule.Name).To(Equal("one"))
+			Expect(rule.IsPos).To(Equal(0))
 		})
 	})
 })
