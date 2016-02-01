@@ -54,7 +54,7 @@ var _ = Describe("ArgParser", func() {
 	})
 
 	Describe("args.Opt()", func() {
-		cmdLine := []string{"--one", "-two", "++three", "+four"}
+		cmdLine := []string{"--one", "-two", "++three", "+four", "--power-level"}
 
 		It("Should create optional rule --one", func() {
 			parser := args.Parser()
@@ -116,10 +116,16 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(BeNil())
 			Expect(opt.Int("four")).To(Equal(1))
 		})
+		It("Should match --power-level", func() {
+			parser := args.Parser()
+			parser.Opt("--power-level", args.Count())
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Int("power-level")).To(Equal(1))
+		})
 	})
 
 	Describe("args.Count()", func() {
-
 		It("Should count one", func() {
 			parser := args.Parser()
 			cmdLine := []string{"--verbose"}
@@ -136,6 +142,37 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(BeNil())
 			Expect(opt.Int("verbose")).To(Equal(3))
 		})
+	})
 
+	Describe("args.Int()", func() {
+		It("Should ensure value supplied is an integer", func() {
+			parser := args.Parser()
+			parser.Opt("--power-level", args.Int())
+
+			cmdLine := []string{"--power-level", "10000"}
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Int("power-level")).To(Equal(10000))
+		})
+
+		It("Should set err if the option value is not parsable as an integer", func() {
+			parser := args.Parser()
+			cmdLine := []string{"--power-level", "over-ten-thousand"}
+			parser.Opt("--power-level", args.Int())
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Invalid value for '--power-level' value 'over-ten-thousand' is not an Integer"))
+			Expect(opt.Int("power-level")).To(Equal(0))
+		})
+
+		It("Should set err if no option value is provided", func() {
+			parser := args.Parser()
+			cmdLine := []string{"--power-level"}
+			parser.Opt("--power-level", args.Int())
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Expected '--power-level' to have an argument"))
+			Expect(opt.Int("power-level")).To(Equal(0))
+		})
 	})
 })

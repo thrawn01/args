@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 )
 
 const (
@@ -17,21 +18,19 @@ const (
 // 					 Types
 // ***********************************************
 type RuleModifier func(*Rule)
+type CastFunc func(string, string) (interface{}, error)
+type ActionFunc func(*Rule, string, []string, *int) error
 
 // ***********************************************
 // 				Rule Object
 // ***********************************************
-const (
-	countAction int = iota
-	appendAction
-)
-
 type Rule struct {
 	IsPos   int
-	Action  int
 	Name    string
 	Value   interface{}
 	Aliases []string
+	Cast    CastFunc
+	Action  ActionFunc
 	// Stuff and Junk
 }
 
@@ -39,28 +38,45 @@ func (self *Rule) Validate() error {
 	return nil
 }
 
-func (self *Rule) MatchesAlias(args []string, idx *int) bool {
+func (self *Rule) MatchesAlias(args []string, idx *int) (bool, string) {
 	for _, alias := range self.Aliases {
 		if args[*idx] == alias {
-			return true
+			return true, args[*idx]
 		}
 	}
-	return false
+	return false, ""
 }
 
 func (self *Rule) Match(args []string, idx *int) (bool, error) {
-	if !self.MatchesAlias(args, idx) {
+	fmt.Printf("Match(%s)\n", args[*idx])
+	matched, alias := self.MatchesAlias(args, idx)
+	fmt.Printf("Matched: %s - %s\n", matched, alias)
+	if !matched {
 		return false, nil
 	}
 
-	if self.Action == countAction {
-		if self.Value == nil {
-			self.Value = 0
+	// If user defined an action
+	if self.Action != nil {
+		err := self.Action(self, alias, args, idx)
+		if err != nil {
+			return true, err
 		}
-		self.Value = self.Value.(int) + 1
 		return true, nil
 	}
-	return false, nil
+
+	// If no actions are specified assume a value follows this argument and should be converted
+	*idx++
+	if len(args) <= *idx {
+		return true, errors.New(fmt.Sprintf("Expected '%s' to have an argument", alias))
+	}
+	//fmt.Printf("arg: %s value: %s\n", alias, args[*idx])
+	value, err := self.Cast(alias, args[*idx])
+	fmt.Printf("cast: %s\n", value)
+	if err != nil {
+		return true, err
+	}
+	self.Value = value
+	return true, nil
 }
 
 // ***********************************************
@@ -120,8 +136,7 @@ type ArgParser struct {
 	idx     int
 }
 
-var isOptional = regexp.MustCompile(`^(\W+)(\w*)$`)
-var extractName = regexp.MustCompile(`^(\W+)(\w*)$`)
+var isOptional = regexp.MustCompile(`^(\W+)([\w|-]*)$`)
 
 func (self *ArgParser) ValidateRules() error {
 	for idx, rule := range self.rules {
@@ -145,6 +160,7 @@ func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
 		// Attempt to extract the name
 		group := isOptional.FindStringSubmatch(name)
 		if group == nil {
+			fmt.Printf("Failed to find argument name\n")
 			self.err = errors.New(fmt.Sprintf("Invalid optional argument name '%s'", name))
 			return
 		} else {
@@ -204,6 +220,11 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (Options, er
 	// Sort the rules so positional rules are parsed last
 	sort.Sort(self.rules)
 
+	// Assign our default values
+	for _, rule := range self.rules {
+		self.results[rule.Name] = rule.Value
+	}
+
 	// Process command line arguments until we find our terminator
 	for ; self.idx < len(self.args); self.idx++ {
 		if self.args[self.idx] == terminator {
@@ -211,7 +232,7 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (Options, er
 			return self.results, nil
 		}
 		// Match our arguments with rules expected
-		fmt.Printf("Attempting to match: %d:%s - ", self.idx, self.args[self.idx])
+		fmt.Printf("====== Attempting to match: %d:%s - ", self.idx, self.args[self.idx])
 		matched, err := self.match(self.rules)
 		if err != nil {
 			return self.results, err
@@ -264,6 +285,30 @@ func Alias(optName string) RuleModifier {
 
 func Count() RuleModifier {
 	return func(rule *Rule) {
-		//fmt.Printf("Count()\n")
+		rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
+			// If user asked us to count the instances of this argument
+			rule.Value = rule.Value.(int) + 1
+			return nil
+		}
+		if rule.Value == nil {
+			rule.Value = 0
+		}
+	}
+}
+
+func Int() RuleModifier {
+	return func(rule *Rule) {
+		rule.Cast = func(optName string, strValue string) (interface{}, error) {
+			fmt.Printf("Conv Value: %s\n", strValue)
+			value, err := strconv.ParseInt(strValue, 10, 64)
+			fmt.Printf("Converted Value: %d\n", value)
+			if err != nil {
+				return 0, errors.New(fmt.Sprintf("Invalid value for '%s' value '%s' is not an Integer", optName, strValue))
+			}
+			return int(value), nil
+		}
+		if rule.Value == nil {
+			rule.Value = 0
+		}
 	}
 }
