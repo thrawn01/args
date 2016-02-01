@@ -159,20 +159,20 @@ var _ = Describe("ArgParser", func() {
 			parser := args.Parser()
 			cmdLine := []string{"--power-level", "over-ten-thousand"}
 			parser.Opt("--power-level", args.Int())
-			opt, err := parser.ParseArgs(cmdLine)
+			_, err := parser.ParseArgs(cmdLine)
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal("Invalid value for '--power-level' value 'over-ten-thousand' is not an Integer"))
-			Expect(opt.Int("power-level")).To(Equal(0))
+			Expect(err.Error()).To(Equal("Invalid value for '--power-level' - 'over-ten-thousand' is not an Integer"))
+			//Expect(opt.Int("power-level")).To(Equal(0))
 		})
 
 		It("Should set err if no option value is provided", func() {
 			parser := args.Parser()
 			cmdLine := []string{"--power-level"}
 			parser.Opt("--power-level", args.Int())
-			opt, err := parser.ParseArgs(cmdLine)
+			_, err := parser.ParseArgs(cmdLine)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Expected '--power-level' to have an argument"))
-			Expect(opt.Int("power-level")).To(Equal(0))
+			//Expect(opt.Int("power-level")).To(Equal(0))
 		})
 	})
 
@@ -187,6 +187,34 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(10000))
 			Expect(value).To(Equal(10000))
+		})
+	})
+
+	Describe("args.Default()", func() {
+		It("Should ensure default values is supplied if no matching argument is found", func() {
+			parser := args.Parser()
+			var value int
+			parser.Opt("--power-level", args.StoreInt(&value), args.Default("10"))
+
+			opt, err := parser.ParseArgs([]string{})
+			Expect(err).To(BeNil())
+			Expect(opt.Int("power-level")).To(Equal(10))
+			Expect(value).To(Equal(10))
+		})
+
+		It("Should panic if default value does not match Opt() type", func() {
+			parser := args.Parser()
+			panicCaught := false
+
+			defer func() {
+				msg := recover()
+				Expect(msg).ToNot(BeNil())
+				Expect(msg).To(ContainSubstring("args.Default"))
+				panicCaught = true
+			}()
+
+			parser.Opt("--power-level", args.Int(), args.Default("over-ten-thousand"))
+			Expect(panicCaught).To(Equal(true))
 		})
 	})
 })

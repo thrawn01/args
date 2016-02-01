@@ -29,6 +29,7 @@ type Rule struct {
 	IsPos     int
 	Name      string
 	Value     interface{}
+	Default   interface{}
 	Aliases   []string
 	Cast      CastFunc
 	Action    ActionFunc
@@ -50,7 +51,6 @@ func (self *Rule) MatchesAlias(args []string, idx *int) (bool, string) {
 }
 
 func (self *Rule) Match(args []string, idx *int) (bool, error) {
-	fmt.Printf("Match(%s)\n", args[*idx])
 	matched, alias := self.MatchesAlias(args, idx)
 	fmt.Printf("Matched: %s - %s\n", matched, alias)
 	if !matched {
@@ -73,7 +73,6 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	}
 	//fmt.Printf("arg: %s value: %s\n", alias, args[*idx])
 	value, err := self.Cast(alias, args[*idx])
-	fmt.Printf("cast: %s\n", value)
 	if err != nil {
 		return true, err
 	}
@@ -150,6 +149,15 @@ func (self *ArgParser) ValidateRules() error {
 					return errors.New(fmt.Sprintf("Duplicate Opt() called with same name as '%s'", rule.Name))
 				}
 			}
+		}
+
+		// Ensure user didn't set a bad default value
+		if rule.Cast != nil && rule.Default != nil {
+			cast, err := rule.Cast("args.Default()", rule.Default.(string))
+			if err != nil {
+				panic(err.Error())
+			}
+			rule.Default = cast
 		}
 	}
 	return nil
@@ -230,11 +238,6 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (Options, er
 	// Sort the rules so positional rules are parsed last
 	sort.Sort(self.rules)
 
-	// Assign our default values
-	for _, rule := range self.rules {
-		self.results[rule.Name] = rule.Value
-	}
-
 	// Process command line arguments until we find our terminator
 	for ; self.idx < len(self.args); self.idx++ {
 		if self.args[self.idx] == terminator {
@@ -255,6 +258,24 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (Options, er
 		// TODO: If we didn't match either and user asked us to fail on
 		// unmatched arguments return an error here
 	}
+
+	// == Apply defaults for un-seen arguments ==
+	// TODO: Environment variables
+
+	// Make a copy of our result map
+	results := make(map[string]interface{})
+	for key, value := range self.results {
+		results[key] = value
+	}
+	// Assign our default for options not specified
+	for _, rule := range self.rules {
+		_, ok := results[rule.Name]
+		if !ok {
+			rule.Value = rule.Default
+			rule.SetOption(self, rule)
+		}
+	}
+
 	return self.results, nil
 }
 
@@ -309,11 +330,9 @@ func Count() RuleModifier {
 }
 
 func castInt(optName string, strValue string) (interface{}, error) {
-	fmt.Printf("Conv Value: %s\n", strValue)
 	value, err := strconv.ParseInt(strValue, 10, 64)
-	fmt.Printf("Converted Value: %d\n", value)
 	if err != nil {
-		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' value '%s' is not an Integer", optName, strValue))
+		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' - '%s' is not an Integer", optName, strValue))
 	}
 	return int(value), nil
 }
@@ -321,9 +340,13 @@ func castInt(optName string, strValue string) (interface{}, error) {
 func Int() RuleModifier {
 	return func(rule *Rule) {
 		rule.Cast = castInt
-		if rule.Value == nil {
-			rule.Value = 0
-		}
+		rule.Value = 0
+	}
+}
+
+func Default(value string) RuleModifier {
+	return func(rule *Rule) {
+		rule.Default = value
 	}
 }
 
