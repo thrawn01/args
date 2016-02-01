@@ -55,10 +55,10 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 
 	if self.Action == countAction {
 		if self.Value == nil {
-			self.Value = 1
-			return true, nil
+			self.Value = 0
 		}
 		self.Value = self.Value.(int) + 1
+		return true, nil
 	}
 	return false, nil
 }
@@ -66,7 +66,7 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 // ***********************************************
 // 				Rules Object
 // ***********************************************
-type Rules []Rule
+type Rules []*Rule
 
 func (self Rules) Len() int {
 	return len(self)
@@ -123,6 +123,21 @@ type ArgParser struct {
 var isOptional = regexp.MustCompile(`^(\W+)(\w*)$`)
 var extractName = regexp.MustCompile(`^(\W+)(\w*)$`)
 
+func (self *ArgParser) ValidateRules() error {
+	for idx, rule := range self.rules {
+		// Duplicate rule check
+		next := idx + 1
+		if next < len(self.rules) {
+			for ; next < len(self.rules); next++ {
+				if rule.Name == self.rules[next].Name {
+					return errors.New(fmt.Sprintf("Duplicate Opt() called with same name as '%s'", rule.Name))
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
 	rule := Rule{}
 	// If name begins with a non word charater, assume it's an optional argument
@@ -130,7 +145,7 @@ func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
 		// Attempt to extract the name
 		group := isOptional.FindStringSubmatch(name)
 		if group == nil {
-			self.err = errors.New(fmt.Sprintf("Invalid Optional argument name '%s'", name))
+			self.err = errors.New(fmt.Sprintf("Invalid optional argument name '%s'", name))
 			return
 		} else {
 			rule.Aliases = append(rule.Aliases, name)
@@ -145,10 +160,10 @@ func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
 		// The modifiers know how to modify a rule
 		modify(&rule)
 	}
-	// Make sure conflicting rules where not used
-	self.err = rule.Validate()
 	// Append our rules to the list
-	self.rules = append(self.rules, rule)
+	self.rules = append(self.rules, &rule)
+	// Make sure conflicting/duplicate rules where not used
+	self.err = self.ValidateRules()
 }
 
 func (self *ArgParser) GetRules() Rules {
@@ -162,6 +177,12 @@ func (self *ArgParser) Parse() (Options, error) {
 
 func (self *ArgParser) ParseArgs(args []string) (Options, error) {
 	return self.ParseUntil(args, "--")
+}
+
+func (self *ArgParser) printRules() {
+	for _, rule := range self.rules {
+		fmt.Printf("Rule: %s - '%s'\n", rule.Name, rule.Value)
+	}
 }
 
 func (self *ArgParser) ParseUntil(args []string, terminator string) (Options, error) {
@@ -195,7 +216,7 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (Options, er
 		if err != nil {
 			return self.results, err
 		}
-
+		self.printRules()
 		if matched {
 			continue
 		}
@@ -215,7 +236,7 @@ func (self *ArgParser) match(rules Rules) (bool, error) {
 			return true, err
 		}
 		if matched {
-			fmt.Printf("Matched '%s'\n", rule.Name)
+			fmt.Printf("Matched '%s' with '%s'\n", rule.Name, rule.Value)
 			// This Rule matched our argument
 			self.results[rule.Name] = rule.Value
 			return true, nil

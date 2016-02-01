@@ -55,9 +55,9 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("args.Opt()", func() {
 		cmdLine := []string{"--one", "-two", "++three", "+four"}
-		parser := args.Parser()
 
 		It("Should create optional rule --one", func() {
+			parser := args.Parser()
 			parser.Opt("--one", args.Count())
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
@@ -65,6 +65,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should create optional rule ++one", func() {
+			parser := args.Parser()
 			parser.Opt("++one", args.Count())
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
@@ -72,6 +73,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should create optional rule -one", func() {
+			parser := args.Parser()
 			parser.Opt("-one", args.Count())
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
@@ -79,6 +81,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should create optional rule +one", func() {
+			parser := args.Parser()
 			parser.Opt("+one", args.Count())
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
@@ -86,23 +89,31 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should match --one", func() {
+			parser := args.Parser()
 			parser.Opt("--one", args.Count())
-			opt, _ := parser.ParseArgs(cmdLine)
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
 			Expect(opt.Int("one")).To(Equal(1))
 		})
 		It("Should match -two", func() {
+			parser := args.Parser()
 			parser.Opt("-two", args.Count())
-			opt, _ := parser.ParseArgs(cmdLine)
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
 			Expect(opt.Int("two")).To(Equal(1))
 		})
 		It("Should match ++three", func() {
+			parser := args.Parser()
 			parser.Opt("++three", args.Count())
-			opt, _ := parser.ParseArgs(cmdLine)
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
 			Expect(opt.Int("three")).To(Equal(1))
 		})
 		It("Should match +four", func() {
+			parser := args.Parser()
 			parser.Opt("+four", args.Count())
-			opt, _ := parser.ParseArgs(cmdLine)
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
 			Expect(opt.Int("four")).To(Equal(1))
 		})
 	})
@@ -113,14 +124,16 @@ var _ = Describe("ArgParser", func() {
 			parser := args.Parser()
 			cmdLine := []string{"--verbose"}
 			parser.Opt("--verbose", args.Count())
-			opt, _ := parser.ParseArgs(cmdLine)
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
 			Expect(opt.Int("verbose")).To(Equal(1))
 		})
 		It("Should count three times", func() {
 			parser := args.Parser()
 			cmdLine := []string{"--verbose", "--verbose", "--verbose"}
 			parser.Opt("--verbose", args.Count())
-			opt, _ := parser.ParseArgs(cmdLine)
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
 			Expect(opt.Int("verbose")).To(Equal(3))
 		})
 
