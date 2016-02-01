@@ -175,4 +175,18 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.Int("power-level")).To(Equal(0))
 		})
 	})
+
+	Describe("args.StoreInt()", func() {
+		It("Should ensure value supplied is assigned to passed value", func() {
+			parser := args.Parser()
+			var value int
+			parser.Opt("--power-level", args.StoreInt(&value))
+
+			cmdLine := []string{"--power-level", "10000"}
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Int("power-level")).To(Equal(10000))
+			Expect(value).To(Equal(10000))
+		})
+	})
 })

@@ -20,17 +20,19 @@ const (
 type RuleModifier func(*Rule)
 type CastFunc func(string, string) (interface{}, error)
 type ActionFunc func(*Rule, string, []string, *int) error
+type SetFunc func(*ArgParser, *Rule)
 
 // ***********************************************
 // 				Rule Object
 // ***********************************************
 type Rule struct {
-	IsPos   int
-	Name    string
-	Value   interface{}
-	Aliases []string
-	Cast    CastFunc
-	Action  ActionFunc
+	IsPos     int
+	Name      string
+	Value     interface{}
+	Aliases   []string
+	Cast      CastFunc
+	Action    ActionFunc
+	SetOption SetFunc
 	// Stuff and Junk
 }
 
@@ -154,7 +156,11 @@ func (self *ArgParser) ValidateRules() error {
 }
 
 func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
-	rule := Rule{}
+	rule := Rule{
+		SetOption: func(parser *ArgParser, rule *Rule) {
+			parser.SetOption(rule.Name, rule.Value)
+		},
+	}
 	// If name begins with a non word charater, assume it's an optional argument
 	if isOptional.MatchString(name) {
 		// Attempt to extract the name
@@ -184,6 +190,10 @@ func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
 
 func (self *ArgParser) GetRules() Rules {
 	return self.rules
+}
+
+func (self *ArgParser) SetOption(key string, value interface{}) {
+	self.results[key] = value
 }
 
 // Parses command line arguments using os.Args
@@ -258,8 +268,10 @@ func (self *ArgParser) match(rules Rules) (bool, error) {
 		}
 		if matched {
 			fmt.Printf("Matched '%s' with '%s'\n", rule.Name, rule.Value)
-			// This Rule matched our argument
-			self.results[rule.Name] = rule.Value
+			// This Rule matched our argument, have the rule set the result in
+			// the option list
+			rule.SetOption(self, rule)
+			//self.results[rule.Name] = rule.Value
 			return true, nil
 		}
 	}
@@ -296,19 +308,32 @@ func Count() RuleModifier {
 	}
 }
 
+func castInt(optName string, strValue string) (interface{}, error) {
+	fmt.Printf("Conv Value: %s\n", strValue)
+	value, err := strconv.ParseInt(strValue, 10, 64)
+	fmt.Printf("Converted Value: %d\n", value)
+	if err != nil {
+		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' value '%s' is not an Integer", optName, strValue))
+	}
+	return int(value), nil
+}
+
 func Int() RuleModifier {
 	return func(rule *Rule) {
-		rule.Cast = func(optName string, strValue string) (interface{}, error) {
-			fmt.Printf("Conv Value: %s\n", strValue)
-			value, err := strconv.ParseInt(strValue, 10, 64)
-			fmt.Printf("Converted Value: %d\n", value)
-			if err != nil {
-				return 0, errors.New(fmt.Sprintf("Invalid value for '%s' value '%s' is not an Integer", optName, strValue))
-			}
-			return int(value), nil
-		}
+		rule.Cast = castInt
 		if rule.Value == nil {
 			rule.Value = 0
+		}
+	}
+}
+
+func StoreInt(dest *int) RuleModifier {
+	// Implies Int()
+	return func(rule *Rule) {
+		rule.Cast = castInt
+		rule.SetOption = func(parser *ArgParser, rule *Rule) {
+			parser.SetOption(rule.Name, rule.Value)
+			*dest = rule.Value.(int)
 		}
 	}
 }
