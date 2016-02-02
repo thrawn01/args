@@ -212,11 +212,11 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.StoreString()", func() {
+	Describe("args.StoreStr()", func() {
 		It("Should ensure value supplied is assigned to passed value", func() {
 			parser := args.Parser()
 			var value string
-			parser.Opt("--power-level", args.StoreString(&value))
+			parser.Opt("--power-level", args.StoreStr(&value))
 
 			cmdLine := []string{"--power-level", "over-ten-thousand"}
 			opt, err := parser.ParseArgs(cmdLine)

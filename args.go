@@ -28,6 +28,7 @@ type StoreFunc func(interface{})
 type Rule struct {
 	IsPos       int
 	Name        string
+	HelpMsg     string
 	Value       interface{}
 	Default     interface{}
 	Aliases     []string
@@ -53,7 +54,7 @@ func (self *Rule) MatchesAlias(args []string, idx *int) (bool, string) {
 
 func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	matched, alias := self.MatchesAlias(args, idx)
-	fmt.Printf("Matched: %s - %s\n", matched, alias)
+	//fmt.Printf("Matched: %s - %s\n", matched, alias)
 	if !matched {
 		return false, nil
 	}
@@ -232,7 +233,7 @@ func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
 		// Attempt to extract the name
 		group := isOptional.FindStringSubmatch(name)
 		if group == nil {
-			fmt.Printf("Failed to find argument name\n")
+			//fmt.Printf("Failed to find argument name\n")
 			self.err = errors.New(fmt.Sprintf("Invalid optional argument name '%s'", name))
 			return
 		} else {
@@ -291,14 +292,14 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (*Options, e
 			goto collectResults
 		}
 		// Match our arguments with rules expected
-		fmt.Printf("====== Attempting to match: %d:%s - ", self.idx, self.args[self.idx])
+		//fmt.Printf("====== Attempting to match: %d:%s - ", self.idx, self.args[self.idx])
 		matched, err := self.match(self.rules)
 		if err != nil {
 			return nil, err
 		}
 
 		if !matched {
-			fmt.Printf("Failed to Match\n")
+			//fmt.Printf("Failed to Match\n")
 			// TODO: If we didn't match any options and user asked us to fail on
 			// unmatched arguments return an error here
 		}
@@ -331,7 +332,7 @@ func (self *ArgParser) match(rules Rules) (bool, error) {
 			return true, err
 		}
 		if matched {
-			fmt.Printf("Matched '%s' with '%s'\n", rule.Name, rule.Value)
+			//fmt.Printf("Matched '%s' with '%s'\n", rule.Name, rule.Value)
 			return true, nil
 		}
 	}
@@ -355,9 +356,9 @@ func Parser() *ArgParser {
 }
 
 // Indicates this option has an alias it can go by
-func Alias(optName string) RuleModifier {
+func Alias(aliasName string) RuleModifier {
 	return func(rule *Rule) {
-		fmt.Printf("Alias(%s)\n", optName)
+		rule.Aliases = append(rule.Aliases, aliasName)
 	}
 }
 
@@ -420,18 +421,16 @@ func StoreInt(dest *int) RuleModifier {
 	return func(rule *Rule) {
 		rule.Cast = castInt
 		rule.StoreValue = func(value interface{}) {
-			fmt.Printf("Value: %s\n", value)
 			*dest = value.(int)
 		}
 	}
 }
 
-func StoreString(dest *string) RuleModifier {
+func StoreStr(dest *string) RuleModifier {
 	// Implies String()
 	return func(rule *Rule) {
 		rule.Cast = castString
 		rule.StoreValue = func(value interface{}) {
-			fmt.Printf("Value: %s\n", value)
 			*dest = value.(string)
 		}
 	}
@@ -440,5 +439,11 @@ func StoreString(dest *string) RuleModifier {
 func Env(varName string) RuleModifier {
 	return func(rule *Rule) {
 		rule.EnvironVars = append(rule.EnvironVars, varName)
+	}
+}
+
+func Help(message string) RuleModifier {
+	return func(rule *Rule) {
+		rule.HelpMsg = message
 	}
 }
