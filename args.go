@@ -20,20 +20,20 @@ const (
 type RuleModifier func(*Rule)
 type CastFunc func(string, string) (interface{}, error)
 type ActionFunc func(*Rule, string, []string, *int) error
-type SetFunc func(*ArgParser, *Rule)
+type StoreFunc func(interface{})
 
 // ***********************************************
 // 				Rule Object
 // ***********************************************
 type Rule struct {
-	IsPos     int
-	Name      string
-	Value     interface{}
-	Default   interface{}
-	Aliases   []string
-	Cast      CastFunc
-	Action    ActionFunc
-	SetOption SetFunc
+	IsPos      int
+	Name       string
+	Value      interface{}
+	Default    interface{}
+	Aliases    []string
+	Cast       CastFunc
+	Action     ActionFunc
+	StoreValue StoreFunc
 	// Stuff and Junk
 }
 
@@ -80,6 +80,19 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	return true, nil
 }
 
+func (self *Rule) GetValue() interface{} {
+	// If Rule Matched Argument on command line
+	if self.Value != nil {
+		return self.Value
+	}
+	// If Rule Matched Environment variable
+	// Apply default if available
+	if self.Default != nil {
+		return self.Default
+	}
+	return nil
+}
+
 // ***********************************************
 // 				Rules Object
 // ***********************************************
@@ -116,11 +129,24 @@ func (self Options) Convert(key string, convFunc func(value interface{})) {
 	convFunc(value)
 }
 
+func (self Options) IsNil(key string) bool {
+	value, ok := self[key]
+	if !ok {
+		return true
+	}
+	return value == nil
+}
+
 func (self Options) Int(key string) int {
 	// TODO: This should convert int to string using strconv
 	var result int
 	self.Convert(key, func(value interface{}) {
-		result = value.(int)
+		if value != nil {
+			result = value.(int)
+			return
+		}
+		// Avoid panic, return 0 if no value
+		result = 0
 	})
 	return result
 }
@@ -130,11 +156,10 @@ func (self Options) Int(key string) int {
 // ***********************************************
 
 type ArgParser struct {
-	args    []string
-	results Options
-	rules   Rules
-	err     error
-	idx     int
+	args  []string
+	rules Rules
+	err   error
+	idx   int
 }
 
 var isOptional = regexp.MustCompile(`^(\W+)([\w|-]*)$`)
@@ -164,11 +189,7 @@ func (self *ArgParser) ValidateRules() error {
 }
 
 func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
-	rule := Rule{
-		SetOption: func(parser *ArgParser, rule *Rule) {
-			parser.SetOption(rule.Name, rule.Value)
-		},
-	}
+	rule := &Rule{}
 	// If name begins with a non word charater, assume it's an optional argument
 	if isOptional.MatchString(name) {
 		// Attempt to extract the name
@@ -188,10 +209,10 @@ func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
 
 	for _, modify := range modifiers {
 		// The modifiers know how to modify a rule
-		modify(&rule)
+		modify(rule)
 	}
 	// Append our rules to the list
-	self.rules = append(self.rules, &rule)
+	self.rules = append(self.rules, rule)
 	// Make sure conflicting/duplicate rules where not used
 	self.err = self.ValidateRules()
 }
@@ -200,39 +221,28 @@ func (self *ArgParser) GetRules() Rules {
 	return self.rules
 }
 
-func (self *ArgParser) SetOption(key string, value interface{}) {
-	self.results[key] = value
-}
-
 // Parses command line arguments using os.Args
-func (self *ArgParser) Parse() (Options, error) {
+func (self *ArgParser) Parse() (*Options, error) {
 	return self.ParseArgs(os.Args[1:])
 }
 
-func (self *ArgParser) ParseArgs(args []string) (Options, error) {
+func (self *ArgParser) ParseArgs(args []string) (*Options, error) {
 	return self.ParseUntil(args, "--")
 }
 
-func (self *ArgParser) printRules() {
-	for _, rule := range self.rules {
-		fmt.Printf("Rule: %s - '%s'\n", rule.Name, rule.Value)
-	}
-}
-
-func (self *ArgParser) ParseUntil(args []string, terminator string) (Options, error) {
-	self.results = make(Options)
+func (self *ArgParser) ParseUntil(args []string, terminator string) (*Options, error) {
 	self.args = args
 	self.idx = 0
 
 	// Sanity Check
 	if len(self.rules) == 0 {
-		self.err = errors.New("Must create some options to parse with args.Opt()" +
+		self.err = errors.New("Must create some options to match with args.Opt()" +
 			" before calling arg.Parse()")
 	}
 
 	// If any of the Opt() Calls reported an error
 	if self.err != nil {
-		return self.results, self.err
+		return nil, self.err
 	}
 
 	// Sort the rules so positional rules are parsed last
@@ -241,46 +251,39 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (Options, er
 	// Process command line arguments until we find our terminator
 	for ; self.idx < len(self.args); self.idx++ {
 		if self.args[self.idx] == terminator {
-			fmt.Printf("Terminator Reached\n")
-			return self.results, nil
+			goto collectResults
 		}
 		// Match our arguments with rules expected
 		fmt.Printf("====== Attempting to match: %d:%s - ", self.idx, self.args[self.idx])
 		matched, err := self.match(self.rules)
 		if err != nil {
-			return self.results, err
+			return nil, err
 		}
-		self.printRules()
-		if matched {
-			continue
+
+		if !matched {
+			fmt.Printf("Failed to Match\n")
+			// TODO: If we didn't match any options and user asked us to fail on
+			// unmatched arguments return an error here
 		}
-		fmt.Printf("Failed to Match\n")
-		// TODO: If we didn't match either and user asked us to fail on
-		// unmatched arguments return an error here
 	}
+collectResults:
+	results := &Options{}
 
-	// == Apply defaults for un-seen arguments ==
-	// TODO: Environment variables
-
-	// Make a copy of our result map
-	results := make(map[string]interface{})
-	for key, value := range self.results {
-		results[key] = value
-	}
-	// Assign our default for options not specified
+	// Get the computed value after applying all rules
 	for _, rule := range self.rules {
-		_, ok := results[rule.Name]
-		if !ok {
-			rule.Value = rule.Default
-			rule.SetOption(self, rule)
+		value := rule.GetValue()
+		// If we have a Store() for this rule apply it here
+		if rule.StoreValue != nil {
+			rule.StoreValue(value)
 		}
+		(*results)[rule.Name] = value
 	}
 
-	return self.results, nil
+	return results, nil
 }
 
 func (self *ArgParser) match(rules Rules) (bool, error) {
-	// Find a Rule for this argument
+	// Find a Rule that matches this argument
 	for _, rule := range rules {
 		matched, err := rule.Match(self.args, &self.idx)
 		if err != nil {
@@ -289,15 +292,17 @@ func (self *ArgParser) match(rules Rules) (bool, error) {
 		}
 		if matched {
 			fmt.Printf("Matched '%s' with '%s'\n", rule.Name, rule.Value)
-			// This Rule matched our argument, have the rule set the result in
-			// the option list
-			rule.SetOption(self, rule)
-			//self.results[rule.Name] = rule.Value
 			return true, nil
 		}
 	}
-	// No Rules match our arguments and there was no error
+	// No Rules matched our arguments and there was no error
 	return false, nil
+}
+
+func (self *ArgParser) printRules() {
+	for _, rule := range self.rules {
+		fmt.Printf("Rule: %s - '%s'\n", rule.Name, rule.Value)
+	}
 }
 
 // ***********************************************
@@ -305,8 +310,8 @@ func (self *ArgParser) match(rules Rules) (bool, error) {
 // ***********************************************
 
 // Creates a new instance of the argument parser
-func Parser() ArgParser {
-	return ArgParser{}
+func Parser() *ArgParser {
+	return &ArgParser{}
 }
 
 // Indicates this option has an alias it can go by
@@ -354,9 +359,9 @@ func StoreInt(dest *int) RuleModifier {
 	// Implies Int()
 	return func(rule *Rule) {
 		rule.Cast = castInt
-		rule.SetOption = func(parser *ArgParser, rule *Rule) {
-			parser.SetOption(rule.Name, rule.Value)
-			*dest = rule.Value.(int)
+		rule.StoreValue = func(value interface{}) {
+			fmt.Printf("Value: %s\n", value)
+			*dest = value.(int)
 		}
 	}
 }

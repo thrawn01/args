@@ -49,7 +49,7 @@ var _ = Describe("ArgParser", func() {
 		It("Should return error if Opt() was never called", func() {
 			_, err := parser.Parse()
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal("Must create some options to parse with args.Opt() before calling arg.Parse()"))
+			Expect(err.Error()).To(Equal("Must create some options to match with args.Opt() before calling arg.Parse()"))
 		})
 	})
 
