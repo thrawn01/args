@@ -26,14 +26,15 @@ type StoreFunc func(interface{})
 // 				Rule Object
 // ***********************************************
 type Rule struct {
-	IsPos      int
-	Name       string
-	Value      interface{}
-	Default    interface{}
-	Aliases    []string
-	Cast       CastFunc
-	Action     ActionFunc
-	StoreValue StoreFunc
+	IsPos       int
+	Name        string
+	Value       interface{}
+	Default     interface{}
+	Aliases     []string
+	EnvironVars []string
+	Cast        CastFunc
+	Action      ActionFunc
+	StoreValue  StoreFunc
 	// Stuff and Junk
 }
 
@@ -80,17 +81,41 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	return true, nil
 }
 
-func (self *Rule) GetValue() interface{} {
+func (self *Rule) GetValue() (interface{}, error) {
 	// If Rule Matched Argument on command line
 	if self.Value != nil {
-		return self.Value
+		return self.Value, nil
 	}
+
 	// If Rule Matched Environment variable
+	value, err := self.GetEnvValue()
+	if err != nil {
+		return nil, err
+	}
+	if value != nil {
+		return value, nil
+	}
 	// Apply default if available
 	if self.Default != nil {
-		return self.Default
+		return self.Default, nil
 	}
-	return nil
+	// Return the default value for our type choice
+	value, _ = self.Cast("", "")
+	return value, nil
+}
+
+func (self *Rule) GetEnvValue() (interface{}, error) {
+	if self.EnvironVars == nil {
+		return nil, nil
+	}
+
+	for _, varName := range self.EnvironVars {
+		//if value, ok := os.LookupEnv(varName); ok {
+		if value := os.Getenv(varName); value != "" {
+			return self.Cast(varName, value)
+		}
+	}
+	return nil, nil
 }
 
 // ***********************************************
@@ -111,42 +136,54 @@ func (self Rules) Swap(left, right int) {
 }
 
 // ***********************************************
-// 				Result Object
+// 				Options Object
 // ***********************************************
 
 type Options map[string]interface{}
 
-func (self Options) Convert(key string, convFunc func(value interface{})) {
+func (self Options) Convert(key string, typeName string, convFunc func(value interface{})) {
 	value, ok := self[key]
 	if !ok {
 		panic(fmt.Sprintf("No Such Option '%s' found", key))
 	}
 	defer func() {
 		if msg := recover(); msg != nil {
-			panic(fmt.Sprintf("Refusing to convert Option '%s' of type '%s' to an int", key, reflect.TypeOf(self[key])))
+			panic(fmt.Sprintf("Refusing to convert Option '%s' of type '%s' to '%s'",
+				key, reflect.TypeOf(self[key]), typeName))
 		}
 	}()
 	convFunc(value)
 }
 
 func (self Options) IsNil(key string) bool {
-	value, ok := self[key]
-	if !ok {
-		return true
+	if value, ok := self[key]; ok {
+		return value == nil
 	}
-	return value == nil
+	return true
 }
 
 func (self Options) Int(key string) int {
-	// TODO: This should convert int to string using strconv
 	var result int
-	self.Convert(key, func(value interface{}) {
+	self.Convert(key, "int", func(value interface{}) {
 		if value != nil {
 			result = value.(int)
 			return
 		}
 		// Avoid panic, return 0 if no value
 		result = 0
+	})
+	return result
+}
+
+func (self Options) String(key string) string {
+	var result string
+	self.Convert(key, "string", func(value interface{}) {
+		if value != nil {
+			result = value.(string)
+			return
+		}
+		// Avoid panic, return "" if no value
+		result = ""
 	})
 	return result
 }
@@ -189,7 +226,7 @@ func (self *ArgParser) ValidateRules() error {
 }
 
 func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
-	rule := &Rule{}
+	rule := &Rule{Cast: castString}
 	// If name begins with a non word charater, assume it's an optional argument
 	if isOptional.MatchString(name) {
 		// Attempt to extract the name
@@ -271,7 +308,10 @@ collectResults:
 
 	// Get the computed value after applying all rules
 	for _, rule := range self.rules {
-		value := rule.GetValue()
+		value, err := rule.GetValue()
+		if err != nil {
+			return nil, err
+		}
 		// If we have a Store() for this rule apply it here
 		if rule.StoreValue != nil {
 			rule.StoreValue(value)
@@ -334,7 +374,20 @@ func Count() RuleModifier {
 	}
 }
 
+func castString(optName string, strValue string) (interface{}, error) {
+	// If empty string is passed, give type init value
+	if strValue == "" {
+		return "", nil
+	}
+	return strValue, nil
+}
+
 func castInt(optName string, strValue string) (interface{}, error) {
+	// If empty string is passed, give type init value
+	if strValue == "" {
+		return 0, nil
+	}
+
 	value, err := strconv.ParseInt(strValue, 10, 64)
 	if err != nil {
 		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' - '%s' is not an Integer", optName, strValue))
@@ -346,6 +399,13 @@ func Int() RuleModifier {
 	return func(rule *Rule) {
 		rule.Cast = castInt
 		rule.Value = 0
+	}
+}
+
+func String() RuleModifier {
+	return func(rule *Rule) {
+		rule.Cast = castString
+		rule.Value = ""
 	}
 }
 
@@ -363,5 +423,22 @@ func StoreInt(dest *int) RuleModifier {
 			fmt.Printf("Value: %s\n", value)
 			*dest = value.(int)
 		}
+	}
+}
+
+func StoreString(dest *string) RuleModifier {
+	// Implies String()
+	return func(rule *Rule) {
+		rule.Cast = castString
+		rule.StoreValue = func(value interface{}) {
+			fmt.Printf("Value: %s\n", value)
+			*dest = value.(string)
+		}
+	}
+}
+
+func Env(varName string) RuleModifier {
+	return func(rule *Rule) {
+		rule.EnvironVars = append(rule.EnvironVars, varName)
 	}
 }
