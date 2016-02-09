@@ -396,14 +396,14 @@ func castInt(optName string, strValue string) (interface{}, error) {
 	return int(value), nil
 }
 
-func Int() RuleModifier {
+func IsInt() RuleModifier {
 	return func(rule *Rule) {
 		rule.Cast = castInt
 		rule.Value = 0
 	}
 }
 
-func String() RuleModifier {
+func IsString() RuleModifier {
 	return func(rule *Rule) {
 		rule.Cast = castString
 		rule.Value = ""
@@ -427,6 +427,10 @@ func StoreInt(dest *int) RuleModifier {
 }
 
 func StoreStr(dest *string) RuleModifier {
+	return StoreString(dest)
+}
+
+func StoreString(dest *string) RuleModifier {
 	// Implies String()
 	return func(rule *Rule) {
 		rule.Cast = castString

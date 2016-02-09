@@ -145,10 +145,10 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.Int()", func() {
+	Describe("args.IsInt()", func() {
 		It("Should ensure value supplied is an integer", func() {
 			parser := args.Parser()
-			parser.Opt("--power-level", args.Int())
+			parser.Opt("--power-level", args.IsInt())
 
 			cmdLine := []string{"--power-level", "10000"}
 			opt, err := parser.ParseArgs(cmdLine)
@@ -159,7 +159,7 @@ var _ = Describe("ArgParser", func() {
 		It("Should set err if the option value is not parsable as an integer", func() {
 			parser := args.Parser()
 			cmdLine := []string{"--power-level", "over-ten-thousand"}
-			parser.Opt("--power-level", args.Int())
+			parser.Opt("--power-level", args.IsInt())
 			_, err := parser.ParseArgs(cmdLine)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Invalid value for '--power-level' - 'over-ten-thousand' is not an Integer"))
@@ -169,7 +169,7 @@ var _ = Describe("ArgParser", func() {
 		It("Should set err if no option value is provided", func() {
 			parser := args.Parser()
 			cmdLine := []string{"--power-level"}
-			parser.Opt("--power-level", args.Int())
+			parser.Opt("--power-level", args.IsInt())
 			_, err := parser.ParseArgs(cmdLine)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Expected '--power-level' to have an argument"))
@@ -191,10 +191,10 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.String()", func() {
+	Describe("args.IsString()", func() {
 		It("Should provide string value", func() {
 			parser := args.Parser()
-			parser.Opt("--power-level", args.String())
+			parser.Opt("--power-level", args.IsString())
 
 			cmdLine := []string{"--power-level", "over-ten-thousand"}
 			opt, err := parser.ParseArgs(cmdLine)
@@ -205,10 +205,24 @@ var _ = Describe("ArgParser", func() {
 		It("Should set err if no option value is provided", func() {
 			parser := args.Parser()
 			cmdLine := []string{"--power-level"}
-			parser.Opt("--power-level", args.String())
+			parser.Opt("--power-level", args.IsString())
 			_, err := parser.ParseArgs(cmdLine)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Expected '--power-level' to have an argument"))
+		})
+	})
+
+	Describe("args.StoreString()", func() {
+		It("Should ensure value supplied is assigned to passed value", func() {
+			parser := args.Parser()
+			var value string
+			parser.Opt("--power-level", args.StoreString(&value))
+
+			cmdLine := []string{"--power-level", "over-ten-thousand"}
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.String("power-level")).To(Equal("over-ten-thousand"))
+			Expect(value).To(Equal("over-ten-thousand"))
 		})
 	})
 
@@ -249,7 +263,7 @@ var _ = Describe("ArgParser", func() {
 				panicCaught = true
 			}()
 
-			parser.Opt("--power-level", args.Int(), args.Default("over-ten-thousand"))
+			parser.Opt("--power-level", args.IsInt(), args.Default("over-ten-thousand"))
 			Expect(panicCaught).To(Equal(true))
 		})
 	})
