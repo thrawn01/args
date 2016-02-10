@@ -332,7 +332,7 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (*Options, e
 	// Process command line arguments until we find our terminator
 	for ; self.idx < len(self.args); self.idx++ {
 		if self.args[self.idx] == terminator {
-			return self.collectResults(nil)
+			return self.CollectResults(nil)
 		}
 		// Match our arguments with rules expected
 		//fmt.Printf("====== Attempting to match: %d:%s - ", self.idx, self.args[self.idx])
@@ -347,10 +347,10 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (*Options, e
 			// unmatched arguments return an error here
 		}
 	}
-	return self.collectResults(nil)
+	return self.CollectResults(nil)
 }
 
-func (self *ArgParser) collectResults(values *map[string]string) (*Options, error) {
+func (self *ArgParser) CollectResults(values *map[string]string) (*Options, error) {
 	results := &Options{}
 
 	// Get the computed value after applying all rules
@@ -380,7 +380,7 @@ func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
 		values[key] = cfg.Section("").Key(key).String()
 	}
 	// Apply the ini file values to the commandline and environment variables
-	return self.collectResults(&values)
+	return self.CollectResults(&values)
 }
 
 func (self *ArgParser) match(rules Rules) (bool, error) {
