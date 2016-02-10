@@ -240,6 +240,96 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
+	Describe("args.StoreTrue()", func() {
+		It("Should ensure value supplied is true when argument is seen", func() {
+			parser := args.Parser()
+			var debug bool
+			parser.Opt("--debug", args.StoreTrue(&debug))
+
+			cmdLine := []string{"--debug"}
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Bool("debug")).To(Equal(true))
+			Expect(debug).To(Equal(true))
+		})
+
+		It("Should ensure value supplied is false when argument is NOT seen", func() {
+			parser := args.Parser()
+			var debug bool
+			parser.Opt("--debug", args.StoreTrue(&debug))
+
+			cmdLine := []string{"--something-else"}
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Bool("debug")).To(Equal(false))
+			Expect(debug).To(Equal(false))
+		})
+	})
+
+	Describe("args.IsTrue()", func() {
+		It("Should set true value when seen", func() {
+			parser := args.Parser()
+			parser.Opt("--help", args.IsTrue())
+
+			cmdLine := []string{"--help"}
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Bool("help")).To(Equal(true))
+		})
+
+		It("Should set false when NOT seen", func() {
+			parser := args.Parser()
+			cmdLine := []string{"--something-else"}
+			parser.Opt("--help", args.IsTrue())
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Bool("help")).To(Equal(false))
+		})
+	})
+
+	Describe("args.StoreSlice()", func() {
+		/*It("Should ensure []string provided is set when a comma separated list is provided", func() {
+			parser := args.Parser()
+			var list []string
+			parser.Opt("--list", args.StoreSlice(&list))
+
+			cmdLine := []string{"--list", "one,two,three"}
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Slice("list").([]string)).To(Equal([]string{"one", "two", "three"}))
+			Expect(list).To(Equal([]string{"one", "two", "three"}))
+		})*/
+
+		It("Should ensure []interface{} provided is set if a single value is provided", func() {
+			parser := args.Parser()
+			var list []string
+			parser.Opt("--list", args.StoreStringSlice(list))
+
+			cmdLine := []string{"--list", "one"}
+			opt, err := parser.ParseArgs(cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.StringSlice("list")).To(Equal([]string{"one"}))
+			Expect(list).To(Equal([]string{"one"}))
+		})
+
+		/*It("Should set err if no list value is provided", func() {
+			parser := args.Parser()
+			var list []string
+			parser.Opt("--list", args.StoreSlice(&list))
+
+			cmdLine := []string{"--list", "one"}
+			_, err := parser.ParseArgs(cmdLine)
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Expected '--list' to have an argument"))
+		})*/
+		//TODO: Test for lists of integers and booleans
+	})
+
+	/*parser.Opt("--rdb-endpoints", args.Alias("-rA"), args.StoreSlice(&conf.RdbAddresses),
+	args.Env("STORAGE_RDB_ENDPOINTS"), args.Default([]string{"localhost:28015"}), args.VarName("<HOST:PORT>"),
+	args.Help("comma separated list of rethinkdb cluster endpoints"))
+	*/
+
 	Describe("args.Default()", func() {
 		It("Should ensure default values is supplied if no matching argument is found", func() {
 			parser := args.Parser()

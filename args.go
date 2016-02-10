@@ -189,6 +189,32 @@ func (self Options) String(key string) string {
 	return result
 }
 
+func (self Options) Bool(key string) bool {
+	var result bool
+	self.Convert(key, "bool", func(value interface{}) {
+		if value != nil {
+			result = value.(bool)
+			return
+		}
+		// Avoid panic, return false if no value
+		result = false
+	})
+	return result
+}
+
+func (self Options) StringSlice(key string) []string {
+	var result []string
+	self.Convert(key, "[]string", func(value interface{}) {
+		if value != nil {
+			result = value.([]string)
+			return
+		}
+		// Avoid panic, return []string{} if no value
+		result = []string{}
+	})
+	return result
+}
+
 // ***********************************************
 // 				ArgParser Object
 // ***********************************************
@@ -375,12 +401,32 @@ func Count() RuleModifier {
 	}
 }
 
+// If the option is seen on the command line, the value is 'true'
+func IsTrue() RuleModifier {
+	return func(rule *Rule) {
+		rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
+			rule.Value = true
+			return nil
+		}
+		if rule.Value == nil {
+			rule.Value = false
+		}
+	}
+}
+
 func castString(optName string, strValue string) (interface{}, error) {
 	// If empty string is passed, give type init value
 	if strValue == "" {
 		return "", nil
 	}
 	return strValue, nil
+}
+
+func IsString() RuleModifier {
+	return func(rule *Rule) {
+		rule.Cast = castString
+		rule.Value = ""
+	}
 }
 
 func castInt(optName string, strValue string) (interface{}, error) {
@@ -403,10 +449,23 @@ func IsInt() RuleModifier {
 	}
 }
 
-func IsString() RuleModifier {
+func castBool(optName string, strValue string) (interface{}, error) {
+	// If empty string is passed, give type init value
+	if strValue == "" {
+		return false, nil
+	}
+
+	value, err := strconv.ParseBool(strValue)
+	if err != nil {
+		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' - '%s' is not a Boolean", optName, strValue))
+	}
+	return bool(value), nil
+}
+
+func IsBool() RuleModifier {
 	return func(rule *Rule) {
-		rule.Cast = castString
-		rule.Value = ""
+		rule.Cast = castBool
+		rule.Value = false
 	}
 }
 
@@ -417,11 +476,52 @@ func Default(value string) RuleModifier {
 }
 
 func StoreInt(dest *int) RuleModifier {
-	// Implies Int()
+	// Implies IsInt()
 	return func(rule *Rule) {
 		rule.Cast = castInt
 		rule.StoreValue = func(value interface{}) {
 			*dest = value.(int)
+		}
+	}
+}
+
+func StoreTrue(dest *bool) RuleModifier {
+	return func(rule *Rule) {
+		rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
+			rule.Value = true
+			return nil
+		}
+		rule.Cast = castBool
+		rule.StoreValue = func(value interface{}) {
+			*dest = value.(bool)
+		}
+	}
+}
+
+func castStringSlice(optName string, strValue string) (interface{}, error) {
+	// If empty string is passed, give type init value
+	if strValue == "" {
+		return []string{}, nil
+	}
+	return []string{strValue}, nil
+}
+
+func StoreStringSlice(dest interface{}) RuleModifier {
+	destValue := reflect.ValueOf(dest)
+	destType := reflect.TypeOf(dest)
+	if destType.Kind() != reflect.Slice {
+		panic(fmt.Sprintf("StoreSlice() '%s' is not a slice", destType.Kind()))
+	}
+	return func(rule *Rule) {
+		rule.Cast = castStringSlice
+		rule.StoreValue = func(src interface{}) {
+			// This should never happen if we validate the types
+			srcType := reflect.TypeOf(src)
+			if srcType.Kind() != reflect.Slice {
+				panic(fmt.Sprintf("Attempted to store '%s' which is not a slice", srcType.Kind()))
+			}
+			srcValue := reflect.ValueOf(src)
+			reflect.Copy(destValue, srcValue)
 		}
 	}
 }
@@ -431,7 +531,7 @@ func StoreStr(dest *string) RuleModifier {
 }
 
 func StoreString(dest *string) RuleModifier {
-	// Implies String()
+	// Implies IsString()
 	return func(rule *Rule) {
 		rule.Cast = castString
 		rule.StoreValue = func(value interface{}) {
