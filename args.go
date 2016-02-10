@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -202,7 +203,8 @@ func (self Options) Bool(key string) bool {
 	return result
 }
 
-func (self Options) StringSlice(key string) []string {
+// TODO: Should support more than just []string
+func (self Options) Slice(key string) []string {
 	var result []string
 	self.Convert(key, "[]string", func(value interface{}) {
 		if value != nil {
@@ -503,15 +505,19 @@ func castStringSlice(optName string, strValue string) (interface{}, error) {
 	if strValue == "" {
 		return []string{}, nil
 	}
-	return []string{strValue}, nil
+
+	// If no comma is found, then assume this is a single value
+	if strings.Index(strValue, ",") == -1 {
+		return []string{strValue}, nil
+	}
+
+	// Split the values separated by comma's
+	return strings.Split(strValue, ","), nil
 }
 
-func StoreStringSlice(dest interface{}) RuleModifier {
-	destValue := reflect.ValueOf(dest)
-	destType := reflect.TypeOf(dest)
-	if destType.Kind() != reflect.Slice {
-		panic(fmt.Sprintf("StoreSlice() '%s' is not a slice", destType.Kind()))
-	}
+// TODO: Make this less horribad, and use more reflection to make the interface simpler
+// It should also take more than just []string but also []int... etc...
+func StoreSlice(dest *[]string) RuleModifier {
 	return func(rule *Rule) {
 		rule.Cast = castStringSlice
 		rule.StoreValue = func(src interface{}) {
@@ -520,8 +526,9 @@ func StoreStringSlice(dest interface{}) RuleModifier {
 			if srcType.Kind() != reflect.Slice {
 				panic(fmt.Sprintf("Attempted to store '%s' which is not a slice", srcType.Kind()))
 			}
-			srcValue := reflect.ValueOf(src)
-			reflect.Copy(destValue, srcValue)
+			for _, value := range src.([]string) {
+				*dest = append(*dest, value)
+			}
 		}
 	}
 }
