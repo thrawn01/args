@@ -34,7 +34,7 @@ type Rule struct {
 	HelpMsg     string
 	VarName     string
 	Value       interface{}
-	Default     interface{}
+	Default     *string
 	Aliases     []string
 	EnvironVars []string
 	Cast        CastFunc
@@ -115,7 +115,7 @@ func (self *Rule) GetValuesFrom(values *map[string]string) (interface{}, error) 
 
 	// Apply default if available
 	if self.Default != nil {
-		return self.Default, nil
+		return self.Cast(self.Name, *self.Default)
 	}
 	// Return the default value for our type choice
 	value, _ = self.Cast("", "")
@@ -260,11 +260,10 @@ func (self *ArgParser) ValidateRules() error {
 
 		// Ensure user didn't set a bad default value
 		if rule.Cast != nil && rule.Default != nil {
-			cast, err := rule.Cast("args.Default()", rule.Default.(string))
+			_, err := rule.Cast("args.Default()", *rule.Default)
 			if err != nil {
 				panic(err.Error())
 			}
-			rule.Default = cast
 		}
 	}
 	return nil
@@ -498,7 +497,7 @@ func IsBool() RuleModifier {
 
 func Default(value string) RuleModifier {
 	return func(rule *Rule) {
-		rule.Default = value
+		rule.Default = &value
 	}
 }
 
