@@ -3,6 +3,7 @@ package args
 import (
 	"errors"
 	"fmt"
+	"github.com/go-ini/ini"
 	"os"
 	"reflect"
 	"regexp"
@@ -27,9 +28,11 @@ type StoreFunc func(interface{})
 // 				Rule Object
 // ***********************************************
 type Rule struct {
+	Count       int
 	IsPos       int
 	Name        string
 	HelpMsg     string
+	VarName     string
 	Value       interface{}
 	Default     interface{}
 	Aliases     []string
@@ -37,7 +40,6 @@ type Rule struct {
 	Cast        CastFunc
 	Action      ActionFunc
 	StoreValue  StoreFunc
-	// Stuff and Junk
 }
 
 func (self *Rule) Validate() error {
@@ -59,6 +61,7 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	if !matched {
 		return false, nil
 	}
+	//self.FlagSeen = true
 
 	// If user defined an action
 	if self.Action != nil {
@@ -83,7 +86,12 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	return true, nil
 }
 
-func (self *Rule) GetValue() (interface{}, error) {
+func (self *Rule) GetValuesFrom(values *map[string]string) (interface{}, error) {
+	// TODO: Do this better
+	if self.Count != 0 {
+		self.Value = self.Count
+	}
+
 	// If Rule Matched Argument on command line
 	if self.Value != nil {
 		return self.Value, nil
@@ -97,6 +105,14 @@ func (self *Rule) GetValue() (interface{}, error) {
 	if value != nil {
 		return value, nil
 	}
+
+	// If provided our map of values, use that
+	if values != nil {
+		if value, ok := (*values)[self.Name]; ok {
+			return self.Cast(self.Name, value)
+		}
+	}
+
 	// Apply default if available
 	if self.Default != nil {
 		return self.Default, nil
@@ -261,7 +277,6 @@ func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
 		// Attempt to extract the name
 		group := isOptional.FindStringSubmatch(name)
 		if group == nil {
-			//fmt.Printf("Failed to find argument name\n")
 			self.err = errors.New(fmt.Sprintf("Invalid optional argument name '%s'", name))
 			return
 		} else {
@@ -288,11 +303,11 @@ func (self *ArgParser) GetRules() Rules {
 }
 
 // Parses command line arguments using os.Args
-func (self *ArgParser) Parse() (*Options, error) {
-	return self.ParseArgs(os.Args[1:])
+func (self *ArgParser) ParseArgs() (*Options, error) {
+	return self.ParseSlice(os.Args[1:])
 }
 
-func (self *ArgParser) ParseArgs(args []string) (*Options, error) {
+func (self *ArgParser) ParseSlice(args []string) (*Options, error) {
 	return self.ParseUntil(args, "--")
 }
 
@@ -303,7 +318,7 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (*Options, e
 	// Sanity Check
 	if len(self.rules) == 0 {
 		self.err = errors.New("Must create some options to match with args.Opt()" +
-			" before calling arg.Parse()")
+			" before calling arg.ParseArgs()")
 	}
 
 	// If any of the Opt() Calls reported an error
@@ -317,7 +332,7 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (*Options, e
 	// Process command line arguments until we find our terminator
 	for ; self.idx < len(self.args); self.idx++ {
 		if self.args[self.idx] == terminator {
-			goto collectResults
+			return self.collectResults(nil)
 		}
 		// Match our arguments with rules expected
 		//fmt.Printf("====== Attempting to match: %d:%s - ", self.idx, self.args[self.idx])
@@ -332,12 +347,15 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (*Options, e
 			// unmatched arguments return an error here
 		}
 	}
-collectResults:
+	return self.collectResults(nil)
+}
+
+func (self *ArgParser) collectResults(values *map[string]string) (*Options, error) {
 	results := &Options{}
 
 	// Get the computed value after applying all rules
 	for _, rule := range self.rules {
-		value, err := rule.GetValue()
+		value, err := rule.GetValuesFrom(values)
 		if err != nil {
 			return nil, err
 		}
@@ -349,6 +367,20 @@ collectResults:
 	}
 
 	return results, nil
+}
+
+func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
+	// Parse the file return a map of the contents
+	cfg, err := ini.Load(input)
+	if err != nil {
+		return nil, err
+	}
+	values := make(map[string]string)
+	for _, key := range cfg.Section("").KeyStrings() {
+		values[key] = cfg.Section("").Key(key).String()
+	}
+	// Apply the ini file values to the commandline and environment variables
+	return self.collectResults(&values)
 }
 
 func (self *ArgParser) match(rules Rules) (bool, error) {
@@ -394,11 +426,8 @@ func Count() RuleModifier {
 	return func(rule *Rule) {
 		rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
 			// If user asked us to count the instances of this argument
-			rule.Value = rule.Value.(int) + 1
+			rule.Count = rule.Count + 1
 			return nil
-		}
-		if rule.Value == nil {
-			rule.Value = 0
 		}
 	}
 }
@@ -410,9 +439,7 @@ func IsTrue() RuleModifier {
 			rule.Value = true
 			return nil
 		}
-		if rule.Value == nil {
-			rule.Value = false
-		}
+		rule.Cast = castBool
 	}
 }
 
@@ -427,7 +454,6 @@ func castString(optName string, strValue string) (interface{}, error) {
 func IsString() RuleModifier {
 	return func(rule *Rule) {
 		rule.Cast = castString
-		rule.Value = ""
 	}
 }
 
@@ -447,7 +473,6 @@ func castInt(optName string, strValue string) (interface{}, error) {
 func IsInt() RuleModifier {
 	return func(rule *Rule) {
 		rule.Cast = castInt
-		rule.Value = 0
 	}
 }
 
@@ -550,6 +575,12 @@ func StoreString(dest *string) RuleModifier {
 func Env(varName string) RuleModifier {
 	return func(rule *Rule) {
 		rule.EnvironVars = append(rule.EnvironVars, varName)
+	}
+}
+
+func VarName(varName string) RuleModifier {
+	return func(rule *Rule) {
+		rule.VarName = varName
 	}
 }
 
