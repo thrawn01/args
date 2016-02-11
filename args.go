@@ -1,6 +1,7 @@
 package args
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/go-ini/ini"
@@ -46,9 +47,9 @@ func (self *Rule) Validate() error {
 	return nil
 }
 
-func (self *Rule) GenerateHelpOpt() HelpOption {
-	return HelpOption{
-		Options: strings.Join(self.Aliases, ", "),
+func (self *Rule) GenerateHelpOpt() HelpFlag {
+	return HelpFlag{
+		Flags:   strings.Join(self.Aliases, ", "),
 		Message: self.HelpMsg,
 	}
 }
@@ -422,29 +423,87 @@ func (self *ArgParser) printHelp() {
 // 				Help Object
 // ***********************************************
 
-type HelpOption struct {
-	Options string
+type HelpFlag struct {
+	Flags   string
 	Message string
 }
 
 type Helper struct {
+	WordWrapLen int
 	Usage       string
 	Description string
-	Options     []HelpOption
+	Flags       []HelpFlag
 }
 
 func (self *Helper) GenerateHelp(rules *Rules) string {
+	if self.WordWrapLen == 0 {
+		self.WordWrapLen = 80
+	}
 	// Ask each rule to generate a HelpOption
 	maxAliasLen := 0
 	for _, rule := range *rules {
 		help := rule.GenerateHelpOpt()
-		if len(help.Options) > maxAliasLen {
-			maxAliasLen = len(help.Options)
+		if len(help.Flags) > maxAliasLen {
+			maxAliasLen = len(help.Flags)
 		}
-		self.Options = append(self.Options, help)
+		self.Flags = append(self.Flags, help)
 	}
-	format := fmt.Sprintf("%%-%ds%%s\n", maxAliasLen)
-	return fmt.Sprintf(format, "-v", "this is a test")
+	maxAliasLen = maxAliasLen + 3
+	var result bytes.Buffer
+	flagFmt := fmt.Sprintf("%%-%ds%%s\n", maxAliasLen)
+	for _, opt := range self.Flags {
+		message := self.WordWrap(opt.Message, maxAliasLen)
+		result.WriteString(fmt.Sprintf(flagFmt, opt.Flags, message))
+	}
+	return result.String()
+}
+
+func (self *Helper) WordWrap(msg string, indent int) string {
+	// Remove any previous formating
+	regex, _ := regexp.Compile(" {2,}|\n|\t")
+	msg = regex.ReplaceAllString(msg, "")
+
+	wordWrapLen := self.WordWrapLen - indent
+	if wordWrapLen <= 0 {
+		panic(fmt.Sprintf("Flag indent spacing '%d' exceeds wordwrap length '%d'\n", indent, self.WordWrapLen))
+	}
+
+	if indent <= 0 {
+		panic(fmt.Sprintf("Refusing to word wrap with an indent of '%d'\n", indent))
+	}
+
+	if len(msg) < wordWrapLen {
+		return msg
+	}
+
+	// Split the msg into lines
+	var lines []string
+	var eol int
+	for i := 0; i < len(msg); {
+		eol = i + wordWrapLen
+		// If the End Of Line exceeds the message length + our peek at the next character
+		if (eol + 1) >= len(msg) {
+			// Slice until the end of the message
+			lines = append(lines, msg[i:len(msg)])
+			i = len(msg)
+			break
+		}
+		// Slice this portion of the message into a single line
+		line := msg[i:eol]
+		// If the next character past eol is not a space
+		// (Usually means we are in the middle of a word)
+		if msg[eol+1] != ' ' {
+			// Find the last space before the word wrap
+			idx := strings.LastIndex(line, " ")
+			eol = i + idx
+		}
+		lines = append(lines, msg[i:eol])
+		i = eol
+	}
+	spacer := fmt.Sprintf("\n%%-%ds", indent-1)
+	//fmt.Print("fmt: %s\n", spacer)
+	seperator := fmt.Sprintf(spacer, "")
+	return strings.Join(lines, seperator)
 }
 
 // ***********************************************
@@ -629,4 +688,30 @@ func Help(message string) RuleModifier {
 	return func(rule *Rule) {
 		rule.HelpMsg = message
 	}
+}
+
+// Mixing Spaces and Tabs will have undesired effects
+func Dedent(input string) string {
+	text := []byte(input)
+
+	// find the first \n::space:: combo
+	leadingWhitespace := regexp.MustCompile(`(?m)^[ \t]+`)
+	idx := leadingWhitespace.FindIndex(text)
+	if idx == nil {
+		fmt.Printf("Unable to find \\n::space:: combo\n")
+		return input
+	}
+	//fmt.Printf("idx: '%d:%d'\n", idx[0], idx[1])
+
+	// Create a regex to match any the number of spaces we first found
+	gobbleRegex := fmt.Sprintf("(?m)^[ \t]{%d}?", (idx[1] - idx[0]))
+	//fmt.Printf("gobbleRegex: '%s'\n", gobbleRegex)
+	gobbleIndents := regexp.MustCompile(gobbleRegex)
+	// Find any identical spaces and remove them
+	dedented := gobbleIndents.ReplaceAll(text, []byte{})
+	return string(dedented)
+}
+
+func DedentTrim(input string, cutset string) string {
+	return strings.Trim(Dedent(input), cutset)
 }

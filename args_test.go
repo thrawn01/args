@@ -433,16 +433,62 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.Help", func() {
+	Describe("Helper.GenerateHelp()", func() {
 		It("Should generate a help message given a set of rules", func() {
 			parser := args.Parser()
-			parser.Opt("--power-level", args.Alias("-p"))
-			parser.Opt("--cat-level", args.Alias("-c"))
+			parser.Opt("--power-level", args.Alias("-p"), args.Help("Specify our power level"))
+			parser.Opt("--cat-level", args.Alias("-c"), args.Help(`Lorem ipsum dolor sit amet, consectetur
+			adipiscing elit, sed do eiusmod tempor incididunt ut labore et
+			mollit anim id est laborum.`))
 			rules := parser.GetRules()
-
 			help := args.Helper{}
 			msg := help.GenerateHelp(&rules)
-			Expect(msg).To(Equal(""))
+			Expect(msg).To(Equal(args.Dedent(`--power-level, -p   Specify our power level
+                  --cat-level, -c     Lorem ipsum dolor sit amet, consecteturadipiscing elit, sed
+                                      do eiusmod tempor incididunt ut labore etmollit anim id
+                                      est laborum.
+                  `)))
+		})
+	})
+
+	Describe("Helper.WordWrap()", func() {
+		It("Should wrap the line including the indent length", func() {
+			help := args.Helper{WordWrapLen: 80}
+			msg := help.WordWrap(`Lorem ipsum dolor sit amet, consectetur
+			adipiscing elit, sed do eiusmod tempor incididunt ut labore et
+			mollit anim id est laborum.`, 10)
+
+			// Should show the message with the indentation of 10 characters on the next line
+			Expect(msg).To(Equal(args.DedentTrim(`
+            Lorem ipsum dolor sit amet, consecteturadipiscing elit, sed do
+                      eiusmod tempor incididunt ut labore etmollit anim id est laborum.`, "\n")))
+		})
+	})
+
+	Describe("args.Dedent()", func() {
+		It("Should un-indent a simple string", func() {
+			text := args.Dedent(`Lorem ipsum dolor sit amet, consecteturadipiscing elit, sed
+                 do eiusmod tempor incididunt ut labore etmollit anim id
+                 est laborum.`)
+			Expect(text).To(Equal("Lorem ipsum dolor sit amet, consecteturadipiscing elit, sed\ndo eiusmod tempor incididunt ut labore etmollit anim id\nest laborum."))
+		})
+		It("Should un-indent a string starting with a new line", func() {
+			text := args.Dedent(`
+                 Lorem ipsum dolor sit amet, consecteturadipiscing elit, sed
+                 do eiusmod tempor incididunt ut labore etmollit anim id
+                 est laborum.`)
+			Expect(text).To(Equal("\nLorem ipsum dolor sit amet, consecteturadipiscing elit, sed\ndo eiusmod tempor incididunt ut labore etmollit anim id\nest laborum."))
+		})
+	})
+
+	Describe("args.DedentTrim()", func() {
+		It("Should un-indent a simple string and trim the result", func() {
+			text := args.DedentTrim(`
+            Lorem ipsum dolor sit amet, consecteturadipiscing elit, sed
+            do eiusmod tempor incididunt ut labore etmollit anim id
+            est laborum.
+            `, "\n")
+			Expect(text).To(Equal("Lorem ipsum dolor sit amet, consecteturadipiscing elit, sed\ndo eiusmod tempor incididunt ut labore etmollit anim id\nest laborum."))
 		})
 	})
 })
