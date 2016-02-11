@@ -435,20 +435,20 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("parser.GenerateOptHelp()", func() {
 		It("Should generate help messages given a set of rules", func() {
-			parser := args.Parser()
+			parser := args.Parser(args.WrapLen(80))
 			parser.Opt("--power-level", args.Alias("-p"), args.Help("Specify our power level"))
 			parser.Opt("--cat-level", args.Alias("-c"), args.Help(`Lorem ipsum dolor sit amet, consectetur
 			mollit anim id est laborum.`))
 			msg := parser.GenerateOptHelp()
-			Expect(msg).To(Equal("  -p, --power-level   Specify our power level" +
+			Expect(msg).To(Equal("  -p, --power-level   Specify our power level " +
 				"\n  -c, --cat-level     Lorem ipsum dolor sit amet, consecteturmollit anim id est" +
-				"\n                      laborum.\n"))
+				"\n                      laborum. \n"))
 		})
 	})
 
 	/*Describe("parser.GenerateHelp()", func() {
 			It("Should generate help messages given a set of rules", func() {
-				parser := args.Parser(args.Name("dragon-ball"))
+				parser := args.Parser(args.Name("dragon-ball"), args.WrapLen(80))
 				parser.Opt("--power-level", args.Alias("-p"), args.Help("Specify our power level"))
 				parser.Opt("--cat-level", args.Alias("-c"), args.Help(`Lorem ipsum dolor sit amet, consectetur
 				adipiscing elit, sed do eiusmod tempor incididunt ut labore et

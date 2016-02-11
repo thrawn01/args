@@ -48,9 +48,22 @@ func (self *Rule) Validate() error {
 }
 
 func (self *Rule) GenerateHelpOpt() (string, string) {
+	var parens []string
+	paren := ""
+	if self.Default != nil {
+		parens = append(parens, fmt.Sprintf("Default=%s", *self.Default))
+	}
+	if len(self.EnvironVars) != 0 {
+		envs := strings.Join(self.EnvironVars, ",")
+		parens = append(parens, fmt.Sprintf("Env=%s", envs))
+	}
+	if len(parens) != 0 {
+		paren = fmt.Sprintf("(%s)", strings.Join(parens, " "))
+	}
+
 	// TODO: This sort should happen when we vaidate rules
 	sort.Sort(sort.Reverse(sort.StringSlice(self.Aliases)))
-	return ("  " + strings.Join(self.Aliases, ", ")), self.RuleDesc
+	return ("  " + strings.Join(self.Aliases, ", ")), (self.RuleDesc + " " + paren)
 }
 
 func (self *Rule) MatchesAlias(args []string, idx *int) (bool, string) {
@@ -440,9 +453,9 @@ func (self *ArgParser) GenerateOptHelp() string {
 	}
 	var options []HelpMsg
 
-	// If there is no word wrap set, default to 80 characters
+	// If there is no word wrap set, default to 200 characters
 	if self.WordWrap == 0 {
-		self.WordWrap = 80
+		self.WordWrap = 200
 	}
 
 	// Ask each rule to generate a Help message for the options
@@ -663,6 +676,12 @@ func Name(name string) ParseModifier {
 func Desc(desc string) ParseModifier {
 	return func(parser *ArgParser) {
 		parser.Description = desc
+	}
+}
+
+func WrapLen(length int) ParseModifier {
+	return func(parser *ArgParser) {
+		parser.WordWrap = length
 	}
 }
 
