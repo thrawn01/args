@@ -433,16 +433,14 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("Helper.GenerateHelp()", func() {
-		It("Should generate a help message given a set of rules", func() {
+	Describe("args.GenerateOptHelp()", func() {
+		It("Should generate help messages given a set of rules", func() {
 			parser := args.Parser()
 			parser.Opt("--power-level", args.Alias("-p"), args.Help("Specify our power level"))
 			parser.Opt("--cat-level", args.Alias("-c"), args.Help(`Lorem ipsum dolor sit amet, consectetur
 			adipiscing elit, sed do eiusmod tempor incididunt ut labore et
 			mollit anim id est laborum.`))
-			rules := parser.GetRules()
-			help := args.Helper{}
-			msg := help.GenerateHelp(&rules)
+			msg := parser.GenerateOptHelp()
 			Expect(msg).To(Equal(args.Dedent(`--power-level, -p   Specify our power level
                   --cat-level, -c     Lorem ipsum dolor sit amet, consecteturadipiscing elit, sed
                                       do eiusmod tempor incididunt ut labore etmollit anim id
@@ -453,15 +451,22 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("Helper.WordWrap()", func() {
 		It("Should wrap the line including the indent length", func() {
-			help := args.Helper{WordWrapLen: 80}
-			msg := help.WordWrap(`Lorem ipsum dolor sit amet, consectetur
-			adipiscing elit, sed do eiusmod tempor incididunt ut labore et
-			mollit anim id est laborum.`, 10)
-
 			// Should show the message with the indentation of 10 characters on the next line
+			msg := args.WordWrap(`Lorem ipsum dolor sit amet, consectetur
+			adipiscing elit, sed do eiusmod tempor incididunt ut labore et
+			mollit anim id est laborum.`, 10, 80)
 			Expect(msg).To(Equal(args.DedentTrim(`
             Lorem ipsum dolor sit amet, consecteturadipiscing elit, sed do
                       eiusmod tempor incididunt ut labore etmollit anim id est laborum.`, "\n")))
+		})
+		It("Should wrap the line without the indent length", func() {
+			// Should show the message with no indentation
+			msg := args.WordWrap(`Lorem ipsum dolor sit amet, consectetur
+			adipiscing elit, sed do eiusmod tempor incididunt ut labore et
+			mollit anim id est laborum.`, 0, 80)
+			Expect(msg).To(Equal(args.DedentTrim(`
+			Lorem ipsum dolor sit amet, consecteturadipiscing elit, sed do eiusmod tempor
+			 incididunt ut labore etmollit anim id est laborum.`, "\n")))
 		})
 	})
 

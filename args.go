@@ -32,7 +32,7 @@ type Rule struct {
 	Count       int
 	IsPos       int
 	Name        string
-	HelpMsg     string
+	RuleDesc    string
 	VarName     string
 	Value       interface{}
 	Default     *string
@@ -47,11 +47,8 @@ func (self *Rule) Validate() error {
 	return nil
 }
 
-func (self *Rule) GenerateHelpOpt() HelpFlag {
-	return HelpFlag{
-		Flags:   strings.Join(self.Aliases, ", "),
-		Message: self.HelpMsg,
-	}
+func (self *Rule) GenerateHelpOpt() (string, string) {
+	return strings.Join(self.Aliases, ", "), self.RuleDesc
 }
 
 func (self *Rule) MatchesAlias(args []string, idx *int) (bool, string) {
@@ -246,10 +243,13 @@ func (self Options) Slice(key string) []string {
 // ***********************************************
 
 type ArgParser struct {
-	args  []string
-	rules Rules
-	err   error
-	idx   int
+	description string
+	usageMsg    string
+	wordWrap    int
+	rules       Rules
+	args        []string
+	err         error
+	idx         int
 }
 
 var isOptional = regexp.MustCompile(`^(\W+)([\w|-]*)$`)
@@ -413,97 +413,43 @@ func (self *ArgParser) printRules() {
 	}
 }
 
-func (self *ArgParser) printHelp() {
-	for _, rule := range self.rules {
-		fmt.Printf("Rule: %s - '%s'\n", rule.Name, rule.Value)
-	}
+func (self *ArgParser) PrintHelp() {
+	fmt.Println(self.GenerateOptHelp())
 }
 
-// ***********************************************
-// 				Help Object
-// ***********************************************
-
-type HelpFlag struct {
-	Flags   string
-	Message string
-}
-
-type Helper struct {
-	WordWrapLen int
-	Usage       string
-	Description string
-	Flags       []HelpFlag
-}
-
-func (self *Helper) GenerateHelp(rules *Rules) string {
-	if self.WordWrapLen == 0 {
-		self.WordWrapLen = 80
-	}
-	// Ask each rule to generate a HelpOption
-	maxAliasLen := 0
-	for _, rule := range *rules {
-		help := rule.GenerateHelpOpt()
-		if len(help.Flags) > maxAliasLen {
-			maxAliasLen = len(help.Flags)
-		}
-		self.Flags = append(self.Flags, help)
-	}
-	maxAliasLen = maxAliasLen + 3
+func (self *ArgParser) GenerateOptHelp() string {
 	var result bytes.Buffer
-	flagFmt := fmt.Sprintf("%%-%ds%%s\n", maxAliasLen)
-	for _, opt := range self.Flags {
-		message := self.WordWrap(opt.Message, maxAliasLen)
+
+	type HelpMsg struct {
+		Flags   string
+		Message string
+	}
+	var options []HelpMsg
+
+	// If there is no word wrap set, default to 80 characters
+	if self.wordWrap == 0 {
+		self.wordWrap = 80
+	}
+
+	// Ask each rule to generate a Help message for the options
+	maxLen := 0
+	for _, rule := range self.rules {
+		flags, message := rule.GenerateHelpOpt()
+		if len(flags) > maxLen {
+			maxLen = len(flags)
+		}
+		options = append(options, HelpMsg{flags, message})
+	}
+
+	// Set our indent length
+	indent := maxLen + 3
+	flagFmt := fmt.Sprintf("%%-%ds%%s\n", indent)
+
+	for _, opt := range options {
+		message := WordWrap(opt.Message, indent, self.wordWrap)
 		result.WriteString(fmt.Sprintf(flagFmt, opt.Flags, message))
 	}
 	return result.String()
-}
-
-func (self *Helper) WordWrap(msg string, indent int) string {
-	// Remove any previous formating
-	regex, _ := regexp.Compile(" {2,}|\n|\t")
-	msg = regex.ReplaceAllString(msg, "")
-
-	wordWrapLen := self.WordWrapLen - indent
-	if wordWrapLen <= 0 {
-		panic(fmt.Sprintf("Flag indent spacing '%d' exceeds wordwrap length '%d'\n", indent, self.WordWrapLen))
-	}
-
-	if indent <= 0 {
-		panic(fmt.Sprintf("Refusing to word wrap with an indent of '%d'\n", indent))
-	}
-
-	if len(msg) < wordWrapLen {
-		return msg
-	}
-
-	// Split the msg into lines
-	var lines []string
-	var eol int
-	for i := 0; i < len(msg); {
-		eol = i + wordWrapLen
-		// If the End Of Line exceeds the message length + our peek at the next character
-		if (eol + 1) >= len(msg) {
-			// Slice until the end of the message
-			lines = append(lines, msg[i:len(msg)])
-			i = len(msg)
-			break
-		}
-		// Slice this portion of the message into a single line
-		line := msg[i:eol]
-		// If the next character past eol is not a space
-		// (Usually means we are in the middle of a word)
-		if msg[eol+1] != ' ' {
-			// Find the last space before the word wrap
-			idx := strings.LastIndex(line, " ")
-			eol = i + idx
-		}
-		lines = append(lines, msg[i:eol])
-		i = eol
-	}
-	spacer := fmt.Sprintf("\n%%-%ds", indent-1)
-	//fmt.Print("fmt: %s\n", spacer)
-	seperator := fmt.Sprintf(spacer, "")
-	return strings.Join(lines, seperator)
 }
 
 // ***********************************************
@@ -686,9 +632,13 @@ func VarName(varName string) RuleModifier {
 
 func Help(message string) RuleModifier {
 	return func(rule *Rule) {
-		rule.HelpMsg = message
+		rule.RuleDesc = message
 	}
 }
+
+// ***********************************************
+//        Public Word Formating Functions
+// ***********************************************
 
 // Mixing Spaces and Tabs will have undesired effects
 func Dedent(input string) string {
@@ -714,4 +664,54 @@ func Dedent(input string) string {
 
 func DedentTrim(input string, cutset string) string {
 	return strings.Trim(Dedent(input), cutset)
+}
+
+func WordWrap(msg string, indent int, wordWrap int) string {
+	// Remove any previous formating
+	regex, _ := regexp.Compile(" {2,}|\n|\t")
+	msg = regex.ReplaceAllString(msg, "")
+
+	wordWrapLen := wordWrap - indent
+	if wordWrapLen <= 0 {
+		panic(fmt.Sprintf("Flag indent spacing '%d' exceeds wordwrap length '%d'\n", indent, wordWrap))
+	}
+
+	if len(msg) < wordWrapLen {
+		return msg
+	}
+
+	// Split the msg into lines
+	var lines []string
+	var eol int
+	for i := 0; i < len(msg); {
+		eol = i + wordWrapLen
+		// If the End Of Line exceeds the message length + our peek at the next character
+		if (eol + 1) >= len(msg) {
+			// Slice until the end of the message
+			lines = append(lines, msg[i:len(msg)])
+			i = len(msg)
+			break
+		}
+		// Slice this portion of the message into a single line
+		line := msg[i:eol]
+		// If the next character past eol is not a space
+		// (Usually means we are in the middle of a word)
+		if msg[eol+1] != ' ' {
+			// Find the last space before the word wrap
+			idx := strings.LastIndex(line, " ")
+			eol = i + idx
+		}
+		lines = append(lines, msg[i:eol])
+		i = eol
+	}
+	var spacer string
+	if indent <= 0 {
+		spacer = fmt.Sprintf("\n%%s")
+	} else {
+		spacer = fmt.Sprintf("\n%%-%ds", indent-1)
+	}
+
+	//fmt.Print("fmt: %s\n", spacer)
+	seperator := fmt.Sprintf(spacer, "")
+	return strings.Join(lines, seperator)
 }
