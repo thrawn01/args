@@ -48,7 +48,9 @@ func (self *Rule) Validate() error {
 }
 
 func (self *Rule) GenerateHelpOpt() (string, string) {
-	return strings.Join(self.Aliases, ", "), self.RuleDesc
+	// TODO: This sort should happen when we vaidate rules
+	sort.Sort(sort.Reverse(sort.StringSlice(self.Aliases)))
+	return ("  " + strings.Join(self.Aliases, ", ")), self.RuleDesc
 }
 
 func (self *Rule) MatchesAlias(args []string, idx *int) (bool, string) {
@@ -241,11 +243,12 @@ func (self Options) Slice(key string) []string {
 // ***********************************************
 // 				ArgParser Object
 // ***********************************************
+type ParseModifier func(*ArgParser)
 
 type ArgParser struct {
-	description string
-	usageMsg    string
-	wordWrap    int
+	Description string
+	ProgName    string
+	WordWrap    int
 	rules       Rules
 	args        []string
 	err         error
@@ -414,7 +417,18 @@ func (self *ArgParser) printRules() {
 }
 
 func (self *ArgParser) PrintHelp() {
-	fmt.Println(self.GenerateOptHelp())
+	fmt.Println(self.GenerateHelp())
+}
+
+func (self *ArgParser) GenerateHelp() string {
+	var result bytes.Buffer
+	// TODO: Improve this once we have positional arguments
+	result.WriteString("Usage:\n")
+	// Super generic usage message
+	result.WriteString(fmt.Sprintf("%s [OPTIONS]\n", self.ProgName))
+	result.WriteString("\nOptions:\n")
+	result.WriteString(self.GenerateOptHelp())
+	return result.String()
 }
 
 func (self *ArgParser) GenerateOptHelp() string {
@@ -427,8 +441,8 @@ func (self *ArgParser) GenerateOptHelp() string {
 	var options []HelpMsg
 
 	// If there is no word wrap set, default to 80 characters
-	if self.wordWrap == 0 {
-		self.wordWrap = 80
+	if self.WordWrap == 0 {
+		self.WordWrap = 80
 	}
 
 	// Ask each rule to generate a Help message for the options
@@ -446,7 +460,7 @@ func (self *ArgParser) GenerateOptHelp() string {
 	flagFmt := fmt.Sprintf("%%-%ds%%s\n", indent)
 
 	for _, opt := range options {
-		message := WordWrap(opt.Message, indent, self.wordWrap)
+		message := WordWrap(opt.Message, indent, self.WordWrap)
 		result.WriteString(fmt.Sprintf(flagFmt, opt.Flags, message))
 	}
 	return result.String()
@@ -457,8 +471,12 @@ func (self *ArgParser) GenerateOptHelp() string {
 // ***********************************************
 
 // Creates a new instance of the argument parser
-func Parser() *ArgParser {
-	return &ArgParser{}
+func Parser(modifiers ...ParseModifier) *ArgParser {
+	parser := &ArgParser{}
+	for _, modify := range modifiers {
+		modify(parser)
+	}
+	return parser
 }
 
 // Indicates this option has an alias it can go by
@@ -633,6 +651,18 @@ func VarName(varName string) RuleModifier {
 func Help(message string) RuleModifier {
 	return func(rule *Rule) {
 		rule.RuleDesc = message
+	}
+}
+
+func Name(name string) ParseModifier {
+	return func(parser *ArgParser) {
+		parser.ProgName = name
+	}
+}
+
+func Desc(desc string) ParseModifier {
+	return func(parser *ArgParser) {
+		parser.Description = desc
 	}
 }
 

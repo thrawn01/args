@@ -433,21 +433,39 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.GenerateOptHelp()", func() {
+	Describe("parser.GenerateOptHelp()", func() {
 		It("Should generate help messages given a set of rules", func() {
 			parser := args.Parser()
 			parser.Opt("--power-level", args.Alias("-p"), args.Help("Specify our power level"))
 			parser.Opt("--cat-level", args.Alias("-c"), args.Help(`Lorem ipsum dolor sit amet, consectetur
-			adipiscing elit, sed do eiusmod tempor incididunt ut labore et
 			mollit anim id est laborum.`))
 			msg := parser.GenerateOptHelp()
-			Expect(msg).To(Equal(args.Dedent(`--power-level, -p   Specify our power level
-                  --cat-level, -c     Lorem ipsum dolor sit amet, consecteturadipiscing elit, sed
-                                      do eiusmod tempor incididunt ut labore etmollit anim id
-                                      est laborum.
-                  `)))
+			Expect(msg).To(Equal("  -p, --power-level   Specify our power level" +
+				"\n  -c, --cat-level     Lorem ipsum dolor sit amet, consecteturmollit anim id est" +
+				"\n                      laborum.\n"))
 		})
 	})
+
+	/*Describe("parser.GenerateHelp()", func() {
+			It("Should generate help messages given a set of rules", func() {
+				parser := args.Parser(args.Name("dragon-ball"))
+				parser.Opt("--power-level", args.Alias("-p"), args.Help("Specify our power level"))
+				parser.Opt("--cat-level", args.Alias("-c"), args.Help(`Lorem ipsum dolor sit amet, consectetur
+				adipiscing elit, sed do eiusmod tempor incididunt ut labore et
+				mollit anim id est laborum.`))
+				msg := parser.GenerateHelp()
+				Expect(msg).To(Equal(args.Dedent(`
+	                Usage:
+	                dragon-ball [OPTIONS]
+
+	                Options:
+	                  --power-level, -p   Specify our power level
+	                  --cat-level, -c     Lorem ipsum dolor sit amet, consecteturadipiscing elit, se
+	                                     d do eiusmod tempor incididunt ut labore etmollit anim id
+	                                      est laborum.
+	            `)))
+			})
+		})*/
 
 	Describe("Helper.WordWrap()", func() {
 		It("Should wrap the line including the indent length", func() {
