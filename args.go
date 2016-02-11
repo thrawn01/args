@@ -46,6 +46,13 @@ func (self *Rule) Validate() error {
 	return nil
 }
 
+func (self *Rule) GenerateHelpOpt() HelpOption {
+	return HelpOption{
+		Options: strings.Join(self.Aliases, ", "),
+		Message: self.HelpMsg,
+	}
+}
+
 func (self *Rule) MatchesAlias(args []string, idx *int) (bool, string) {
 	for _, alias := range self.Aliases {
 		if args[*idx] == alias {
@@ -307,10 +314,10 @@ func (self *ArgParser) ParseArgs() (*Options, error) {
 }
 
 func (self *ArgParser) ParseSlice(args []string) (*Options, error) {
-	return self.ParseUntil(args, "--")
+	return self.parseUntil(args, "--")
 }
 
-func (self *ArgParser) ParseUntil(args []string, terminator string) (*Options, error) {
+func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, error) {
 	self.args = args
 	self.idx = 0
 
@@ -331,7 +338,7 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (*Options, e
 	// Process command line arguments until we find our terminator
 	for ; self.idx < len(self.args); self.idx++ {
 		if self.args[self.idx] == terminator {
-			return self.CollectResults(nil)
+			return self.ParseMap(nil)
 		}
 		// Match our arguments with rules expected
 		//fmt.Printf("====== Attempting to match: %d:%s - ", self.idx, self.args[self.idx])
@@ -346,10 +353,10 @@ func (self *ArgParser) ParseUntil(args []string, terminator string) (*Options, e
 			// unmatched arguments return an error here
 		}
 	}
-	return self.CollectResults(nil)
+	return self.ParseMap(nil)
 }
 
-func (self *ArgParser) CollectResults(values *map[string]string) (*Options, error) {
+func (self *ArgParser) ParseMap(values *map[string]string) (*Options, error) {
 	results := &Options{}
 
 	// Get the computed value after applying all rules
@@ -379,7 +386,7 @@ func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
 		values[key] = cfg.Section("").Key(key).String()
 	}
 	// Apply the ini file values to the commandline and environment variables
-	return self.CollectResults(&values)
+	return self.ParseMap(&values)
 }
 
 func (self *ArgParser) match(rules Rules) (bool, error) {
@@ -403,6 +410,41 @@ func (self *ArgParser) printRules() {
 	for _, rule := range self.rules {
 		fmt.Printf("Rule: %s - '%s'\n", rule.Name, rule.Value)
 	}
+}
+
+func (self *ArgParser) printHelp() {
+	for _, rule := range self.rules {
+		fmt.Printf("Rule: %s - '%s'\n", rule.Name, rule.Value)
+	}
+}
+
+// ***********************************************
+// 				Help Object
+// ***********************************************
+
+type HelpOption struct {
+	Options string
+	Message string
+}
+
+type Helper struct {
+	Usage       string
+	Description string
+	Options     []HelpOption
+}
+
+func (self *Helper) GenerateHelp(rules *Rules) string {
+	// Ask each rule to generate a HelpOption
+	maxAliasLen := 0
+	for _, rule := range *rules {
+		help := rule.GenerateHelpOpt()
+		if len(help.Options) > maxAliasLen {
+			maxAliasLen = len(help.Options)
+		}
+		self.Options = append(self.Options, help)
+	}
+	format := fmt.Sprintf("%%-%ds%%s\n", maxAliasLen)
+	return fmt.Sprintf(format, "-v", "this is a test")
 }
 
 // ***********************************************

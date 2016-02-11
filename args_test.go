@@ -433,4 +433,16 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
+	Describe("args.Help", func() {
+		It("Should generate a help message given a set of rules", func() {
+			parser := args.Parser()
+			parser.Opt("--power-level", args.Alias("-p"))
+			parser.Opt("--cat-level", args.Alias("-c"))
+			rules := parser.GetRules()
+
+			help := args.Helper{}
+			msg := help.GenerateHelp(&rules)
+			Expect(msg).To(Equal(""))
+		})
+	})
 })
