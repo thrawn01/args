@@ -28,6 +28,10 @@ func main() {
 	parser.Opt("--power-level", args.Alias("-p"), args.StoreInt(&conf.PowerLevel),
 		args.Env("POWER_LEVEL"), args.Default("10000"), args.Help("set our power level"))
 
+	// Options can begin with -name, --name or even ++name. Most alpha non word character are supported
+	parser.Opt("++power", args.Alias("+p"), args.IsString(), args.Default("11,000"),
+		args.Help("prefix demo"))
+
 	// Use the args.Env() function to define an environment variable
 	parser.Opt("--message", args.Alias("-m"), args.StoreStr(&conf.Message),
 		args.Env("MESSAGE"), args.Default("over-ten-thousand"), args.Help("send a message"))
@@ -99,7 +103,42 @@ func main() {
 		os.Exit(-1)
 	}
 }
+```
 
+Running this program produces this output
+
+```
+CAST Power     '10000'
+CAST Message   'over-ten-thousand'
+CAST Slice     '[one two three]'
+CAST Verbose   '0'
+CAST Debug     'false'
+
+STRUCT Power   '10000'
+STRUCT Message 'over-ten-thousand'
+STRUCT Slice   '[one two three]'
+STRUCT Verbose '0'
+STRUCT Debug   'false'
+
+INI Power      '20000'
+INI Message    'OVER-THEN-THOUSAND!'
+INI Slice      '[three four five six]'
+INI Verbose    '5'
+INI Debug      'true'
+
+Usage:
+  example [OPTIONS]
+
+Options:
+  -p, --power-level   set our power level (Default=10000 Env=POWER_LEVEL)
+  +p, ++power         prefix demo (Default=11,000)
+  -m, --message       send a message (Default=over-ten-thousand Env=MESSAGE)
+  -s, --slice         list of messages (Default=one,two,three Env=LIST)
+  -v, --verbose       be verbose
+  -d, --debug         turn on Debug
+  -h, --help          show this help message
+
+exit status 255
 ```
 
 ## Stuff that works
@@ -108,6 +147,7 @@ func main() {
 * Support for Storing Strings,Ints,Booleans in a struct
 * Support Default Arguments
 * Support Reading arguments from an ini file
+* Support different types of optional prefixes (--, -, ++, +, etc..)
 * Generate Help Message
 
 ## TODO

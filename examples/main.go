@@ -23,6 +23,10 @@ func main() {
 	parser.Opt("--power-level", args.Alias("-p"), args.StoreInt(&conf.PowerLevel),
 		args.Env("POWER_LEVEL"), args.Default("10000"), args.Help("set our power level"))
 
+	// Options can begin with -name, --name or even ++name. Most alpha non word character are supported
+	parser.Opt("++power", args.Alias("+p"), args.IsString(), args.Default("11,000"),
+		args.Help("prefix demo"))
+
 	// Use the args.Env() function to define an environment variable
 	parser.Opt("--message", args.Alias("-m"), args.StoreStr(&conf.Message),
 		args.Env("MESSAGE"), args.Default("over-ten-thousand"), args.Help("send a message"))
