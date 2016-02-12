@@ -35,6 +35,7 @@ type Rule struct {
 	RuleDesc    string
 	VarName     string
 	Value       interface{}
+	Seen        bool
 	Default     *string
 	Aliases     []string
 	EnvironVars []string
@@ -81,7 +82,7 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	if !matched {
 		return false, nil
 	}
-	//self.FlagSeen = true
+	self.Seen = true
 
 	// If user defined an action
 	if self.Action != nil {
@@ -177,10 +178,15 @@ func (self Rules) Swap(left, right int) {
 // 				Options Object
 // ***********************************************
 
-type Options map[string]interface{}
+type OptResult struct {
+	Seen  bool // Argument was seen on the commandline
+	Value interface{}
+}
+
+type Options map[string]OptResult
 
 func (self Options) Convert(key string, typeName string, convFunc func(value interface{})) {
-	value, ok := self[key]
+	opt, ok := self[key]
 	if !ok {
 		panic(fmt.Sprintf("No Such Option '%s' found", key))
 	}
@@ -190,12 +196,21 @@ func (self Options) Convert(key string, typeName string, convFunc func(value int
 				key, reflect.TypeOf(self[key]), typeName))
 		}
 	}()
-	convFunc(value)
+	convFunc(opt.Value)
 }
 
 func (self Options) IsNil(key string) bool {
-	if value, ok := self[key]; ok {
-		return value == nil
+	if opt, ok := self[key]; ok {
+		return opt.Value == nil
+	}
+	return true
+}
+
+func (self Options) NoArgs() bool {
+	for _, opt := range self {
+		if opt.Seen == true {
+			return false
+		}
 	}
 	return true
 }
@@ -325,13 +340,12 @@ func (self *ArgParser) GetRules() Rules {
 	return self.rules
 }
 
-// Parses command line arguments using os.Args
-func (self *ArgParser) ParseArgs() (*Options, error) {
-	return self.ParseSlice(os.Args[1:])
-}
-
-func (self *ArgParser) ParseSlice(args []string) (*Options, error) {
-	return self.parseUntil(args, "--")
+// Parses command line arguments using os.Args if 'args' is nil
+func (self *ArgParser) ParseArgs(args *[]string) (*Options, error) {
+	if args == nil {
+		return self.parseUntil(os.Args[1:], "--")
+	}
+	return self.parseUntil(*args, "--")
 }
 
 func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, error) {
@@ -386,7 +400,7 @@ func (self *ArgParser) ParseMap(values *map[string]string) (*Options, error) {
 		if rule.StoreValue != nil {
 			rule.StoreValue(value)
 		}
-		(*results)[rule.Name] = value
+		(*results)[rule.Name] = OptResult{Value: value, Seen: rule.Seen}
 	}
 
 	return results, nil
@@ -623,6 +637,8 @@ func StoreSlice(dest *[]string) RuleModifier {
 	return func(rule *Rule) {
 		rule.Cast = castStringSlice
 		rule.StoreValue = func(src interface{}) {
+			// First clear the currenty slice if any
+			*dest = nil
 			// This should never happen if we validate the types
 			srcType := reflect.TypeOf(src)
 			if srcType.Kind() != reflect.Slice {

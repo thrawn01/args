@@ -1,8 +1,3 @@
-## Argument Parser
-Because I was un-happy about all the other arg parsers
-
-## Usage
-```go
 package main
 
 import (
@@ -99,28 +94,3 @@ func main() {
 		os.Exit(-1)
 	}
 }
-
-```
-
-## Stuff that works
-* Support list of strings '--list my,list,of,things'
-* Support Counting the number of times an arg has been seen
-* Support for Storing Strings,Ints,Booleans in a struct
-* Support Default Arguments
-* Support Reading arguments from an ini file
-* Generate Help Message
-
-## TODO
-* Custom Help and Usage
-* Support Positional Arguments
-* Support SubParsing
-* Support counting arguments in this format -vvvv
-* Support list of ints,floats,etc.. '--list my,list,of,things'
-* Support map type '--map={1:"thing", 2:"thing"}'
-* Support float type '--float=3.14'
-* Support '-arg=value'
-* Support Parent Parsing
-* Support '-aV' where 'a' is the argument and 'V' is the value
-* DeDent thingy
-
-
