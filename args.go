@@ -438,7 +438,7 @@ func (self *ArgParser) GenerateHelp() string {
 	// TODO: Improve this once we have positional arguments
 	result.WriteString("Usage:\n")
 	// Super generic usage message
-	result.WriteString(fmt.Sprintf("%s [OPTIONS]\n", self.ProgName))
+	result.WriteString(fmt.Sprintf("  %s [OPTIONS]\n", self.ProgName))
 	result.WriteString("\nOptions:\n")
 	result.WriteString(self.GenerateOptHelp())
 	return result.String()
