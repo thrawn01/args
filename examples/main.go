@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/thrawn01/args"
 	"os"
+
+	"github.com/thrawn01/args"
 )
 
 type Config struct {
@@ -19,31 +20,32 @@ func main() {
 	// Create the parser
 	parser := args.Parser(args.Name("example"))
 
+	parser.Opt("--power-level").StoreInt(&conf.PowerLevel).
+		Env("POWER_LEVEL").Default("10000").Help("set our power level")
+
 	// Store Integers directly into a struct with a default value
-	parser.Opt("--power-level", args.Alias("-p"), args.StoreInt(&conf.PowerLevel),
-		args.Env("POWER_LEVEL"), args.Default("10000"), args.Help("set our power level"))
+	parser.Opt("--power-level").Alias("-p").StoreInt(&conf.PowerLevel).
+		Env("POWER_LEVEL").Default("10000").Help("set our power level")
 
 	// Options can begin with -name, --name or even ++name. Most alpha non word character are supported
-	parser.Opt("++power", args.Alias("+p"), args.IsString(), args.Default("11,000"),
-		args.Help("prefix demo"))
+	parser.Opt("++power").Alias("+p").IsString().Default("11,000").Help("prefix demo")
 
 	// Use the args.Env() function to define an environment variable
-	parser.Opt("--message", args.Alias("-m"), args.StoreStr(&conf.Message),
-		args.Env("MESSAGE"), args.Default("over-ten-thousand"), args.Help("send a message"))
+	parser.Opt("--message").Alias("-m").StoreStr(&conf.Message).
+		Env("MESSAGE").Default("over-ten-thousand").Help("send a message")
 
-	// Pass a comma seperated list of strings and get a []string
-	parser.Opt("--slice", args.Alias("-s"), args.StoreSlice(&conf.Slice),
-		args.Env("LIST"), args.Default("one,two,three"), args.Help("list of messages"))
+	// Pass a comma separated list of strings and get a []string
+	parser.Opt("--slice").Alias("-s").StoreSlice(&conf.Slice).Env("LIST").
+		Default("one,two,three").Help("list of messages"))
 
 	// Count the number of times an argument is seen
-	parser.Opt("--verbose", args.Alias("-v"), args.Count(), args.StoreInt(&conf.Verbose),
-		args.Help("be verbose"))
+	parser.Opt("--verbose").Alias("-v").Count().StoreInt(&conf.Verbose).Help("be verbose")
 
 	// Set bool to true if the argument is present on the command line
-	parser.Opt("--debug", args.Alias("-d"), args.IsTrue(), args.Help("turn on Debug"))
+	parser.Opt("--debug").Alias("-d").IsTrue().Help("turn on Debug")
 
 	// Specify the type of the arg with IsInt(), IsString(), IsBool() or IsTrue()
-	parser.Opt("--help", args.Alias("-h"), args.IsTrue(), args.Help("show this help message"))
+	parser.Opt("--help").Alias("-h").IsTrue().Help("show this help message")
 
 	// Pass our own argument list, or nil to parse os.Args[]
 	opt, err := parser.ParseArgs(nil)

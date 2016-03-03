@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/go-ini/ini"
 	"os"
 	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/go-ini/ini"
 )
 
 const (
@@ -18,15 +19,139 @@ const (
 )
 
 // ***********************************************
-// 					 Types
+//  Types
 // ***********************************************
-type RuleModifier func(*Rule)
 type CastFunc func(string, string) (interface{}, error)
 type ActionFunc func(*Rule, string, []string, *int) error
 type StoreFunc func(interface{})
 
 // ***********************************************
-// 				Rule Object
+// RuleModifier Object
+// ***********************************************
+type RuleModifier struct {
+	rule *Rule
+}
+
+func (self *RuleModifier) GetRule() *Rule {
+	return self.rule
+}
+
+func (self *RuleModifier) IsString() *RuleModifier {
+	self.rule.Cast = castString
+	return self
+}
+
+// If the option is seen on the command line, the value is 'true'
+func (self *RuleModifier) IsTrue() *RuleModifier {
+	self.rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
+		rule.Value = true
+		return nil
+	}
+	self.rule.Cast = castBool
+	return self
+}
+
+func (self *RuleModifier) IsBool() *RuleModifier {
+	self.rule.Cast = castBool
+	self.rule.Value = false
+	return self
+}
+
+func (self *RuleModifier) Default(value string) *RuleModifier {
+	self.rule.Default = &value
+	return self
+}
+
+func (self *RuleModifier) StoreInt(dest *int) *RuleModifier {
+	// Implies IsInt()
+	self.rule.Cast = castInt
+	self.rule.StoreValue = func(value interface{}) {
+		*dest = value.(int)
+	}
+	return self
+}
+
+func (self *RuleModifier) IsInt() *RuleModifier {
+	self.rule.Cast = castInt
+	return self
+}
+
+func (self *RuleModifier) StoreTrue(dest *bool) *RuleModifier {
+	self.rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
+		rule.Value = true
+		return nil
+	}
+	self.rule.Cast = castBool
+	self.rule.StoreValue = func(value interface{}) {
+		*dest = value.(bool)
+	}
+	return self
+}
+
+// TODO: Make this less horribad, and use more reflection to make the interface simpler
+// It should also take more than just []string but also []int... etc...
+func (self *RuleModifier) StoreSlice(dest *[]string) *RuleModifier {
+	self.rule.Cast = castStringSlice
+	self.rule.StoreValue = func(src interface{}) {
+		// First clear the currenty slice if any
+		*dest = nil
+		// This should never happen if we validate the types
+		srcType := reflect.TypeOf(src)
+		if srcType.Kind() != reflect.Slice {
+			panic(fmt.Sprintf("Attempted to store '%s' which is not a slice", srcType.Kind()))
+		}
+		for _, value := range src.([]string) {
+			*dest = append(*dest, value)
+		}
+	}
+	return self
+}
+
+// Indicates this option has an alias it can go by
+func (self *RuleModifier) Alias(aliasName string) *RuleModifier {
+	self.rule.Aliases = append(self.rule.Aliases, aliasName)
+	return self
+}
+
+func (self *RuleModifier) StoreStr(dest *string) *RuleModifier {
+	return self.StoreString(dest)
+}
+
+func (self *RuleModifier) StoreString(dest *string) *RuleModifier {
+	// Implies IsString()
+	self.rule.Cast = castString
+	self.rule.StoreValue = func(value interface{}) {
+		*dest = value.(string)
+	}
+	return self
+}
+
+func (self *RuleModifier) Count() *RuleModifier {
+	self.rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
+		// If user asked us to count the instances of this argument
+		rule.Count = rule.Count + 1
+		return nil
+	}
+	return self
+}
+
+func (self *RuleModifier) Env(varName string) *RuleModifier {
+	self.rule.EnvironVars = append(self.rule.EnvironVars, varName)
+	return self
+}
+
+func (self *RuleModifier) VarName(varName string) *RuleModifier {
+	self.rule.VarName = varName
+	return self
+}
+
+func (self *RuleModifier) Help(message string) *RuleModifier {
+	self.rule.RuleDesc = message
+	return self
+}
+
+// ***********************************************
+// Rule Object
 // ***********************************************
 type Rule struct {
 	Count       int
@@ -62,7 +187,7 @@ func (self *Rule) GenerateHelpOpt() (string, string) {
 		paren = fmt.Sprintf("(%s)", strings.Join(parens, " "))
 	}
 
-	// TODO: This sort should happen when we vaidate rules
+	// TODO: This sort should happen when we validate rules
 	sort.Sort(sort.Reverse(sort.StringSlice(self.Aliases)))
 	return ("  " + strings.Join(self.Aliases, ", ")), (self.RuleDesc + " " + paren)
 }
@@ -158,7 +283,7 @@ func (self *Rule) GetEnvValue() (interface{}, error) {
 }
 
 // ***********************************************
-// 				Rules Object
+// Rules Object
 // ***********************************************
 type Rules []*Rule
 
@@ -175,7 +300,7 @@ func (self Rules) Swap(left, right int) {
 }
 
 // ***********************************************
-// 				Options Object
+// Options Object
 // ***********************************************
 
 type OptResult struct {
@@ -269,7 +394,7 @@ func (self Options) Slice(key string) []string {
 }
 
 // ***********************************************
-// 				ArgParser Object
+// ArgParser Object
 // ***********************************************
 type ParseModifier func(*ArgParser)
 
@@ -308,15 +433,16 @@ func (self *ArgParser) ValidateRules() error {
 	return nil
 }
 
-func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
+func (self *ArgParser) Opt(name string) *RuleModifier {
 	rule := &Rule{Cast: castString}
-	// If name begins with a non word charater, assume it's an optional argument
+	// Create a RuleModifier to configure the rule
+	modifier := &RuleModifier{rule}
+	// If name begins with a non word character, assume it's an optional argument
 	if isOptional.MatchString(name) {
 		// Attempt to extract the name
 		group := isOptional.FindStringSubmatch(name)
 		if group == nil {
-			self.err = errors.New(fmt.Sprintf("Invalid optional argument name '%s'", name))
-			return
+			panic(fmt.Sprintf("Invalid optional argument name '%s'", name))
 		} else {
 			rule.Aliases = append(rule.Aliases, name)
 			rule.Name = group[2]
@@ -325,15 +451,9 @@ func (self *ArgParser) Opt(name string, modifiers ...RuleModifier) {
 		rule.IsPos = 1
 		rule.Name = name
 	}
-
-	for _, modify := range modifiers {
-		// The modifiers know how to modify a rule
-		modify(rule)
-	}
-	// Append our rules to the list
+	// Append the rule our list of rules
 	self.rules = append(self.rules, rule)
-	// Make sure conflicting/duplicate rules where not used
-	self.err = self.ValidateRules()
+	return modifier
 }
 
 func (self *ArgParser) GetRules() Rules {
@@ -358,9 +478,8 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 			" before calling arg.ParseArgs()")
 	}
 
-	// If any of the Opt() Calls reported an error
-	if self.err != nil {
-		return nil, self.err
+	if err := self.ValidateRules(); err != nil {
+		return nil, err
 	}
 
 	// Sort the rules so positional rules are parsed last
@@ -494,7 +613,7 @@ func (self *ArgParser) GenerateOptHelp() string {
 }
 
 // ***********************************************
-// 				PUBLIC FUNCTIONS
+// PUBLIC FUNCTIONS
 // ***********************************************
 
 // Creates a new instance of the argument parser
@@ -504,183 +623,6 @@ func Parser(modifiers ...ParseModifier) *ArgParser {
 		modify(parser)
 	}
 	return parser
-}
-
-// Indicates this option has an alias it can go by
-func Alias(aliasName string) RuleModifier {
-	return func(rule *Rule) {
-		rule.Aliases = append(rule.Aliases, aliasName)
-	}
-}
-
-func Count() RuleModifier {
-	return func(rule *Rule) {
-		rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
-			// If user asked us to count the instances of this argument
-			rule.Count = rule.Count + 1
-			return nil
-		}
-	}
-}
-
-// If the option is seen on the command line, the value is 'true'
-func IsTrue() RuleModifier {
-	return func(rule *Rule) {
-		rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
-			rule.Value = true
-			return nil
-		}
-		rule.Cast = castBool
-	}
-}
-
-func castString(optName string, strValue string) (interface{}, error) {
-	// If empty string is passed, give type init value
-	if strValue == "" {
-		return "", nil
-	}
-	return strValue, nil
-}
-
-func IsString() RuleModifier {
-	return func(rule *Rule) {
-		rule.Cast = castString
-	}
-}
-
-func castInt(optName string, strValue string) (interface{}, error) {
-	// If empty string is passed, give type init value
-	if strValue == "" {
-		return 0, nil
-	}
-
-	value, err := strconv.ParseInt(strValue, 10, 64)
-	if err != nil {
-		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' - '%s' is not an Integer", optName, strValue))
-	}
-	return int(value), nil
-}
-
-func IsInt() RuleModifier {
-	return func(rule *Rule) {
-		rule.Cast = castInt
-	}
-}
-
-func castBool(optName string, strValue string) (interface{}, error) {
-	// If empty string is passed, give type init value
-	if strValue == "" {
-		return false, nil
-	}
-
-	value, err := strconv.ParseBool(strValue)
-	if err != nil {
-		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' - '%s' is not a Boolean", optName, strValue))
-	}
-	return bool(value), nil
-}
-
-func IsBool() RuleModifier {
-	return func(rule *Rule) {
-		rule.Cast = castBool
-		rule.Value = false
-	}
-}
-
-func Default(value string) RuleModifier {
-	return func(rule *Rule) {
-		rule.Default = &value
-	}
-}
-
-func StoreInt(dest *int) RuleModifier {
-	// Implies IsInt()
-	return func(rule *Rule) {
-		rule.Cast = castInt
-		rule.StoreValue = func(value interface{}) {
-			*dest = value.(int)
-		}
-	}
-}
-
-func StoreTrue(dest *bool) RuleModifier {
-	return func(rule *Rule) {
-		rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
-			rule.Value = true
-			return nil
-		}
-		rule.Cast = castBool
-		rule.StoreValue = func(value interface{}) {
-			*dest = value.(bool)
-		}
-	}
-}
-
-func castStringSlice(optName string, strValue string) (interface{}, error) {
-	// If empty string is passed, give type init value
-	if strValue == "" {
-		return []string{}, nil
-	}
-
-	// If no comma is found, then assume this is a single value
-	if strings.Index(strValue, ",") == -1 {
-		return []string{strValue}, nil
-	}
-
-	// Split the values separated by comma's
-	return strings.Split(strValue, ","), nil
-}
-
-// TODO: Make this less horribad, and use more reflection to make the interface simpler
-// It should also take more than just []string but also []int... etc...
-func StoreSlice(dest *[]string) RuleModifier {
-	return func(rule *Rule) {
-		rule.Cast = castStringSlice
-		rule.StoreValue = func(src interface{}) {
-			// First clear the currenty slice if any
-			*dest = nil
-			// This should never happen if we validate the types
-			srcType := reflect.TypeOf(src)
-			if srcType.Kind() != reflect.Slice {
-				panic(fmt.Sprintf("Attempted to store '%s' which is not a slice", srcType.Kind()))
-			}
-			for _, value := range src.([]string) {
-				*dest = append(*dest, value)
-			}
-		}
-	}
-}
-
-func StoreStr(dest *string) RuleModifier {
-	return StoreString(dest)
-}
-
-func StoreString(dest *string) RuleModifier {
-	// Implies IsString()
-	return func(rule *Rule) {
-		rule.Cast = castString
-		rule.StoreValue = func(value interface{}) {
-			*dest = value.(string)
-		}
-	}
-}
-
-func Env(varName string) RuleModifier {
-	return func(rule *Rule) {
-		rule.EnvironVars = append(rule.EnvironVars, varName)
-	}
-}
-
-func VarName(varName string) RuleModifier {
-	return func(rule *Rule) {
-		rule.VarName = varName
-	}
-}
-
-func Help(message string) RuleModifier {
-	return func(rule *Rule) {
-		rule.RuleDesc = message
-	}
 }
 
 func Name(name string) ParseModifier {
@@ -702,7 +644,7 @@ func WrapLen(length int) ParseModifier {
 }
 
 // ***********************************************
-//        Public Word Formating Functions
+// Public Word Formatting Functions
 // ***********************************************
 
 // Mixing Spaces and Tabs will have undesired effects
@@ -779,4 +721,53 @@ func WordWrap(msg string, indent int, wordWrap int) string {
 	//fmt.Print("fmt: %s\n", spacer)
 	seperator := fmt.Sprintf(spacer, "")
 	return strings.Join(lines, seperator)
+}
+
+func castString(optName string, strValue string) (interface{}, error) {
+	// If empty string is passed, give type init value
+	if strValue == "" {
+		return "", nil
+	}
+	return strValue, nil
+}
+
+func castInt(optName string, strValue string) (interface{}, error) {
+	// If empty string is passed, give type init value
+	if strValue == "" {
+		return 0, nil
+	}
+
+	value, err := strconv.ParseInt(strValue, 10, 64)
+	if err != nil {
+		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' - '%s' is not an Integer", optName, strValue))
+	}
+	return int(value), nil
+}
+
+func castBool(optName string, strValue string) (interface{}, error) {
+	// If empty string is passed, give type init value
+	if strValue == "" {
+		return false, nil
+	}
+
+	value, err := strconv.ParseBool(strValue)
+	if err != nil {
+		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' - '%s' is not a Boolean", optName, strValue))
+	}
+	return bool(value), nil
+}
+
+func castStringSlice(optName string, strValue string) (interface{}, error) {
+	// If empty string is passed, give type init value
+	if strValue == "" {
+		return []string{}, nil
+	}
+
+	// If no comma is found, then assume this is a single value
+	if strings.Index(strValue, ",") == -1 {
+		return []string{strValue}, nil
+	}
+
+	// Split the values separated by comma's
+	return strings.Split(strValue, ","), nil
 }
