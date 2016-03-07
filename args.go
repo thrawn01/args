@@ -18,6 +18,7 @@ import (
 
 const (
 	DefaultTerminator string = "--"
+	DefaultOptGroup   string = ""
 )
 
 // ***********************************************
@@ -169,6 +170,7 @@ type Rule struct {
 	Cast        CastFunc
 	Action      ActionFunc
 	StoreValue  StoreFunc
+	Group       string
 }
 
 func (self *Rule) Validate() error {
@@ -234,7 +236,7 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	return true, nil
 }
 
-func (self *Rule) GetValuesFrom(values *map[string]string) (interface{}, error) {
+func (self *Rule) ComputedValue(values *map[string]string) (interface{}, error) {
 	// TODO: Do this better
 	if self.Count != 0 {
 		self.Value = self.Count
@@ -302,16 +304,41 @@ func (self Rules) Swap(left, right int) {
 }
 
 // ***********************************************
+// GroupOptions Object
+// ***********************************************
+type GroupOptions struct {
+	options map[string]*Options
+}
+
+func NewGroupOptions() *GroupOptions {
+	return &GroupOptions{make(map[string]*Options)}
+}
+
+func (self *GroupOptions) Get(group string) *Options {
+	opts, ok := self.options[group]
+	if !ok {
+		newOpts := NewOptions()
+		self.options[group] = newOpts
+		return newOpts
+	}
+	return opts
+}
+
+// ***********************************************
 // Options Object
 // ***********************************************
 
 type OptionVal struct {
-	Seen  bool // Argument was seen on the commandline
 	Value interface{}
+	Seen  bool // Argument was seen on the commandline
 }
 
 type Options struct {
 	Values map[string]*OptionVal
+}
+
+func NewOptions() *Options {
+	return &Options{make(map[string]*OptionVal)}
 }
 
 func (self *Options) Convert(key string, typeName string, convFunc func(value interface{})) {
@@ -335,13 +362,8 @@ func (self *Options) IsNil(key string) bool {
 	return true
 }
 
-// Not allowed to set arbitrary values, only those which already exist
-func (self *Options) Set(key string, value interface{}) bool {
-	if opt, ok := self.Values[key]; ok {
-		opt.Value = value
-		return true
-	}
-	return false
+func (self *Options) Set(key string, value interface{}, seen bool) {
+	self.Values[key] = &OptionVal{value, seen}
 }
 
 func (self *Options) NoArgs() bool {
@@ -417,7 +439,7 @@ type ArgParser struct {
 	WordWrap    int
 	mutex       sync.Mutex
 	args        []string
-	opts        *Options
+	groupOpts   *GroupOptions
 	rules       Rules
 	err         error
 	idx         int
@@ -431,7 +453,7 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 		200,
 		sync.Mutex{},
 		[]string{},
-		nil,
+		NewGroupOptions(),
 		nil,
 		nil,
 		0,
@@ -468,7 +490,7 @@ func (self *ArgParser) ValidateRules() error {
 }
 
 func (self *ArgParser) Opt(name string) *RuleModifier {
-	rule := &Rule{Cast: castString}
+	rule := &Rule{Cast: castString, Group: DefaultOptGroup}
 	// Create a RuleModifier to configure the rule
 	modifier := &RuleModifier{rule}
 	// If name begins with a non word character, assume it's an optional argument
@@ -522,7 +544,7 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 	// Process command line arguments until we find our terminator
 	for ; self.idx < len(self.args); self.idx++ {
 		if self.args[self.idx] == terminator {
-			return self.ParseMap(nil)
+			return self.Apply(nil)
 		}
 		// Match our arguments with rules expected
 		//fmt.Printf("====== Attempting to match: %d:%s - ", self.idx, self.args[self.idx])
@@ -537,15 +559,17 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 			// unmatched arguments return an error here
 		}
 	}
-	return self.ParseMap(nil)
+	return self.Apply(nil)
 }
 
-func (self *ArgParser) ParseMap(values *map[string]string) (*Options, error) {
-	results := make(map[string]*OptionVal)
+// Gather all the values from our rules, then apply the passed in map to any rules that don't have a computed value.
+func (self *ArgParser) Apply(values *map[string]string) (*Options, error) {
+	results := NewGroupOptions()
 
-	// Get the computed value after applying all rules
+	// for each of the rules
 	for _, rule := range self.rules {
-		value, err := rule.GetValuesFrom(values)
+		// Get the computed value
+		value, err := rule.ComputedValue(values)
 		if err != nil {
 			return nil, err
 		}
@@ -553,24 +577,28 @@ func (self *ArgParser) ParseMap(values *map[string]string) (*Options, error) {
 		if rule.StoreValue != nil {
 			rule.StoreValue(value)
 		}
-		results[rule.Name] = &OptionVal{Value: value, Seen: rule.Seen}
+		results.Get(rule.Group).Set(rule.Name, value, rule.Seen)
 	}
-	self.SetOpts(results)
-	return self.GetOpts(), nil
+	self.SetGroupOpts(results)
+	return self.GetGroupOpts().Get(DefaultOptGroup), nil
 }
 
-func (self *ArgParser) SetOpts(opts map[string]*OptionVal) {
+func (self *ArgParser) SetGroupOpts(groupOpts *GroupOptions) {
 	self.mutex.Lock()
-	self.opts = &Options{opts}
+	self.groupOpts = groupOpts
 	self.mutex.Unlock()
 }
 
-func (self *ArgParser) GetOpts() *Options {
+func (self *ArgParser) GetGroupOpts() *GroupOptions {
 	self.mutex.Lock()
 	defer func() {
 		self.mutex.Unlock()
 	}()
-	return self.opts
+	return self.groupOpts
+}
+
+func (self *ArgParser) GetOpts() *Options {
+	return self.GetGroupOpts().Get(DefaultOptGroup)
 }
 
 func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
@@ -584,7 +612,7 @@ func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
 		values[key] = cfg.Section("").Key(key).String()
 	}
 	// Apply the ini file values to the commandline and environment variables
-	return self.ParseMap(&values)
+	return self.Apply(&values)
 }
 
 func (self *ArgParser) match(rules Rules) (bool, error) {
