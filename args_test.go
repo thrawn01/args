@@ -18,7 +18,7 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("Options.Convert()", func() {
 		It("Should convert options to integers", func() {
-			opts := args.Options{"one": args.OptResult{Value: 1, Seen: false}}
+			opts := args.Options{map[string]*args.OptionVal{"one": &args.OptionVal{Value: 1, Seen: false}}}
 			var result int
 			opts.Convert("one", "int", func(value interface{}) {
 				result = value.(int)
@@ -27,7 +27,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should raise panic if unable to cast an option", func() {
-			opts := args.Options{"one": args.OptResult{Value: "", Seen: false}}
+			opts := args.Options{map[string]*args.OptionVal{"one": &args.OptionVal{Value: "", Seen: false}}}
 			panicCaught := false
 			result := 0
 
@@ -45,10 +45,10 @@ var _ = Describe("ArgParser", func() {
 		})
 
 	})
-	/*Describe("ValuesFromIni()", func() {
+	Describe("ValuesFromIni()", func() {
 		It("Should provide arg values from INI file", func() {
-			parser := args.Parser()
-			parser.Opt("--one", args.IsString())
+			parser := args.NewParser()
+			parser.Opt("--one").IsString()
 			input := []byte("one=this is one value\ntwo=this is two value\n")
 			opt, err := parser.ParseIni(input)
 			Expect(err).To(BeNil())
@@ -56,10 +56,10 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should provide arg values from INI file after parsing the command line", func() {
-			parser := args.Parser()
-			parser.Opt("--one", args.IsString())
-			parser.Opt("--two", args.IsString())
-			parser.Opt("--three", args.IsString())
+			parser := args.NewParser()
+			parser.Opt("--one").IsString()
+			parser.Opt("--two").IsString()
+			parser.Opt("--three").IsString()
 			cmdLine := []string{"--three", "this is three value"}
 			opt, err := parser.ParseArgs(&cmdLine)
 			input := []byte("one=this is one value\ntwo=this is two value\n")
@@ -70,10 +70,10 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should not overide options supplied via the command line", func() {
-			parser := args.Parser()
-			parser.Opt("--one", args.IsString())
-			parser.Opt("--two", args.IsString())
-			parser.Opt("--three", args.IsString())
+			parser := args.NewParser()
+			parser.Opt("--one").IsString()
+			parser.Opt("--two").IsString()
+			parser.Opt("--three").IsString()
 			cmdLine := []string{"--three", "this is three value", "--one", "this is from the cmd line"}
 			opt, err := parser.ParseArgs(&cmdLine)
 			input := []byte("one=this is one value\ntwo=this is two value\n")
@@ -84,9 +84,9 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should clear any pre existing slices in the struct before assignment", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			var list []string
-			parser.Opt("--list", args.StoreSlice(&list), args.Default("foo,bar,bit"))
+			parser.Opt("--list").StoreSlice(&list).Default("foo,bar,bit")
 
 			opt, err := parser.ParseArgs(nil)
 			Expect(err).To(BeNil())
@@ -102,26 +102,26 @@ var _ = Describe("ArgParser", func() {
 	})
 
 	Describe("args.ParseArgs(nil)", func() {
-		parser := args.Parser()
+		parser := args.NewParser()
 		It("Should return error if Opt() was never called", func() {
 			_, err := parser.ParseArgs(nil)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Must create some options to match with args.Opt() before calling arg.ParseArgs()"))
 		})
-	})*/
+	})
 
 	Describe("args.Opt()", func() {
 		cmdLine := []string{"--one", "-two", "++three", "+four", "--power-level"}
 
 		It("Should create optional rule --one", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			parser.Opt("--one").Count()
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
 			Expect(rule.IsPos).To(Equal(0))
 		})
 		It("Should create optional rule ++one", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			parser.Opt("++one").Count()
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
@@ -129,7 +129,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should create optional rule -one", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			parser.Opt("-one").Count()
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
@@ -137,7 +137,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should create optional rule +one", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			parser.Opt("+one").Count()
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
@@ -145,35 +145,35 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should match --one", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			parser.Opt("--one").Count()
 			opt, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("one")).To(Equal(1))
 		})
 		It("Should match -two", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			parser.Opt("-two").Count()
 			opt, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("two")).To(Equal(1))
 		})
 		It("Should match ++three", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			parser.Opt("++three").Count()
 			opt, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("three")).To(Equal(1))
 		})
 		It("Should match +four", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			parser.Opt("+four").Count()
 			opt, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("four")).To(Equal(1))
 		})
 		It("Should match --power-level", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			parser.Opt("--power-level").Count()
 			opt, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
@@ -182,7 +182,7 @@ var _ = Describe("ArgParser", func() {
 	})
 	Describe("args.Count()", func() {
 		It("Should count one", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			cmdLine := []string{"--verbose"}
 			parser.Opt("--verbose").Count()
 			opt, err := parser.ParseArgs(&cmdLine)
@@ -190,7 +190,7 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.Int("verbose")).To(Equal(1))
 		})
 		It("Should count three times", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			cmdLine := []string{"--verbose", "--verbose", "--verbose"}
 			parser.Opt("--verbose").Count()
 			opt, err := parser.ParseArgs(&cmdLine)
@@ -201,7 +201,7 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("args.IsInt()", func() {
 		It("Should ensure value supplied is an integer", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			parser.Opt("--power-level").IsInt()
 
 			cmdLine := []string{"--power-level", "10000"}
@@ -211,7 +211,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should set err if the option value is not parsable as an integer", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			cmdLine := []string{"--power-level", "over-ten-thousand"}
 			parser.Opt("--power-level").IsInt()
 			_, err := parser.ParseArgs(&cmdLine)
@@ -221,7 +221,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should set err if no option value is provided", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			cmdLine := []string{"--power-level"}
 			parser.Opt("--power-level").IsInt()
 			_, err := parser.ParseArgs(&cmdLine)
@@ -233,7 +233,7 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("args.StoreInt()", func() {
 		It("Should ensure value supplied is assigned to passed value", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			var value int
 			parser.Opt("--power-level").StoreInt(&value)
 
@@ -247,7 +247,7 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("args.IsString()", func() {
 		It("Should provide string value", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			parser.Opt("--power-level").IsString()
 
 			cmdLine := []string{"--power-level", "over-ten-thousand"}
@@ -257,7 +257,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should set err if no option value is provided", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			cmdLine := []string{"--power-level"}
 			parser.Opt("--power-level").IsString()
 			_, err := parser.ParseArgs(&cmdLine)
@@ -268,7 +268,7 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("args.StoreString()", func() {
 		It("Should ensure value supplied is assigned to passed value", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			var value string
 			parser.Opt("--power-level").StoreString(&value)
 
@@ -282,7 +282,7 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("args.StoreStr()", func() {
 		It("Should ensure value supplied is assigned to passed value", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			var value string
 			parser.Opt("--power-level").StoreStr(&value)
 
@@ -296,7 +296,7 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("args.StoreTrue()", func() {
 		It("Should ensure value supplied is true when argument is seen", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			var debug bool
 			parser.Opt("--debug").StoreTrue(&debug)
 
@@ -308,7 +308,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should ensure value supplied is false when argument is NOT seen", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			var debug bool
 			parser.Opt("--debug").StoreTrue(&debug)
 
@@ -322,7 +322,7 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("args.IsTrue()", func() {
 		It("Should set true value when seen", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			parser.Opt("--help").IsTrue()
 
 			cmdLine := []string{"--help"}
@@ -332,7 +332,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should set false when NOT seen", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			cmdLine := []string{"--something-else"}
 			parser.Opt("--help").IsTrue()
 			opt, err := parser.ParseArgs(&cmdLine)
@@ -343,7 +343,7 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("args.StoreSlice()", func() {
 		It("Should ensure []string provided is set when a comma separated list is provided", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			var list []string
 			parser.Opt("--list").StoreSlice(&list)
 
@@ -355,7 +355,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should ensure []interface{} provided is set if a single value is provided", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			var list []string
 			parser.Opt("--list").StoreSlice(&list)
 
@@ -367,7 +367,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should set err if no list value is provided", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			var list []string
 			parser.Opt("--list").StoreSlice(&list)
 
@@ -381,7 +381,7 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("args.Default()", func() {
 		It("Should ensure default values is supplied if no matching argument is found", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			var value int
 			parser.Opt("--power-level").StoreInt(&value).Default("10")
 
@@ -392,7 +392,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should panic if default value does not match Opt() type", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			panicCaught := false
 
 			defer func() {
@@ -414,7 +414,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should supply the environ value if argument was not passed", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			var value int
 			parser.Opt("--power-level").StoreInt(&value).Env("POWER_LEVEL")
 
@@ -427,7 +427,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should return an error if the environ value does not match the Opt() type", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			var value int
 			parser.Opt("--power-level").StoreInt(&value).Env("POWER_LEVEL")
 
@@ -439,7 +439,7 @@ var _ = Describe("ArgParser", func() {
 		})
 
 		It("Should use the default value if argument was not passed and environment var was not set", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			var value int
 			parser.Opt("--power-level").StoreInt(&value).Env("POWER_LEVEL").Default("1")
 
@@ -452,7 +452,7 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("opts.NoArgs()", func() {
 		It("Should return true if no arguments on the command line", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			parser.Opt("--power-level").IsInt().Default("1")
 
 			opt, err := parser.ParseArgs(nil)
@@ -461,7 +461,7 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.NoArgs()).To(Equal(true))
 		})
 		It("Should return false if arguments on the command line", func() {
-			parser := args.Parser()
+			parser := args.NewParser()
 			parser.Opt("--power-level").IsInt().Default("1")
 
 			opt, err := parser.ParseArgs(&[]string{"--power-level", "2"})
@@ -473,7 +473,7 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("parser.GenerateOptHelp()", func() {
 		It("Should generate help messages given a set of rules", func() {
-			parser := args.Parser(args.WrapLen(80))
+			parser := args.NewParser(args.WrapLen(80))
 			parser.Opt("--power-level").Alias("-p").Help("Specify our power level")
 			parser.Opt("--cat-level").
 				Alias("-c").
@@ -488,7 +488,7 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("parser.GenerateHelp()", func() {
 		It("Should generate help messages given a set of rules", func() {
-			parser := args.Parser(args.Name("dragon-ball"), args.WrapLen(80))
+			parser := args.NewParser(args.Name("dragon-ball"), args.WrapLen(80))
 			parser.Opt("--power-level").Alias("-p").Help("Specify our power level")
 			parser.Opt("--cat-level").Alias("-c").Help(`Lorem ipsum dolor sit amet, consectetur
 				adipiscing elit, sed do eiusmod tempor incididunt ut labore et

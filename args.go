@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 
+	"sync"
+
 	"github.com/go-ini/ini"
 )
 
@@ -303,36 +305,47 @@ func (self Rules) Swap(left, right int) {
 // Options Object
 // ***********************************************
 
-type OptResult struct {
+type OptionVal struct {
 	Seen  bool // Argument was seen on the commandline
 	Value interface{}
 }
 
-type Options map[string]OptResult
+type Options struct {
+	Values map[string]*OptionVal
+}
 
-func (self Options) Convert(key string, typeName string, convFunc func(value interface{})) {
-	opt, ok := self[key]
+func (self *Options) Convert(key string, typeName string, convFunc func(value interface{})) {
+	opt, ok := self.Values[key]
 	if !ok {
 		panic(fmt.Sprintf("No Such Option '%s' found", key))
 	}
 	defer func() {
 		if msg := recover(); msg != nil {
 			panic(fmt.Sprintf("Refusing to convert Option '%s' of type '%s' to '%s'",
-				key, reflect.TypeOf(self[key]), typeName))
+				key, reflect.TypeOf(self.Values[key]), typeName))
 		}
 	}()
 	convFunc(opt.Value)
 }
 
-func (self Options) IsNil(key string) bool {
-	if opt, ok := self[key]; ok {
+func (self *Options) IsNil(key string) bool {
+	if opt, ok := self.Values[key]; ok {
 		return opt.Value == nil
 	}
 	return true
 }
 
-func (self Options) NoArgs() bool {
-	for _, opt := range self {
+// Not allowed to set arbitrary values, only those which already exist
+func (self *Options) Set(key string, value interface{}) bool {
+	if opt, ok := self.Values[key]; ok {
+		opt.Value = value
+		return true
+	}
+	return false
+}
+
+func (self *Options) NoArgs() bool {
+	for _, opt := range self.Values {
 		if opt.Seen == true {
 			return false
 		}
@@ -340,7 +353,7 @@ func (self Options) NoArgs() bool {
 	return true
 }
 
-func (self Options) Int(key string) int {
+func (self *Options) Int(key string) int {
 	var result int
 	self.Convert(key, "int", func(value interface{}) {
 		if value != nil {
@@ -353,7 +366,7 @@ func (self Options) Int(key string) int {
 	return result
 }
 
-func (self Options) String(key string) string {
+func (self *Options) String(key string) string {
 	var result string
 	self.Convert(key, "string", func(value interface{}) {
 		if value != nil {
@@ -366,7 +379,7 @@ func (self Options) String(key string) string {
 	return result
 }
 
-func (self Options) Bool(key string) bool {
+func (self *Options) Bool(key string) bool {
 	var result bool
 	self.Convert(key, "bool", func(value interface{}) {
 		if value != nil {
@@ -380,7 +393,7 @@ func (self Options) Bool(key string) bool {
 }
 
 // TODO: Should support more than just []string
-func (self Options) Slice(key string) []string {
+func (self *Options) Slice(key string) []string {
 	var result []string
 	self.Convert(key, "[]string", func(value interface{}) {
 		if value != nil {
@@ -400,12 +413,33 @@ type ParseModifier func(*ArgParser)
 
 type ArgParser struct {
 	Description string
-	ProgName    string
+	Name        string
 	WordWrap    int
-	rules       Rules
+	mutex       sync.Mutex
 	args        []string
+	opts        *Options
+	rules       Rules
 	err         error
 	idx         int
+}
+
+// Creates a new instance of the argument parser
+func NewParser(modifiers ...ParseModifier) *ArgParser {
+	parser := &ArgParser{
+		"",
+		"",
+		200,
+		sync.Mutex{},
+		[]string{},
+		nil,
+		nil,
+		nil,
+		0,
+	}
+	for _, modify := range modifiers {
+		modify(parser)
+	}
+	return parser
 }
 
 var isOptional = regexp.MustCompile(`^(\W+)([\w|-]*)$`)
@@ -474,7 +508,7 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 
 	// Sanity Check
 	if len(self.rules) == 0 {
-		self.err = errors.New("Must create some options to match with args.Opt()" +
+		return nil, errors.New("Must create some options to match with args.Opt()" +
 			" before calling arg.ParseArgs()")
 	}
 
@@ -507,7 +541,7 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 }
 
 func (self *ArgParser) ParseMap(values *map[string]string) (*Options, error) {
-	results := &Options{}
+	results := make(map[string]*OptionVal)
 
 	// Get the computed value after applying all rules
 	for _, rule := range self.rules {
@@ -519,10 +553,24 @@ func (self *ArgParser) ParseMap(values *map[string]string) (*Options, error) {
 		if rule.StoreValue != nil {
 			rule.StoreValue(value)
 		}
-		(*results)[rule.Name] = OptResult{Value: value, Seen: rule.Seen}
+		results[rule.Name] = &OptionVal{Value: value, Seen: rule.Seen}
 	}
+	self.SetOpts(results)
+	return self.GetOpts(), nil
+}
 
-	return results, nil
+func (self *ArgParser) SetOpts(opts map[string]*OptionVal) {
+	self.mutex.Lock()
+	self.opts = &Options{opts}
+	self.mutex.Unlock()
+}
+
+func (self *ArgParser) GetOpts() *Options {
+	self.mutex.Lock()
+	defer func() {
+		self.mutex.Unlock()
+	}()
+	return self.opts
 }
 
 func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
@@ -571,7 +619,7 @@ func (self *ArgParser) GenerateHelp() string {
 	// TODO: Improve this once we have positional arguments
 	result.WriteString("Usage:\n")
 	// Super generic usage message
-	result.WriteString(fmt.Sprintf("  %s [OPTIONS]\n", self.ProgName))
+	result.WriteString(fmt.Sprintf("  %s [OPTIONS]\n", self.Name))
 	result.WriteString("\nOptions:\n")
 	result.WriteString(self.GenerateOptHelp())
 	return result.String()
@@ -585,11 +633,6 @@ func (self *ArgParser) GenerateOptHelp() string {
 		Message string
 	}
 	var options []HelpMsg
-
-	// If there is no word wrap set, default to 200 characters
-	if self.WordWrap == 0 {
-		self.WordWrap = 200
-	}
 
 	// Ask each rule to generate a Help message for the options
 	maxLen := 0
@@ -616,18 +659,9 @@ func (self *ArgParser) GenerateOptHelp() string {
 // PUBLIC FUNCTIONS
 // ***********************************************
 
-// Creates a new instance of the argument parser
-func Parser(modifiers ...ParseModifier) *ArgParser {
-	parser := &ArgParser{}
-	for _, modify := range modifiers {
-		modify(parser)
-	}
-	return parser
-}
-
 func Name(name string) ParseModifier {
 	return func(parser *ArgParser) {
-		parser.ProgName = name
+		parser.Name = name
 	}
 }
 
