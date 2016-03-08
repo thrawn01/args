@@ -13,8 +13,8 @@ import (
 func main() {
 
 	// Create the parser with program name 'example'
-	// and environment variables prefixed with APP_
-	parser := args.Parser(args.Name("example"), args.EtcdPath("/exampleApp"))
+	// and etcd keys prefixed with exampleApp/
+	parser := args.Parser(args.Name("example"), args.EtcdPath("exampleApp/"))
 
 	// Since 'Etcd()' is not used, this option is not configurable via etcd
 	parser.Opt("--etcd-endpoints").Alias("-eP").IsSlice()
@@ -24,7 +24,7 @@ func main() {
 	parser.Opt("--service-name").Alias("-sN")
 	Default("frontend1").Help("Name used for service discovery")
 
-	// if EtcdKey() is not given etcd keys are crafted by using
+	// if Etcd() is given etcd keys are crafted by using
 	// the name of the option. This etcd key will be '/exampleApp/message'
 	parser.Opt("--message").Etcd().
 		Default("over-ten-thousand").Help("send a message")
@@ -72,14 +72,20 @@ func main() {
 	keysAPI := etcd.NewKeysAPI(client)
 
 	// Grab values for config options defined with 'Etcd()'
-	opt, err := parser.FromEtcd(keysAPI, log)
+	opt, err = parser.FromEtcd(keysAPI, log)
 	if err != nil {
 		fmt.Printf("Etcd or value parse issue - %s\n", err.Error())
 	}
 
+	// Simple watch example, When ever a config item changes
+	// in etcd; immediately update our config
+	args.WatchEtcd(parser.EtcdPath(), func(group, key, value string) {
+		parser.Apply(args.NewOptions().Get(group).Set(key, value))
+	})
+
 	// Complex Example, where the config changes in etcd do
 	// not get applied until 'config-version' is changed.
-	stagedConf := args.NewGroupOptions()
+	stagedConf := args.NewOptions()
 	// Watch etcd for any configuration changes
 	args.WatchEtcd(parser.EtcdPath(), func(group, key, value string) {
 		// Apply all the config
@@ -87,7 +93,7 @@ func main() {
 		if group == "" && key == "config-version" {
 			// NOTE: If you are using opt.ThreadSafe() you can safely
 			// ignore the 'opt' returned by Apply(). This is because Apply()
-			// will update it's internal pointer to the new version of the
+			// will update parsers internal pointer to the new version of the
 			// config and subsequent calls to opt.ThreadSafe() will always
 			// safely return the new version of the config
 
@@ -98,8 +104,17 @@ func main() {
 				return
 			}
 			// Clear the staged config values
-			stagedConf = args.NewGroupOptions()
+			stagedConf = args.NewOptions()
 			fmt.Printf("Config has been updated to version %d\n", opt.Int("config-version"))
 		}
 	})
+
+	// Little Demo of how options work
+	var options args.Options
+	var groupOptions args.GroupOptions
+	dbOptions = options.Get("database")
+
+	hostName := dbOptions.String("host")
+	user := dbOptions.String("user")
+
 }
