@@ -24,7 +24,7 @@ const (
 // ***********************************************
 //  Types
 // ***********************************************
-type CastFunc func(string, string) (interface{}, error)
+type CastFunc func(string, interface{}) (interface{}, error)
 type ActionFunc func(*Rule, string, []string, *int) error
 type StoreFunc func(interface{})
 
@@ -236,7 +236,7 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	return true, nil
 }
 
-func (self *Rule) ComputedValue(values *map[string]string) (interface{}, error) {
+func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	// TODO: Do this better
 	if self.Count != 0 {
 		self.Value = self.Count
@@ -258,8 +258,8 @@ func (self *Rule) ComputedValue(values *map[string]string) (interface{}, error) 
 
 	// If provided our map of values, use that
 	if values != nil {
-		if value, ok := (*values)[self.Name]; ok {
-			return self.Cast(self.Name, value)
+		if values.HasKey(self.Name) {
+			return self.Cast(self.Name, values.RawValue(self.Name))
 		}
 	}
 
@@ -268,7 +268,7 @@ func (self *Rule) ComputedValue(values *map[string]string) (interface{}, error) 
 		return self.Cast(self.Name, *self.Default)
 	}
 	// Return the default value for our type choice
-	value, _ = self.Cast("", "")
+	value, _ = self.Cast(self.Name, nil)
 	return value, nil
 }
 
@@ -318,19 +318,26 @@ type OptionValue struct {
 }
 
 func NewOptions(group string) *Options {
-	return &Options{
-		group,
-		make(map[string]*OptionValue),
-		make(map[string]*Options),
-	}
-}
-
-func NewOptionsWithGroups(group string, groups map[string]*Options) *Options {
-	return &Options{
+	groups := make(map[string]*Options)
+	new := &Options{
 		group,
 		make(map[string]*OptionValue),
 		groups,
 	}
+	// Add the new Options{} to the group of options
+	groups[group] = new
+	return new
+}
+
+func NewOptionsWithGroups(group string, groups map[string]*Options) *Options {
+	new := &Options{
+		group,
+		make(map[string]*OptionValue),
+		groups,
+	}
+	// Add the new Options{} to the group of options
+	groups[group] = new
+	return new
 }
 
 func NewOptionsFromMap(group string, groups map[string]map[string]*OptionValue) *Options {
@@ -342,6 +349,31 @@ func NewOptionsFromMap(group string, groups map[string]map[string]*OptionValue) 
 		}
 	}
 	return options
+}
+
+func (self *Options) ValuesToString() string {
+	var buffer bytes.Buffer
+	buffer.WriteString(fmt.Sprintf("%s:\n", self.group))
+	for key, value := range self.values {
+		buffer.WriteString(fmt.Sprintf("   %s=%s\n", key, value.Value))
+	}
+	return buffer.String()
+}
+
+func (self *Options) GroupsToString() string {
+	var buffer bytes.Buffer
+	for _, group := range self.groups {
+		buffer.WriteString(group.ValuesToString())
+	}
+	return buffer.String()
+}
+
+func (self *Options) Keys() []string {
+	keys := make([]string, 0, len(self.values))
+	for key := range self.values {
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 func (self *Options) Group(group string) *Options {
@@ -472,6 +504,18 @@ func (self *Options) IsNil(key string) bool {
 		return opt.Value == nil
 	}
 	return true
+}
+
+func (self *Options) HasKey(key string) bool {
+	_, ok := self.values[key]
+	return ok
+}
+
+func (self *Options) RawValue(key string) interface{} {
+	if opt, ok := self.values[key]; ok {
+		return opt.Value
+	}
+	return nil
 }
 
 // ***********************************************
@@ -609,7 +653,7 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 }
 
 // Gather all the values from our rules, then apply the passed in map to any rules that don't have a computed value.
-func (self *ArgParser) Apply(values *map[string]string) (*Options, error) {
+func (self *ArgParser) Apply(values *Options) (*Options, error) {
 	results := NewOptions("")
 
 	// for each of the rules
@@ -649,12 +693,21 @@ func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
 	if err != nil {
 		return nil, err
 	}
-	values := make(map[string]string)
-	for _, key := range cfg.Section("").KeyStrings() {
-		values[key] = cfg.Section("").Key(key).String()
+	values := NewOptions("")
+	for _, section := range cfg.Sections() {
+		group := cfg.Section(section.Name())
+		for _, key := range group.KeyStrings() {
+			// Always use our default option group name for the DEFAULT section
+			name := section.Name()
+			if name == "DEFAULT" {
+				name = DefaultOptionGroup
+			}
+			values.Group(name).Set(key, group.Key(key).String(), false)
+		}
+
 	}
 	// Apply the ini file values to the commandline and environment variables
-	return self.Apply(&values)
+	return self.Apply(values)
 }
 
 func (self *ArgParser) match(rules Rules) (bool, error) {
@@ -827,45 +880,103 @@ func WordWrap(msg string, indent int, wordWrap int) string {
 	return strings.Join(lines, seperator)
 }
 
-func castString(optName string, strValue string) (interface{}, error) {
-	// If empty string is passed, give type init value
-	if strValue == "" {
+func castString(name string, value interface{}) (interface{}, error) {
+	// If value is nil, return the type default
+	if value == nil {
 		return "", nil
 	}
-	return strValue, nil
+
+	// If value is not an string
+	if reflect.TypeOf(value).Kind() != reflect.String {
+		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' - '%s' is not a String", name, value))
+	}
+	return value, nil
 }
 
-func castInt(optName string, strValue string) (interface{}, error) {
-	// If empty string is passed, give type init value
-	if strValue == "" {
+func castInt(name string, value interface{}) (interface{}, error) {
+	// If value is nil, return the type default
+	if value == nil {
 		return 0, nil
 	}
 
-	value, err := strconv.ParseInt(strValue, 10, 64)
-	if err != nil {
-		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' - '%s' is not an Integer", optName, strValue))
+	// If it's already an integer of some sort
+	kind := reflect.TypeOf(value).Kind()
+	switch kind {
+	case reflect.Int:
+		return value, nil
+	case reflect.Int8:
+		return int(value.(int8)), nil
+	case reflect.Int16:
+		return int(value.(int16)), nil
+	case reflect.Int32:
+		return int(value.(int32)), nil
+	case reflect.Int64:
+		return int(value.(int64)), nil
+	case reflect.Uint8:
+		return int(value.(uint8)), nil
+	case reflect.Uint16:
+		return int(value.(uint16)), nil
+	case reflect.Uint32:
+		return int(value.(uint32)), nil
+	case reflect.Uint64:
+		return int(value.(uint64)), nil
 	}
-	return int(value), nil
+	// If it's not an integer, it better be a string that we can cast
+	if kind != reflect.String {
+		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' - '%s' is not a Integer or Castable string", name, value))
+	}
+	strValue := value.(string)
+
+	intValue, err := strconv.ParseInt(strValue, 10, 64)
+	if err != nil {
+		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' - '%s' is not an Integer", name, strValue))
+	}
+	return int(intValue), nil
 }
 
-func castBool(optName string, strValue string) (interface{}, error) {
-	// If empty string is passed, give type init value
-	if strValue == "" {
+func castBool(name string, value interface{}) (interface{}, error) {
+	// If value is nil, return the type default
+	if value == nil {
 		return false, nil
 	}
 
-	value, err := strconv.ParseBool(strValue)
-	if err != nil {
-		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' - '%s' is not a Boolean", optName, strValue))
+	kind := reflect.TypeOf(value).Kind()
+	if kind == reflect.Bool {
+		return value, nil
 	}
-	return bool(value), nil
+	// If it's not a boolean, it better be a string that we can cast
+	if kind != reflect.String {
+		return 0, errors.New(fmt.Sprintf("Invalid value for '%s' - '%s' is not a Boolean or Castable string", name, value))
+	}
+	strValue := value.(string)
+
+	boolValue, err := strconv.ParseBool(strValue)
+	if err != nil {
+		return false, errors.New(fmt.Sprintf("Invalid value for '%s' - '%s' is not a Boolean", name, strValue))
+	}
+	return bool(boolValue), nil
 }
 
-func castStringSlice(optName string, strValue string) (interface{}, error) {
-	// If empty string is passed, give type init value
-	if strValue == "" {
+func castStringSlice(name string, value interface{}) (interface{}, error) {
+	// If value is nil, return the type default
+	if value == nil {
 		return []string{}, nil
 	}
+
+	kind := reflect.TypeOf(value).Kind()
+	if kind == reflect.Slice {
+		sliceKind := reflect.TypeOf(value).Elem().Kind()
+		// Is already a []string
+		if sliceKind == reflect.String {
+			return value, nil
+		}
+		return []string{}, errors.New(fmt.Sprintf("Invalid slice type for '%s' - '%s'  not a String", name, value))
+	}
+
+	if kind != reflect.String {
+		return []string{}, errors.New(fmt.Sprintf("Invalid slice type for '%s' - '%s' is not a []string or parsable comma delimited string", name, value))
+	}
+	strValue := value.(string)
 
 	// If no comma is found, then assume this is a single value
 	if strings.Index(strValue, ",") == -1 {
