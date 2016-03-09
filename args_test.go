@@ -16,20 +16,24 @@ func TestArgs(t *testing.T) {
 
 var _ = Describe("ArgParser", func() {
 
-	Describe("Options.Convert()", func() {
+	Describe("Options.Int()", func() {
 		It("Should convert options to integers", func() {
-			opts := args.Options{map[string]*args.OptionVal{"one": &args.OptionVal{Value: 1, Seen: false}}}
-			var result int
-			opts.Convert("one", "int", func(value interface{}) {
-				result = value.(int)
+			opts := args.NewOptionsFromMap("", map[string]map[string]*args.OptionValue{
+				"": {
+					"one": &args.OptionValue{Value: 1, Seen: false},
+				},
 			})
+			result := opts.Int("one")
 			Expect(result).To(Equal(1))
 		})
 
 		It("Should raise panic if unable to cast an option", func() {
-			opts := args.Options{map[string]*args.OptionVal{"one": &args.OptionVal{Value: "", Seen: false}}}
+			opts := args.NewOptionsFromMap("", map[string]map[string]*args.OptionValue{
+				"": {
+					"one": &args.OptionValue{Value: "", Seen: false},
+				},
+			})
 			panicCaught := false
-			result := 0
 
 			defer func() {
 				msg := recover()
@@ -38,9 +42,7 @@ var _ = Describe("ArgParser", func() {
 				panicCaught = true
 			}()
 
-			opts.Convert("one", "int", func(value interface{}) {
-				result = value.(int)
-			})
+			opts.Int("one")
 			Expect(panicCaught).To(Equal(true))
 		})
 

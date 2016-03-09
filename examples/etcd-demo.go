@@ -17,12 +17,12 @@ func main() {
 	parser := args.Parser(args.Name("example"), args.EtcdPath("exampleApp/"))
 
 	// Since 'Etcd()' is not used, this option is not configurable via etcd
-	parser.Opt("--etcd-endpoints").Alias("-eP").IsSlice()
-	Default("192.168.5.1,192.168.5.2").Help("List of etcd endpoints")
+	parser.Opt("--etcd-endpoints").Alias("-eP").IsSlice().
+		Default("192.168.5.1,192.168.5.2").Help("List of etcd endpoints")
 
 	// Define a name used by other services to discover this service
-	parser.Opt("--service-name").Alias("-sN")
-	Default("frontend1").Help("Name used for service discovery")
+	parser.Opt("--service-name").Alias("-sN").
+		Default("frontend1").Help("Name used for service discovery")
 
 	// if Etcd() is given etcd keys are crafted by using
 	// the name of the option. This etcd key will be '/exampleApp/message'
@@ -110,9 +110,9 @@ func main() {
 	})
 
 	// Little Demo of how options work
-	var options args.Options
-	var groupOptions args.GroupOptions
-	dbOptions = options.Get("database")
+	var options, dbOptions args.Options
+	options = args.NewOptions()
+	dbOptions = options.Group("database")
 
 	hostName := dbOptions.String("host")
 	user := dbOptions.String("user")

@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	DefaultTerminator string = "--"
-	DefaultOptGroup   string = ""
+	DefaultTerminator  string = "--"
+	DefaultOptionGroup string = ""
 )
 
 // ***********************************************
@@ -304,80 +304,119 @@ func (self Rules) Swap(left, right int) {
 }
 
 // ***********************************************
-// GroupOptions Object
-// ***********************************************
-type GroupOptions struct {
-	options map[string]*Options
-}
-
-func NewGroupOptions() *GroupOptions {
-	return &GroupOptions{make(map[string]*Options)}
-}
-
-func (self *GroupOptions) Get(group string) *Options {
-	opts, ok := self.options[group]
-	if !ok {
-		newOpts := NewOptions()
-		self.options[group] = newOpts
-		return newOpts
-	}
-	return opts
-}
-
-// ***********************************************
 // Options Object
 // ***********************************************
+type Options struct {
+	group  string
+	values map[string]*OptionValue
+	groups map[string]*Options
+}
 
-type OptionVal struct {
+type OptionValue struct {
 	Value interface{}
 	Seen  bool // Argument was seen on the commandline
 }
 
-type Options struct {
-	Values map[string]*OptionVal
+func NewOptions(group string) *Options {
+	return &Options{
+		group,
+		make(map[string]*OptionValue),
+		make(map[string]*Options),
+	}
 }
 
-func NewOptions() *Options {
-	return &Options{make(map[string]*OptionVal)}
+func NewOptionsWithGroups(group string, groups map[string]*Options) *Options {
+	return &Options{
+		group,
+		make(map[string]*OptionValue),
+		groups,
+	}
 }
 
-func (self *Options) Convert(key string, typeName string, convFunc func(value interface{})) {
-	opt, ok := self.Values[key]
+func NewOptionsFromMap(group string, groups map[string]map[string]*OptionValue) *Options {
+	options := NewOptions(group)
+	for groupName, values := range groups {
+		grp := options.Group(groupName)
+		for key, opt := range values {
+			grp.Set(key, opt.Value, opt.Seen)
+		}
+	}
+	return options
+}
+
+func (self *Options) Group(group string) *Options {
+	// If they asked for the default group, and I'm the default group return myself
+	if group == DefaultOptionGroup && self.group == group {
+		return self
+	}
+	opts, ok := self.groups[group]
 	if !ok {
-		panic(fmt.Sprintf("No Such Option '%s' found", key))
+		// TODO: Validate group name has valid characters or at least
+		// doesn't have ':' in the name which would conflict with Compare()
+
+		// If group doesn't exist; create it
+		new := NewOptionsWithGroups(group, self.groups)
+		self.groups[group] = new
+		return new
+	}
+	return opts
+}
+
+func (self *Options) Set(key string, value interface{}, seen bool) *Options {
+	self.values[key] = &OptionValue{value, seen}
+	return self
+}
+
+func (self *Options) Get(key string) string {
+	return self.String(key)
+}
+
+// Return true if any of the values in this Option object were seen on the command line
+func (self *Options) ValuesSeen() bool {
+	for _, opt := range self.values {
+		if opt.Seen == true {
+			return true
+		}
+	}
+	return false
+}
+
+/*
+	Return true if no arguments where seen on the command line
+
+	opts, _ := parser.ParseArgs(nil)
+	if opts.NoArgs() {
+		fmt.Printf("No arguments provided")
+		parser.PrintHelp()
+		os.Exit(-1)
+	}
+*/
+func (self *Options) NoArgs() bool {
+	for _, group := range self.groups {
+		if group.ValuesSeen() {
+			return false
+		}
+	}
+	return !self.ValuesSeen()
+}
+
+func (self *Options) convert(key string, typeName string, convFunc func(value interface{})) {
+	opt, ok := self.values[key]
+	if !ok {
+		panic(fmt.Sprintf("No Such Value '%s' found", key))
 	}
 	defer func() {
 		if msg := recover(); msg != nil {
-			panic(fmt.Sprintf("Refusing to convert Option '%s' of type '%s' to '%s'",
-				key, reflect.TypeOf(self.Values[key]), typeName))
+			panic(fmt.Sprintf("Refusing to convert Option '%s' of type '%s' with value '%s' to '%s'",
+				key, reflect.TypeOf(self.values[key].Value), self.values[key].Value, typeName))
 		}
 	}()
 	convFunc(opt.Value)
 }
 
-func (self *Options) IsNil(key string) bool {
-	if opt, ok := self.Values[key]; ok {
-		return opt.Value == nil
-	}
-	return true
-}
-
-func (self *Options) Set(key string, value interface{}, seen bool) {
-	self.Values[key] = &OptionVal{value, seen}
-}
-
-func (self *Options) NoArgs() bool {
-	for _, opt := range self.Values {
-		if opt.Seen == true {
-			return false
-		}
-	}
-	return true
-}
-
 func (self *Options) Int(key string) int {
 	var result int
-	self.Convert(key, "int", func(value interface{}) {
+	self.convert(key, "int", func(value interface{}) {
 		if value != nil {
 			result = value.(int)
 			return
@@ -390,7 +429,7 @@ func (self *Options) Int(key string) int {
 
 func (self *Options) String(key string) string {
 	var result string
-	self.Convert(key, "string", func(value interface{}) {
+	self.convert(key, "string", func(value interface{}) {
 		if value != nil {
 			result = value.(string)
 			return
@@ -403,7 +442,7 @@ func (self *Options) String(key string) string {
 
 func (self *Options) Bool(key string) bool {
 	var result bool
-	self.Convert(key, "bool", func(value interface{}) {
+	self.convert(key, "bool", func(value interface{}) {
 		if value != nil {
 			result = value.(bool)
 			return
@@ -417,7 +456,7 @@ func (self *Options) Bool(key string) bool {
 // TODO: Should support more than just []string
 func (self *Options) Slice(key string) []string {
 	var result []string
-	self.Convert(key, "[]string", func(value interface{}) {
+	self.convert(key, "[]string", func(value interface{}) {
 		if value != nil {
 			result = value.([]string)
 			return
@@ -426,6 +465,13 @@ func (self *Options) Slice(key string) []string {
 		result = []string{}
 	})
 	return result
+}
+
+func (self *Options) IsNil(key string) bool {
+	if opt, ok := self.values[key]; ok {
+		return opt.Value == nil
+	}
+	return true
 }
 
 // ***********************************************
@@ -439,7 +485,7 @@ type ArgParser struct {
 	WordWrap    int
 	mutex       sync.Mutex
 	args        []string
-	groupOpts   *GroupOptions
+	options     *Options
 	rules       Rules
 	err         error
 	idx         int
@@ -453,7 +499,7 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 		200,
 		sync.Mutex{},
 		[]string{},
-		NewGroupOptions(),
+		NewOptions(""),
 		nil,
 		nil,
 		0,
@@ -490,7 +536,7 @@ func (self *ArgParser) ValidateRules() error {
 }
 
 func (self *ArgParser) Opt(name string) *RuleModifier {
-	rule := &Rule{Cast: castString, Group: DefaultOptGroup}
+	rule := &Rule{Cast: castString, Group: DefaultOptionGroup}
 	// Create a RuleModifier to configure the rule
 	modifier := &RuleModifier{rule}
 	// If name begins with a non word character, assume it's an optional argument
@@ -564,7 +610,7 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 
 // Gather all the values from our rules, then apply the passed in map to any rules that don't have a computed value.
 func (self *ArgParser) Apply(values *map[string]string) (*Options, error) {
-	results := NewGroupOptions()
+	results := NewOptions("")
 
 	// for each of the rules
 	for _, rule := range self.rules {
@@ -577,28 +623,24 @@ func (self *ArgParser) Apply(values *map[string]string) (*Options, error) {
 		if rule.StoreValue != nil {
 			rule.StoreValue(value)
 		}
-		results.Get(rule.Group).Set(rule.Name, value, rule.Seen)
+		results.Group(rule.Group).Set(rule.Name, value, rule.Seen)
 	}
-	self.SetGroupOpts(results)
-	return self.GetGroupOpts().Get(DefaultOptGroup), nil
+	self.SetOpts(results)
+	return self.GetOpts(), nil
 }
 
-func (self *ArgParser) SetGroupOpts(groupOpts *GroupOptions) {
+func (self *ArgParser) SetOpts(options *Options) {
 	self.mutex.Lock()
-	self.groupOpts = groupOpts
+	self.options = options
 	self.mutex.Unlock()
 }
 
-func (self *ArgParser) GetGroupOpts() *GroupOptions {
+func (self *ArgParser) GetOpts() *Options {
 	self.mutex.Lock()
 	defer func() {
 		self.mutex.Unlock()
 	}()
-	return self.groupOpts
-}
-
-func (self *ArgParser) GetOpts() *Options {
-	return self.GetGroupOpts().Get(DefaultOptGroup)
+	return self.options
 }
 
 func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
