@@ -40,6 +40,10 @@ func NewRuleModifier(parser *ArgParser) *RuleModifier {
 	return &RuleModifier{newRule(), parser}
 }
 
+func newRuleModifier(rule *Rule, parser *ArgParser) *RuleModifier {
+	return &RuleModifier{newRule(), parser}
+}
+
 func (self *RuleModifier) GetRule() *Rule {
 	return self.rule
 }
@@ -140,6 +144,7 @@ func (self *RuleModifier) Count() *RuleModifier {
 		rule.Count = rule.Count + 1
 		return nil
 	}
+	self.rule.Cast = castInt
 	return self
 }
 
@@ -173,6 +178,7 @@ func (self *RuleModifier) AddOption(name string) *RuleModifier {
 type Rule struct {
 	Count       int
 	IsPos       int
+	IsConfig    bool
 	Name        string
 	RuleDesc    string
 	VarName     string
@@ -224,6 +230,9 @@ func (self *Rule) MatchesAlias(args []string, idx *int) (bool, string) {
 }
 
 func (self *Rule) Match(args []string, idx *int) (bool, error) {
+	if self.IsConfig {
+		return false, nil
+	}
 	matched, alias := self.MatchesAlias(args, idx)
 	//fmt.Printf("Matched: %s - %s\n", matched, alias)
 	if !matched {
@@ -255,13 +264,13 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 }
 
 func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
-	// TODO: Do this better
+	// TODO: Do count better?
 	if self.Count != 0 {
 		self.Value = self.Count
 	}
 
 	// If Rule Matched Argument on command line
-	if self.Value != nil {
+	if self.Seen {
 		return self.Value, nil
 	}
 
@@ -270,6 +279,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if value != nil {
 		return value, nil
 	}
@@ -609,6 +619,16 @@ func (self *ArgParser) AddOption(name string) *RuleModifier {
 	return self.AddRule(name, NewRuleModifier(self))
 }
 
+func (self *ArgParser) Cfg(name string) *RuleModifier {
+	return self.AddConfig(name)
+}
+
+func (self *ArgParser) AddConfig(name string) *RuleModifier {
+	rule := newRule()
+	rule.IsConfig = true
+	return self.AddRule(name, newRuleModifier(rule, self))
+}
+
 func (self *ArgParser) AddRule(name string, modifier *RuleModifier) *RuleModifier {
 	rule := modifier.GetRule()
 	// If name begins with a non word character, assume it's an optional argument
@@ -622,7 +642,11 @@ func (self *ArgParser) AddRule(name string, modifier *RuleModifier) *RuleModifie
 			rule.Name = group[2]
 		}
 	} else {
-		rule.IsPos = 1
+		// If it's not a config only option
+		if !rule.IsConfig {
+			// If must be a positional
+			rule.IsPos = 1
+		}
 		rule.Name = name
 	}
 	// Append the rule our list of rules

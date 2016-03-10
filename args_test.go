@@ -18,11 +18,12 @@ var _ = Describe("ArgParser", func() {
 
 	Describe("Options.Int()", func() {
 		It("Should convert options to integers", func() {
-			opts := args.NewOptionsFromMap("", map[string]map[string]*args.OptionValue{
-				"": {
-					"one": &args.OptionValue{Value: 1, Seen: false},
-				},
-			})
+			opts := args.NewOptionsFromMap(args.DefaultOptionGroup,
+				map[string]map[string]*args.OptionValue{
+					args.DefaultOptionGroup: {
+						"one": &args.OptionValue{Value: 1, Seen: false},
+					},
+				})
 			result := opts.Int("one")
 			Expect(result).To(Equal(1))
 		})
@@ -182,16 +183,29 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.Int("power-level")).To(Equal(1))
 		})
 	})
-	Describe("opt.InGroup()", func() {
-		cmdLine := []string{"--power-level", "--hostname", "mysql.com"}
-		It("Should add a new group", func() {
+	Describe("args.AddConfig()", func() {
+		cmdLine := []string{"--power-level", "--power-level"}
+		It("Should add new config only rule", func() {
 			parser := args.NewParser()
-			parser.AddOption("--power-level").Count()
-			parser.AddOption("--hostname").InGroup("database")
+			parser.AddConfig("power-level").Count().Help("My help message")
+
+			// Should ignore command line options
 			opt, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
-			Expect(opt.Int("power-level")).To(Equal(1))
-			Expect(opt.Group("database").String("hostname")).To(Equal("mysql.com"))
+			Expect(opt.Int("power-level")).To(Equal(0))
+
+			// But Apply() a config file
+			options := args.NewOptionsFromMap(args.DefaultOptionGroup,
+				map[string]map[string]*args.OptionValue{
+					args.DefaultOptionGroup: {
+						"power-level": &args.OptionValue{Value: 3, Seen: false},
+					},
+				})
+			newOpt, _ := parser.Apply(options)
+			// The old config still has the original non config applied version
+			Expect(opt.Int("power-level")).To(Equal(0))
+			// The new config has the value applied
+			Expect(newOpt.Int("power-level")).To(Equal(3))
 		})
 	})
 	Describe("args.AddRule()", func() {
@@ -218,7 +232,31 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.Count()", func() {
+	Describe("args.AddRule()", func() {
+		cmdLine := []string{"--power-level", "--power-level"}
+		It("Should add new rules", func() {
+			parser := args.NewParser()
+			rule := args.NewRuleModifier(parser).Count().Help("My help message")
+			parser.AddRule("--power-level", rule)
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Int("power-level")).To(Equal(2))
+		})
+	})
+
+	Describe("RuleModifier.InGroup()", func() {
+		cmdLine := []string{"--power-level", "--hostname", "mysql.com"}
+		It("Should add a new group", func() {
+			parser := args.NewParser()
+			parser.AddOption("--power-level").Count()
+			parser.AddOption("--hostname").InGroup("database")
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Int("power-level")).To(Equal(1))
+			Expect(opt.Group("database").String("hostname")).To(Equal("mysql.com"))
+		})
+	})
+	Describe("RuleModifier.Count()", func() {
 		It("Should count one", func() {
 			parser := args.NewParser()
 			cmdLine := []string{"--verbose"}
@@ -237,7 +275,7 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.IsInt()", func() {
+	Describe("RuleModifier.IsInt()", func() {
 		It("Should ensure value supplied is an integer", func() {
 			parser := args.NewParser()
 			parser.AddOption("--power-level").IsInt()
@@ -269,7 +307,7 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.StoreInt()", func() {
+	Describe("RuleModifier.StoreInt()", func() {
 		It("Should ensure value supplied is assigned to passed value", func() {
 			parser := args.NewParser()
 			var value int
@@ -283,7 +321,7 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.IsString()", func() {
+	Describe("RuleModifier.IsString()", func() {
 		It("Should provide string value", func() {
 			parser := args.NewParser()
 			parser.AddOption("--power-level").IsString()
@@ -304,7 +342,7 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.StoreString()", func() {
+	Describe("RuleModifier.StoreString()", func() {
 		It("Should ensure value supplied is assigned to passed value", func() {
 			parser := args.NewParser()
 			var value string
@@ -318,7 +356,7 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.StoreStr()", func() {
+	Describe("RuleModifier.StoreStr()", func() {
 		It("Should ensure value supplied is assigned to passed value", func() {
 			parser := args.NewParser()
 			var value string
@@ -332,7 +370,7 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.StoreTrue()", func() {
+	Describe("RuleModifier.StoreTrue()", func() {
 		It("Should ensure value supplied is true when argument is seen", func() {
 			parser := args.NewParser()
 			var debug bool
@@ -358,7 +396,7 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.IsTrue()", func() {
+	Describe("RuleModifier.IsTrue()", func() {
 		It("Should set true value when seen", func() {
 			parser := args.NewParser()
 			parser.AddOption("--help").IsTrue()
@@ -379,7 +417,7 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.StoreSlice()", func() {
+	Describe("RuleModifier.StoreSlice()", func() {
 		It("Should ensure []string provided is set when a comma separated list is provided", func() {
 			parser := args.NewParser()
 			var list []string
@@ -417,7 +455,7 @@ var _ = Describe("ArgParser", func() {
 
 	})
 
-	Describe("args.Default()", func() {
+	Describe("RuleModifier.Default()", func() {
 		It("Should ensure default values is supplied if no matching argument is found", func() {
 			parser := args.NewParser()
 			var value int
@@ -446,7 +484,7 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("args.Env()", func() {
+	Describe("RuleModifier.Env()", func() {
 		AfterEach(func() {
 			os.Unsetenv("POWER_LEVEL")
 		})
