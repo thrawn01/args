@@ -243,6 +243,39 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.Int("power-level")).To(Equal(2))
 		})
 	})
+	Describe("RuleModifier.AddConfig()", func() {
+		cmdLine := []string{"--power-level", "--power-level", "--user"}
+		It("Should add new config only rule", func() {
+			parser := args.NewParser()
+			parser.AddConfig("power-level").Count().Help("My help message")
+
+			db := parser.InGroup("database")
+			db.AddConfig("user").Help("database user")
+			db.AddConfig("pass").Help("database password")
+
+			// Should ignore command line options
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Int("power-level")).To(Equal(0))
+
+			// But Apply() a config file
+			options := args.NewOptionsFromMap(args.DefaultOptionGroup,
+				map[string]map[string]*args.OptionValue{
+					args.DefaultOptionGroup: {
+						"power-level": &args.OptionValue{Value: 3, Seen: false},
+					},
+					"database": {
+						"user": &args.OptionValue{Value: "my-user", Seen: false},
+						"pass": &args.OptionValue{Value: "my-pass", Seen: false},
+					},
+				})
+			newOpt, _ := parser.Apply(options)
+			// The new config has the value applied
+			Expect(newOpt.Int("power-level")).To(Equal(3))
+			Expect(newOpt.Group("database").String("user")).To(Equal("my-user"))
+			Expect(newOpt.Group("database").String("pass")).To(Equal("my-pass"))
+		})
+	})
 
 	Describe("RuleModifier.InGroup()", func() {
 		cmdLine := []string{"--power-level", "--hostname", "mysql.com"}

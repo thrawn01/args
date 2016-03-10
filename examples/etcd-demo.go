@@ -21,17 +21,17 @@ func main() {
 		Default("192.168.5.1,192.168.5.2").Help("List of etcd endpoints")
 
 	// Define a name used by other services to discover this service
-	parser.Option("--service-name").Alias("-sN").
+	parser.AddOption("--service-name").Alias("-sN").
 		Default("frontend1").Help("Name used for service discovery")
 
 	// if Etcd() is given etcd keys are crafted by using
 	// the name of the option. This etcd key will be '/exampleApp/message'
-	parser.Opt("--message").Etcd().
+	parser.AddOption("--message").Etcd().
 		Default("over-ten-thousand").Help("send a message")
 
 	// Defines --power-level command line option, but defines the
 	// etcd key as '/exampleApp/powerLevel'
-	parser.Opt("--power-level").EtcdKey("powerLevel").
+	parser.AddOption("--power-level").EtcdKey("powerLevel").
 		Default("10000").Help("set our power level")
 
 	// Config options can also be used
@@ -45,13 +45,13 @@ func main() {
 	db.AddConfig("database").Default("localhost").Etcd().Help("database hostname")
 
 	// etcd key will be '/exampleApp/database/debug'
-	db.Conf("debug").IsTrue().Etcd().Help("enable database debug")
+	db.AddConfig("debug").IsTrue().Etcd().Help("enable database debug")
 	// etcd key will be '/exampleApp/database/database'
-	db.Conf("database").IsString().Etcd().Default("myDatabase").Help("name of database to use")
+	db.AddConfig("database").IsString().Etcd().Default("myDatabase").Help("name of database to use")
 	// etcd key will be '/exampleApp/database/user'
-	db.Conf("user").Etcd().Help("database user")
+	db.AddConfig("user").Etcd().Help("database user")
 	// etcd key will be '/exampleApp/database/pass'
-	db.Conf("pass").Etcd().Help("database password")
+	db.AddConfig("pass").Etcd().Help("database password")
 
 	opts, err := parser.ParseArgs(nil)
 	if err != nil {

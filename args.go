@@ -41,7 +41,7 @@ func NewRuleModifier(parser *ArgParser) *RuleModifier {
 }
 
 func newRuleModifier(rule *Rule, parser *ArgParser) *RuleModifier {
-	return &RuleModifier{newRule(), parser}
+	return &RuleModifier{rule, parser}
 }
 
 func (self *RuleModifier) GetRule() *Rule {
@@ -169,7 +169,16 @@ func (self *RuleModifier) InGroup(group string) *RuleModifier {
 }
 
 func (self *RuleModifier) AddOption(name string) *RuleModifier {
-	return self.parser.AddRule(name, self)
+	modifier := *self
+	// Make a new RuleModifier using self as the template
+	return self.parser.AddRule(name, &modifier)
+}
+
+func (self *RuleModifier) AddConfig(name string) *RuleModifier {
+	// Make a new Rule using self.rule as the template
+	rule := *self.rule
+	rule.IsConfig = true
+	return self.parser.AddRule(name, newRuleModifier(&rule, self.parser))
 }
 
 // ***********************************************
@@ -286,8 +295,9 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 
 	// If provided our map of values, use that
 	if values != nil {
-		if values.HasKey(self.Name) {
-			return self.Cast(self.Name, values.RawValue(self.Name))
+		group := values.Group(self.Group)
+		if group.HasKey(self.Name) {
+			return self.Cast(self.Name, group.RawValue(self.Name))
 		}
 	}
 
@@ -381,7 +391,11 @@ func NewOptionsFromMap(group string, groups map[string]map[string]*OptionValue) 
 
 func (self *Options) ValuesToString() string {
 	var buffer bytes.Buffer
-	buffer.WriteString(fmt.Sprintf("%s:\n", self.group))
+	groupName := self.group
+	if groupName == "" {
+		groupName = "\"\""
+	}
+	buffer.WriteString(fmt.Sprintf("%s:\n", groupName))
 	for key, value := range self.values {
 		buffer.WriteString(fmt.Sprintf("   %s=%s\n", key, value.Value))
 	}
