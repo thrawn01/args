@@ -17,11 +17,11 @@ func main() {
 	parser := args.Parser(args.Name("example"), args.EtcdPath("exampleApp/"))
 
 	// Since 'Etcd()' is not used, this option is not configurable via etcd
-	parser.Opt("--etcd-endpoints").Alias("-eP").IsSlice().
+	parser.AddOption("--etcd-endpoints").Alias("-eP").IsSlice().
 		Default("192.168.5.1,192.168.5.2").Help("List of etcd endpoints")
 
 	// Define a name used by other services to discover this service
-	parser.Opt("--service-name").Alias("-sN").
+	parser.Option("--service-name").Alias("-sN").
 		Default("frontend1").Help("Name used for service discovery")
 
 	// if Etcd() is given etcd keys are crafted by using
@@ -35,14 +35,15 @@ func main() {
 		Default("10000").Help("set our power level")
 
 	// Config options can also be used
-	parser.Conf("config-version").IsInt().Etcd().
+	parser.AddConfig("config-version").InGroup("database").IsInt().Etcd().
 		Help("Indicates updates to etcd are complete and we should reload the service")
 
 	// You can also use groups with etcd keys
-	db = parser.Group("database")
+	db = parser.InGroup("database")
 
 	// etcd key will be '/exampleApp/database/host'
-	db.Conf("host").Default("localhost").Etcd().Help("database hostname")
+	db.AddConfig("database").Default("localhost").Etcd().Help("database hostname")
+
 	// etcd key will be '/exampleApp/database/debug'
 	db.Conf("debug").IsTrue().Etcd().Help("enable database debug")
 	// etcd key will be '/exampleApp/database/database'
@@ -109,12 +110,5 @@ func main() {
 		}
 	})
 
-	// Little Demo of how options work
-	var options, dbOptions args.Options
-	options = args.NewOptions()
-	dbOptions = options.Group("database")
-
-	hostName := dbOptions.String("host")
-	user := dbOptions.String("user")
-
+	// TODO: Make a third example where we grab the updated etcd config only when 'config-version' changes
 }

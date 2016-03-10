@@ -32,7 +32,12 @@ type StoreFunc func(interface{})
 // RuleModifier Object
 // ***********************************************
 type RuleModifier struct {
-	rule *Rule
+	rule   *Rule
+	parser *ArgParser
+}
+
+func newRuleModifier(rule *Rule, parser *ArgParser) *RuleModifier {
+	return &RuleModifier{rule, parser}
 }
 
 func (self *RuleModifier) GetRule() *Rule {
@@ -153,6 +158,15 @@ func (self *RuleModifier) Help(message string) *RuleModifier {
 	return self
 }
 
+func (self *RuleModifier) InGroup(group string) *RuleModifier {
+	self.rule.Group = group
+	return self
+}
+
+func (self *RuleModifier) AddOption(name string) *RuleModifier {
+	return self.parser.AddOption(name)
+}
+
 // ***********************************************
 // Rule Object
 // ***********************************************
@@ -177,7 +191,7 @@ func (self *Rule) Validate() error {
 	return nil
 }
 
-func (self *Rule) GenerateHelpOpt() (string, string) {
+func (self *Rule) GenerateHelp() (string, string) {
 	var parens []string
 	paren := ""
 	if self.Default != nil {
@@ -563,7 +577,7 @@ func (self *ArgParser) ValidateRules() error {
 		if next < len(self.rules) {
 			for ; next < len(self.rules); next++ {
 				if rule.Name == self.rules[next].Name {
-					return errors.New(fmt.Sprintf("Duplicate Opt() called with same name as '%s'", rule.Name))
+					return errors.New(fmt.Sprintf("Duplicate option with same name as '%s'", rule.Name))
 				}
 			}
 		}
@@ -580,9 +594,13 @@ func (self *ArgParser) ValidateRules() error {
 }
 
 func (self *ArgParser) Opt(name string) *RuleModifier {
+	return self.AddOption(name)
+}
+
+func (self *ArgParser) AddOption(name string) *RuleModifier {
 	rule := &Rule{Cast: castString, Group: DefaultOptionGroup}
 	// Create a RuleModifier to configure the rule
-	modifier := &RuleModifier{rule}
+	modifier := newRuleModifier(rule, self)
 	// If name begins with a non word character, assume it's an optional argument
 	if isOptional.MatchString(name) {
 		// Attempt to extract the name
@@ -620,7 +638,7 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 
 	// Sanity Check
 	if len(self.rules) == 0 {
-		return nil, errors.New("Must create some options to match with args.Opt()" +
+		return nil, errors.New("Must create some options to match with args.AddOption()" +
 			" before calling arg.ParseArgs()")
 	}
 
@@ -760,7 +778,7 @@ func (self *ArgParser) GenerateOptHelp() string {
 	// Ask each rule to generate a Help message for the options
 	maxLen := 0
 	for _, rule := range self.rules {
-		flags, message := rule.GenerateHelpOpt()
+		flags, message := rule.GenerateHelp()
 		if len(flags) > maxLen {
 			maxLen = len(flags)
 		}
