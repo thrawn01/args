@@ -52,7 +52,7 @@ var _ = Describe("ArgParser", func() {
 			parser := args.NewParser()
 			parser.AddOption("--one").IsString()
 			input := []byte("one=this is one value\ntwo=this is two value\n")
-			opt, err := parser.ParseIni(input)
+			opt, err := parser.FromIni(input)
 			Expect(err).To(BeNil())
 			Expect(opt.String("one")).To(Equal("this is one value"))
 		})
@@ -65,7 +65,7 @@ var _ = Describe("ArgParser", func() {
 			cmdLine := []string{"--three", "this is three value"}
 			opt, err := parser.ParseArgs(&cmdLine)
 			input := []byte("one=this is one value\ntwo=this is two value\n")
-			opt, err = parser.ParseIni(input)
+			opt, err = parser.FromIni(input)
 			Expect(err).To(BeNil())
 			Expect(opt.String("one")).To(Equal("this is one value"))
 			Expect(opt.String("three")).To(Equal("this is three value"))
@@ -79,7 +79,7 @@ var _ = Describe("ArgParser", func() {
 			cmdLine := []string{"--three", "this is three value", "--one", "this is from the cmd line"}
 			opt, err := parser.ParseArgs(&cmdLine)
 			input := []byte("one=this is one value\ntwo=this is two value\n")
-			opt, err = parser.ParseIni(input)
+			opt, err = parser.FromIni(input)
 			Expect(err).To(BeNil())
 			Expect(opt.String("one")).To(Equal("this is from the cmd line"))
 			Expect(opt.String("three")).To(Equal("this is three value"))
@@ -96,7 +96,7 @@ var _ = Describe("ArgParser", func() {
 			Expect(list).To(Equal([]string{"foo", "bar", "bit"}))
 
 			input := []byte("list=six,five,four\n")
-			opt, err = parser.ParseIni(input)
+			opt, err = parser.FromIni(input)
 			Expect(err).To(BeNil())
 			Expect(opt.Slice("list")).To(Equal([]string{"six", "five", "four"}))
 			Expect(list).To(Equal([]string{"six", "five", "four"}))

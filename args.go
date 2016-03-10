@@ -13,6 +13,7 @@ import (
 
 	"sync"
 
+	etcd "github.com/coreos/etcd/client"
 	"github.com/go-ini/ini"
 )
 
@@ -168,10 +169,18 @@ func (self *RuleModifier) InGroup(group string) *RuleModifier {
 	return self
 }
 
+func (self *RuleModifier) Opt(name string) *RuleModifier {
+	return self.AddOption(name)
+}
+
 func (self *RuleModifier) AddOption(name string) *RuleModifier {
 	modifier := *self
 	// Make a new RuleModifier using self as the template
 	return self.parser.AddRule(name, &modifier)
+}
+
+func (self *RuleModifier) Cfg(name string) *RuleModifier {
+	return self.AddConfig(name)
 }
 
 func (self *RuleModifier) AddConfig(name string) *RuleModifier {
@@ -179,6 +188,17 @@ func (self *RuleModifier) AddConfig(name string) *RuleModifier {
 	rule := *self.rule
 	rule.IsConfig = true
 	return self.parser.AddRule(name, newRuleModifier(&rule, self.parser))
+}
+
+func (self *RuleModifier) Etcd() *RuleModifier {
+	self.rule.Etcd = true
+	return self
+}
+
+func (self *RuleModifier) EtcdKey(key string) *RuleModifier {
+	self.rule.Etcd = true
+	self.rule.EtcdKey = key
+	return self
 }
 
 // ***********************************************
@@ -200,6 +220,8 @@ type Rule struct {
 	Action      ActionFunc
 	StoreValue  StoreFunc
 	Group       string
+	Etcd        bool
+	EtcdKey     string
 }
 
 func newRule() *Rule {
@@ -570,6 +592,7 @@ type ArgParser struct {
 	Name        string
 	WordWrap    int
 	mutex       sync.Mutex
+	etcdPath    string
 	args        []string
 	options     *Options
 	rules       Rules
@@ -584,6 +607,7 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 		"",
 		200,
 		sync.Mutex{},
+		"",
 		[]string{},
 		NewOptions(""),
 		nil,
@@ -641,6 +665,14 @@ func (self *ArgParser) AddConfig(name string) *RuleModifier {
 	rule := newRule()
 	rule.IsConfig = true
 	return self.AddRule(name, newRuleModifier(rule, self))
+}
+
+func (self *ArgParser) GetEtcdPath() string {
+	return self.etcdPath
+}
+
+func (self *ArgParser) SetEtcdPath(path string) {
+	self.etcdPath = path
 }
 
 func (self *ArgParser) AddRule(name string, modifier *RuleModifier) *RuleModifier {
@@ -753,6 +785,27 @@ func (self *ArgParser) GetOpts() *Options {
 	return self.options
 }
 
+func (self *ArgParser) ParseEtcd(api etcd.KeysAPI) (*Options, error) {
+	for _, rule := range self.rules {
+		if rule.Etcd {
+			// Build the ETCD key
+
+		}
+	}
+	return NewOptions(DefaultOptionGroup), nil
+}
+
+// Parse the INI file and the Apply() the values to the parser
+func (self *ArgParser) FromIni(input []byte) (*Options, error) {
+	options, err := self.ParseIni(input)
+	if err != nil {
+		return options, err
+	}
+	// Apply the ini file values to the commandline and environment variables
+	return self.Apply(options)
+}
+
+// Parse the INI file and return the raw parsed options
 func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
 	// Parse the file return a map of the contents
 	cfg, err := ini.Load(input)
@@ -772,8 +825,7 @@ func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
 		}
 
 	}
-	// Apply the ini file values to the commandline and environment variables
-	return self.Apply(values)
+	return values, nil
 }
 
 func (self *ArgParser) match(rules Rules) (bool, error) {
@@ -851,6 +903,12 @@ func (self *ArgParser) GenerateOptHelp() string {
 func Name(name string) ParseModifier {
 	return func(parser *ArgParser) {
 		parser.Name = name
+	}
+}
+
+func EtcdPath(path string) ParseModifier {
+	return func(parser *ArgParser) {
+		parser.SetEtcdPath(path)
 	}
 }
 
