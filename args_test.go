@@ -15,7 +15,6 @@ func TestArgs(t *testing.T) {
 }
 
 var _ = Describe("ArgParser", func() {
-
 	Describe("Options.Int()", func() {
 		It("Should convert options to integers", func() {
 			opts := args.NewOptionsFromMap(args.DefaultOptionGroup,
@@ -103,7 +102,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(list).To(Equal([]string{"six", "five", "four"}))
 		})
 	})
-
 	Describe("args.ParseArgs(nil)", func() {
 		parser := args.NewParser()
 		It("Should return error if AddOption() was never called", func() {
@@ -112,7 +110,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(err.Error()).To(Equal("Must create some options to match with args.AddOption() before calling arg.ParseArgs()"))
 		})
 	})
-
 	Describe("args.AddOption()", func() {
 		cmdLine := []string{"--one", "-two", "++three", "+four", "--power-level"}
 
@@ -231,7 +228,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.Group("database").String("hostname")).To(Equal("mysql.com"))
 		})
 	})
-
 	Describe("args.AddRule()", func() {
 		cmdLine := []string{"--power-level", "--power-level"}
 		It("Should add new rules", func() {
@@ -276,7 +272,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(newOpt.Group("database").String("pass")).To(Equal("my-pass"))
 		})
 	})
-
 	Describe("RuleModifier.InGroup()", func() {
 		cmdLine := []string{"--power-level", "--hostname", "mysql.com"}
 		It("Should add a new group", func() {
@@ -307,7 +302,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.Int("verbose")).To(Equal(3))
 		})
 	})
-
 	Describe("RuleModifier.IsInt()", func() {
 		It("Should ensure value supplied is an integer", func() {
 			parser := args.NewParser()
@@ -339,7 +333,6 @@ var _ = Describe("ArgParser", func() {
 			//Expect(opt.Int("power-level")).To(Equal(0))
 		})
 	})
-
 	Describe("RuleModifier.StoreInt()", func() {
 		It("Should ensure value supplied is assigned to passed value", func() {
 			parser := args.NewParser()
@@ -353,7 +346,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(value).To(Equal(10000))
 		})
 	})
-
 	Describe("RuleModifier.IsString()", func() {
 		It("Should provide string value", func() {
 			parser := args.NewParser()
@@ -374,7 +366,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(err.Error()).To(Equal("Expected '--power-level' to have an argument"))
 		})
 	})
-
 	Describe("RuleModifier.StoreString()", func() {
 		It("Should ensure value supplied is assigned to passed value", func() {
 			parser := args.NewParser()
@@ -388,7 +379,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(value).To(Equal("over-ten-thousand"))
 		})
 	})
-
 	Describe("RuleModifier.StoreStr()", func() {
 		It("Should ensure value supplied is assigned to passed value", func() {
 			parser := args.NewParser()
@@ -402,7 +392,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(value).To(Equal("over-ten-thousand"))
 		})
 	})
-
 	Describe("RuleModifier.StoreTrue()", func() {
 		It("Should ensure value supplied is true when argument is seen", func() {
 			parser := args.NewParser()
@@ -428,7 +417,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(debug).To(Equal(false))
 		})
 	})
-
 	Describe("RuleModifier.IsTrue()", func() {
 		It("Should set true value when seen", func() {
 			parser := args.NewParser()
@@ -449,7 +437,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.Bool("help")).To(Equal(false))
 		})
 	})
-
 	Describe("RuleModifier.StoreSlice()", func() {
 		It("Should ensure []string provided is set when a comma separated list is provided", func() {
 			parser := args.NewParser()
@@ -487,7 +474,6 @@ var _ = Describe("ArgParser", func() {
 		})
 
 	})
-
 	Describe("RuleModifier.Default()", func() {
 		It("Should ensure default values is supplied if no matching argument is found", func() {
 			parser := args.NewParser()
@@ -516,7 +502,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(panicCaught).To(Equal(true))
 		})
 	})
-
 	Describe("RuleModifier.Env()", func() {
 		AfterEach(func() {
 			os.Unsetenv("POWER_LEVEL")
@@ -558,7 +543,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(value).To(Equal(1))
 		})
 	})
-
 	Describe("opts.NoArgs()", func() {
 		It("Should return true if no arguments on the command line", func() {
 			parser := args.NewParser()
@@ -579,7 +563,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.NoArgs()).To(Equal(false))
 		})
 	})
-
 	Describe("parser.GenerateOptHelp()", func() {
 		It("Should generate help messages given a set of rules", func() {
 			parser := args.NewParser(args.WrapLen(80))
@@ -594,7 +577,6 @@ var _ = Describe("ArgParser", func() {
 				"\n                      laborum. \n"))
 		})
 	})
-
 	Describe("parser.GenerateHelp()", func() {
 		It("Should generate help messages given a set of rules", func() {
 			parser := args.NewParser(args.Name("dragon-ball"), args.WrapLen(80))
@@ -613,7 +595,6 @@ var _ = Describe("ArgParser", func() {
 			"                      est laborum."))*/
 		})
 	})
-
 	Describe("Helper.WordWrap()", func() {
 		It("Should wrap the line including the indent length", func() {
 			// Should show the message with the indentation of 10 characters on the next line
@@ -630,7 +611,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(msg).To(Equal("Lorem ipsum dolor sit amet, consecteturadipiscing elit, sed do eiusmod tempor\n incididunt ut labore etmollit anim id est laborum."))
 		})
 	})
-
 	Describe("args.Dedent()", func() {
 		It("Should un-indent a simple string", func() {
 			text := args.Dedent(`Lorem ipsum dolor sit amet, consecteturadipiscing elit, sed
@@ -646,7 +626,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(text).To(Equal("\nLorem ipsum dolor sit amet, consecteturadipiscing elit, sed\ndo eiusmod tempor incididunt ut labore etmollit anim id\nest laborum."))
 		})
 	})
-
 	Describe("args.DedentTrim()", func() {
 		It("Should un-indent a simple string and trim the result", func() {
 			text := args.DedentTrim(`
