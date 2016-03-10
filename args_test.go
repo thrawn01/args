@@ -182,6 +182,42 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.Int("power-level")).To(Equal(1))
 		})
 	})
+	Describe("opt.InGroup()", func() {
+		cmdLine := []string{"--power-level", "--hostname", "mysql.com"}
+		It("Should add a new group", func() {
+			parser := args.NewParser()
+			parser.AddOption("--power-level").Count()
+			parser.AddOption("--hostname").InGroup("database")
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Int("power-level")).To(Equal(1))
+			Expect(opt.Group("database").String("hostname")).To(Equal("mysql.com"))
+		})
+	})
+	Describe("args.AddRule()", func() {
+		cmdLine := []string{"--power-level", "--power-level"}
+		It("Should add new rules", func() {
+			parser := args.NewParser()
+			rule := args.NewRuleModifier(parser).Count().Help("My help message")
+			parser.AddRule("--power-level", rule)
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Int("power-level")).To(Equal(2))
+		})
+	})
+	Describe("args.InGroup()", func() {
+		cmdLine := []string{"--power-level", "--hostname", "mysql.com"}
+		It("Should add a new group", func() {
+			parser := args.NewParser()
+			parser.AddOption("--power-level").Count()
+			parser.InGroup("database").AddOption("--hostname")
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Int("power-level")).To(Equal(1))
+			Expect(opt.Group("database").String("hostname")).To(Equal("mysql.com"))
+		})
+	})
+
 	Describe("args.Count()", func() {
 		It("Should count one", func() {
 			parser := args.NewParser()

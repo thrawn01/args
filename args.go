@@ -36,8 +36,8 @@ type RuleModifier struct {
 	parser *ArgParser
 }
 
-func newRuleModifier(rule *Rule, parser *ArgParser) *RuleModifier {
-	return &RuleModifier{rule, parser}
+func NewRuleModifier(parser *ArgParser) *RuleModifier {
+	return &RuleModifier{newRule(), parser}
 }
 
 func (self *RuleModifier) GetRule() *Rule {
@@ -164,7 +164,7 @@ func (self *RuleModifier) InGroup(group string) *RuleModifier {
 }
 
 func (self *RuleModifier) AddOption(name string) *RuleModifier {
-	return self.parser.AddOption(name)
+	return self.parser.AddRule(name, self)
 }
 
 // ***********************************************
@@ -185,6 +185,10 @@ type Rule struct {
 	Action      ActionFunc
 	StoreValue  StoreFunc
 	Group       string
+}
+
+func newRule() *Rule {
+	return &Rule{Cast: castString, Group: DefaultOptionGroup}
 }
 
 func (self *Rule) Validate() error {
@@ -593,14 +597,20 @@ func (self *ArgParser) ValidateRules() error {
 	return nil
 }
 
+func (self *ArgParser) InGroup(group string) *RuleModifier {
+	return NewRuleModifier(self).InGroup(group)
+}
+
 func (self *ArgParser) Opt(name string) *RuleModifier {
 	return self.AddOption(name)
 }
 
 func (self *ArgParser) AddOption(name string) *RuleModifier {
-	rule := &Rule{Cast: castString, Group: DefaultOptionGroup}
-	// Create a RuleModifier to configure the rule
-	modifier := newRuleModifier(rule, self)
+	return self.AddRule(name, NewRuleModifier(self))
+}
+
+func (self *ArgParser) AddRule(name string, modifier *RuleModifier) *RuleModifier {
+	rule := modifier.GetRule()
 	// If name begins with a non word character, assume it's an optional argument
 	if isOptional.MatchString(name) {
 		// Attempt to extract the name
