@@ -23,12 +23,20 @@ const (
 	DefaultOptionGroup string = ""
 )
 
+var DefaultLogger *NullLogger = &NullLogger{}
+
 // We only need part of the standard logging functions
 type StdLogger interface {
 	Print(...interface{})
 	Printf(string, ...interface{})
 	Println(...interface{})
 }
+
+type NullLogger struct{}
+
+func (self *NullLogger) Print(...interface{})          {}
+func (self *NullLogger) Printf(string, ...interface{}) {}
+func (self *NullLogger) Println(...interface{})        {}
 
 // ***********************************************
 //  Types
@@ -109,9 +117,14 @@ func (self *RuleModifier) StoreTrue(dest *bool) *RuleModifier {
 	return self
 }
 
+func (self *RuleModifier) IsStringSlice() *RuleModifier {
+	self.rule.Cast = castStringSlice
+	return self
+}
+
 // TODO: Make this less horribad, and use more reflection to make the interface simpler
 // It should also take more than just []string but also []int... etc...
-func (self *RuleModifier) StoreSlice(dest *[]string) *RuleModifier {
+func (self *RuleModifier) StoreStringSlice(dest *[]string) *RuleModifier {
 	self.rule.Cast = castStringSlice
 	self.rule.StoreValue = func(src interface{}) {
 		// First clear the currenty slice if any
@@ -158,7 +171,7 @@ func (self *RuleModifier) Count() *RuleModifier {
 }
 
 func (self *RuleModifier) Env(varName string) *RuleModifier {
-	self.rule.EnvironVars = append(self.rule.EnvironVars, varName)
+	self.rule.EnvVars = append(self.rule.EnvVars, varName)
 	return self
 }
 
@@ -213,23 +226,24 @@ func (self *RuleModifier) EtcdKey(key string) *RuleModifier {
 // Rule Object
 // ***********************************************
 type Rule struct {
-	Count       int
-	IsPos       int
-	IsConfig    bool
-	Name        string
-	RuleDesc    string
-	VarName     string
-	Value       interface{}
-	Seen        bool
-	Default     *string
-	Aliases     []string
-	EnvironVars []string
-	Cast        CastFunc
-	Action      ActionFunc
-	StoreValue  StoreFunc
-	Group       string
-	Etcd        bool
-	EtcdKey     string
+	Count      int
+	IsPos      int
+	IsConfig   bool
+	Name       string
+	RuleDesc   string
+	VarName    string
+	Value      interface{}
+	Seen       bool
+	Default    *string
+	Aliases    []string
+	EnvVars    []string
+	EnvPrefix  string
+	Cast       CastFunc
+	Action     ActionFunc
+	StoreValue StoreFunc
+	Group      string
+	Etcd       bool
+	EtcdKey    string
 }
 
 func newRule() *Rule {
@@ -246,8 +260,8 @@ func (self *Rule) GenerateHelp() (string, string) {
 	if self.Default != nil {
 		parens = append(parens, fmt.Sprintf("Default=%s", *self.Default))
 	}
-	if len(self.EnvironVars) != 0 {
-		envs := strings.Join(self.EnvironVars, ",")
+	if len(self.EnvVars) != 0 {
+		envs := strings.Join(self.EnvVars, ",")
 		parens = append(parens, fmt.Sprintf("Env=%s", envs))
 	}
 	if len(parens) != 0 {
@@ -341,11 +355,12 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 }
 
 func (self *Rule) GetEnvValue() (interface{}, error) {
-	if self.EnvironVars == nil {
+	if self.EnvVars == nil {
 		return nil, nil
 	}
 
-	for _, varName := range self.EnvironVars {
+	for _, varName := range self.EnvVars {
+		varName := self.EnvPrefix + varName
 		//if value, ok := os.LookupEnv(varName); ok {
 		if value := os.Getenv(varName); value != "" {
 			return self.Cast(varName, value)
@@ -372,242 +387,12 @@ func (self Rules) Swap(left, right int) {
 }
 
 // ***********************************************
-// Options Object
-// ***********************************************
-type Options struct {
-	group  string
-	values map[string]*OptionValue
-	groups map[string]*Options
-}
-
-type OptionValue struct {
-	Value interface{}
-	Seen  bool // Argument was seen on the commandline
-}
-
-func NewOptions(group string) *Options {
-	groups := make(map[string]*Options)
-	new := &Options{
-		group,
-		make(map[string]*OptionValue),
-		groups,
-	}
-	// Add the new Options{} to the group of options
-	groups[group] = new
-	return new
-}
-
-func NewOptionsWithGroups(group string, groups map[string]*Options) *Options {
-	new := &Options{
-		group,
-		make(map[string]*OptionValue),
-		groups,
-	}
-	// Add the new Options{} to the group of options
-	groups[group] = new
-	return new
-}
-
-func NewOptionsFromMap(group string, groups map[string]map[string]*OptionValue) *Options {
-	options := NewOptions(group)
-	for groupName, values := range groups {
-		grp := options.Group(groupName)
-		for key, opt := range values {
-			grp.Set(key, opt.Value, opt.Seen)
-		}
-	}
-	return options
-}
-
-func (self *Options) ValuesToString() string {
-	var buffer bytes.Buffer
-	groupName := self.group
-	if groupName == "" {
-		groupName = "\"\""
-	}
-	buffer.WriteString(fmt.Sprintf("%s:\n", groupName))
-	for key, value := range self.values {
-		buffer.WriteString(fmt.Sprintf("   %s=%s\n", key, value.Value))
-	}
-	return buffer.String()
-}
-
-func (self *Options) GroupsToString() string {
-	var buffer bytes.Buffer
-	for _, group := range self.groups {
-		buffer.WriteString(group.ValuesToString())
-	}
-	return buffer.String()
-}
-
-func (self *Options) Keys() []string {
-	keys := make([]string, 0, len(self.values))
-	for key := range self.values {
-		keys = append(keys, key)
-	}
-	return keys
-}
-
-func (self *Options) Group(group string) *Options {
-	// If they asked for the default group, and I'm the default group return myself
-	if group == DefaultOptionGroup && self.group == group {
-		return self
-	}
-	opts, ok := self.groups[group]
-	if !ok {
-		// TODO: Validate group name has valid characters or at least
-		// doesn't have ':' in the name which would conflict with Compare()
-
-		// If group doesn't exist; create it
-		new := NewOptionsWithGroups(group, self.groups)
-		self.groups[group] = new
-		return new
-	}
-	return opts
-}
-
-func (self *Options) Set(key string, value interface{}, seen bool) *Options {
-	self.values[key] = &OptionValue{value, seen}
-	return self
-}
-
-// Return true if any of the values in this Option object were seen on the command line
-func (self *Options) ValuesSeen() bool {
-	for _, opt := range self.values {
-		if opt.Seen == true {
-			return true
-		}
-	}
-	return false
-}
-
-/*
-	Return true if no arguments where seen on the command line
-
-	opts, _ := parser.ParseArgs(nil)
-	if opts.NoArgs() {
-		fmt.Printf("No arguments provided")
-		parser.PrintHelp()
-		os.Exit(-1)
-	}
-*/
-func (self *Options) NoArgs() bool {
-	for _, group := range self.groups {
-		if group.ValuesSeen() {
-			return false
-		}
-	}
-	return !self.ValuesSeen()
-}
-
-func (self *Options) convert(key string, typeName string, convFunc func(value interface{})) {
-	opt, ok := self.values[key]
-	if !ok {
-		// TODO: Use the user provided logger instance to inform what happened
-		//self.parser.Log.Printf("No Such Option '%s' found", key)
-		convFunc(nil)
-	}
-	defer func() {
-		if msg := recover(); msg != nil {
-			panic(fmt.Sprintf("Refusing to convert Option '%s' of type '%s' with value '%s' to '%s'",
-				key, reflect.TypeOf(self.values[key].Value), self.values[key].Value, typeName))
-		}
-	}()
-	convFunc(opt.Value)
-}
-
-func (self *Options) Int(key string) int {
-	var result int
-	self.convert(key, "int", func(value interface{}) {
-		if value != nil {
-			result = value.(int)
-			return
-		}
-		// Avoid panic, return 0 if no value
-		result = 0
-	})
-	return result
-}
-
-func (self *Options) String(key string) string {
-	var result string
-	self.convert(key, "string", func(value interface{}) {
-		if value != nil {
-			result = value.(string)
-			return
-		}
-		// Avoid panic, return "" if no value
-		result = ""
-	})
-	return result
-}
-
-func (self *Options) Bool(key string) bool {
-	var result bool
-	self.convert(key, "bool", func(value interface{}) {
-		if value != nil {
-			result = value.(bool)
-			return
-		}
-		// Avoid panic, return false if no value
-		result = false
-	})
-	return result
-}
-
-// TODO: Should support more than just []string
-func (self *Options) StringSlice(key string) []string {
-	var result []string
-	self.convert(key, "[]string", func(value interface{}) {
-		if value != nil {
-			result = value.([]string)
-			return
-		}
-		// Avoid panic, return []string{} if no value
-		result = []string{}
-	})
-	return result
-}
-
-func (self *Options) IsSet(key string) bool {
-	if opt, ok := self.values[key]; ok {
-		return opt.Value != nil
-	}
-	return false
-}
-
-func (self *Options) HasKey(key string) bool {
-	_, ok := self.values[key]
-	return ok
-}
-
-func (self *Options) Get(key string) interface{} {
-	if opt, ok := self.values[key]; ok {
-		return opt.Value
-	}
-	return nil
-}
-
-func (self *Options) RawValue(key string) interface{} {
-	if opt, ok := self.values[key]; ok {
-		return opt.Value
-	}
-	return nil
-}
-
-// TODO: Add these getters
-/*Float64(key string) : float64
-StringMap(key string) : map[string]interface{}
-StringMapString(key string) : map[string]string
-Time(key string) : time.Time
-Duration(key string) : time.Duration*/
-
-// ***********************************************
 // ArgParser Object
 // ***********************************************
 type ParseModifier func(*ArgParser)
 
 type ArgParser struct {
+	EnvPrefix   string
 	Description string
 	Name        string
 	WordWrap    int
@@ -625,10 +410,11 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 	parser := &ArgParser{
 		"",
 		"",
+		"",
 		200,
 		sync.Mutex{},
 		[]string{},
-		NewOptions(""),
+		NewOptions("", nil),
 		nil,
 		nil,
 		0,
@@ -693,6 +479,10 @@ func (self *ArgParser) AddConfig(name string) *RuleModifier {
 
 func (self *ArgParser) AddRule(name string, modifier *RuleModifier) *RuleModifier {
 	rule := modifier.GetRule()
+
+	// Apply the Environment Prefix to all new rules
+	rule.EnvPrefix = self.EnvPrefix
+
 	// If name begins with a non word character, assume it's an optional argument
 	if isOptional.MatchString(name) {
 		// Attempt to extract the name
@@ -768,7 +558,7 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 
 // Gather all the values from our rules, then apply the passed in map to any rules that don't have a computed value.
 func (self *ArgParser) Apply(values *Options) (*Options, error) {
-	results := NewOptions("")
+	results := NewOptions("", nil)
 
 	// for each of the rules
 	for _, rule := range self.rules {
@@ -814,7 +604,7 @@ func buildKeyPath(slugs ...string) string {
 }
 
 func (self *ArgParser) ParseEtcd(appRoot string, api etcd.KeysAPI) (*Options, error) {
-	values := NewOptions("")
+	values := NewOptions("", nil)
 	for _, rule := range self.rules {
 		if rule.Etcd {
 			key := rule.EtcdKey
@@ -834,7 +624,7 @@ func (self *ArgParser) ParseEtcd(appRoot string, api etcd.KeysAPI) (*Options, er
 			values.Group(rule.Group).Set(rule.Name, resp.Node.Value, false)
 		}
 	}
-	return NewOptions(DefaultOptionGroup), nil
+	return NewOptions(DefaultOptionGroup, nil), nil
 }
 
 // Parse the INI file and the Apply() the values to the parser
@@ -854,7 +644,7 @@ func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
 	if err != nil {
 		return nil, err
 	}
-	values := NewOptions("")
+	values := NewOptions("", nil)
 	for _, section := range cfg.Sections() {
 		group := cfg.Section(section.Name())
 		for _, key := range group.KeyStrings() {
@@ -957,6 +747,12 @@ func Desc(desc string) ParseModifier {
 func WrapLen(length int) ParseModifier {
 	return func(parser *ArgParser) {
 		parser.WordWrap = length
+	}
+}
+
+func EnvPrefix(prefix string) ParseModifier {
+	return func(parser *ArgParser) {
+		parser.EnvPrefix = prefix
 	}
 }
 
