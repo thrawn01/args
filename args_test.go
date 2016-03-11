@@ -185,7 +185,7 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.Int("power-level")).To(Equal(0))
 
 			// But Apply() a config file
-			options := args.NewOptionsFromMap(args.DefaultOptionGroup, nil,
+			options := parser.NewOptionsFromMap(args.DefaultOptionGroup,
 				map[string]map[string]*args.OptionValue{
 					args.DefaultOptionGroup: {
 						"power-level": &args.OptionValue{Value: 3, Seen: false},
@@ -248,7 +248,7 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.Int("power-level")).To(Equal(0))
 
 			// But Apply() a config file
-			options := args.NewOptionsFromMap(args.DefaultOptionGroup, nil,
+			options := parser.NewOptionsFromMap(args.DefaultOptionGroup,
 				map[string]map[string]*args.OptionValue{
 					args.DefaultOptionGroup: {
 						"power-level": &args.OptionValue{Value: 3, Seen: false},
@@ -639,7 +639,9 @@ var _ = Describe("Options", func() {
 	var log *TestLogger
 	BeforeEach(func() {
 		log = NewTestLogger()
-		opts = args.NewOptionsFromMap(args.DefaultOptionGroup, log,
+		parser := args.NewParser()
+		parser.SetLog(log)
+		opts = parser.NewOptionsFromMap(args.DefaultOptionGroup,
 			map[string]map[string]*args.OptionValue{
 				args.DefaultOptionGroup: {
 					"int":    &args.OptionValue{Value: 1, Seen: false},

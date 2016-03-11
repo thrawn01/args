@@ -132,7 +132,7 @@ func (self *RuleModifier) StoreStringSlice(dest *[]string) *RuleModifier {
 		// This should never happen if we validate the types
 		srcType := reflect.TypeOf(src)
 		if srcType.Kind() != reflect.Slice {
-			self.parser.Log.Printf("Attempted to store '%s' which is not a slice", srcType.Kind())
+			self.parser.GetLog().Printf("Attempted to store '%s' which is not a slice", srcType.Kind())
 		}
 		for _, value := range src.([]string) {
 			*dest = append(*dest, value)
@@ -402,7 +402,7 @@ type ArgParser struct {
 	rules       Rules
 	err         error
 	idx         int
-	Log         StdLogger
+	log         StdLogger
 }
 
 // Creates a new instance of the argument parser
@@ -414,7 +414,7 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 		200,
 		sync.Mutex{},
 		[]string{},
-		NewOptions("", nil),
+		nil,
 		nil,
 		nil,
 		0,
@@ -428,8 +428,12 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 
 var isOptional = regexp.MustCompile(`^(\W+)([\w|-]*)$`)
 
-func (self *ArgParser) SetLogger(logger StdLogger) {
-	self.Log = logger
+func (self *ArgParser) SetLog(logger StdLogger) {
+	self.log = logger
+}
+
+func (self *ArgParser) GetLog() StdLogger {
+	return self.log
 }
 
 func (self *ArgParser) ValidateRules() error {
@@ -558,7 +562,7 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 
 // Gather all the values from our rules, then apply the passed in map to any rules that don't have a computed value.
 func (self *ArgParser) Apply(values *Options) (*Options, error) {
-	results := NewOptions("", nil)
+	results := self.NewOptions("")
 
 	// for each of the rules
 	for _, rule := range self.rules {
@@ -604,7 +608,7 @@ func buildKeyPath(slugs ...string) string {
 }
 
 func (self *ArgParser) ParseEtcd(appRoot string, api etcd.KeysAPI) (*Options, error) {
-	values := NewOptions("", nil)
+	values := self.NewOptions("")
 	for _, rule := range self.rules {
 		if rule.Etcd {
 			key := rule.EtcdKey
@@ -616,15 +620,15 @@ func (self *ArgParser) ParseEtcd(appRoot string, api etcd.KeysAPI) (*Options, er
 			resp, err := api.Get(context.Background(), key, nil)
 			if err != nil {
 				// TODO: should check for errors of importance!
-				if self.Log != nil {
-					self.Log.Println(err.Error())
+				if self.log != nil {
+					self.log.Println(err.Error())
 				}
 				continue
 			}
 			values.Group(rule.Group).Set(rule.Name, resp.Node.Value, false)
 		}
 	}
-	return NewOptions(DefaultOptionGroup, nil), nil
+	return self.NewOptions(DefaultOptionGroup), nil
 }
 
 // Parse the INI file and the Apply() the values to the parser
@@ -644,7 +648,7 @@ func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
 	if err != nil {
 		return nil, err
 	}
-	values := NewOptions("", nil)
+	values := self.NewOptions("")
 	for _, section := range cfg.Sections() {
 		group := cfg.Section(section.Name())
 		for _, key := range group.KeyStrings() {

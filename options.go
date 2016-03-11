@@ -13,6 +13,7 @@ import (
 type Options struct {
 	group  string
 	log    StdLogger
+	parser *ArgParser
 	values map[string]*OptionValue
 	groups map[string]*Options
 }
@@ -22,14 +23,12 @@ type OptionValue struct {
 	Seen  bool // Argument was seen on the commandline
 }
 
-func NewOptions(group string, log StdLogger) *Options {
-	if log == nil {
-		log = DefaultLogger
-	}
+func (self *ArgParser) NewOptions(group string) *Options {
 	groups := make(map[string]*Options)
 	new := &Options{
 		group,
-		log,
+		self.log,
+		self,
 		make(map[string]*OptionValue),
 		groups,
 	}
@@ -38,13 +37,11 @@ func NewOptions(group string, log StdLogger) *Options {
 	return new
 }
 
-func NewOptionsWithGroups(group string, log StdLogger, groups map[string]*Options) *Options {
-	if log == nil {
-		log = DefaultLogger
-	}
+func (self *ArgParser) NewOptionsWithGroups(group string, groups map[string]*Options) *Options {
 	new := &Options{
 		group,
-		log,
+		self.log,
+		self,
 		make(map[string]*OptionValue),
 		groups,
 	}
@@ -53,8 +50,8 @@ func NewOptionsWithGroups(group string, log StdLogger, groups map[string]*Option
 	return new
 }
 
-func NewOptionsFromMap(group string, log StdLogger, groups map[string]map[string]*OptionValue) *Options {
-	options := NewOptions(group, log)
+func (self *ArgParser) NewOptionsFromMap(group string, groups map[string]map[string]*OptionValue) *Options {
+	options := self.NewOptions(group)
 	for groupName, values := range groups {
 		grp := options.Group(groupName)
 		for key, opt := range values {
@@ -62,6 +59,10 @@ func NewOptionsFromMap(group string, log StdLogger, groups map[string]map[string
 		}
 	}
 	return options
+}
+
+func (self *Options) ThreadSafe() *Options {
+	return self.parser.GetOpts()
 }
 
 func (self *Options) ValuesToString() string {
@@ -104,7 +105,7 @@ func (self *Options) Group(group string) *Options {
 		// doesn't have ':' in the name which would conflict with Compare()
 
 		// If group doesn't exist; create it
-		new := NewOptionsWithGroups(group, nil, self.groups)
+		new := self.parser.NewOptionsWithGroups(group, self.groups)
 		self.groups[group] = new
 		return new
 	}
