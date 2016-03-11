@@ -15,12 +15,20 @@ import (
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/go-ini/ini"
+	"golang.org/x/net/context"
 )
 
 const (
 	DefaultTerminator  string = "--"
 	DefaultOptionGroup string = ""
 )
+
+// We only need part of the standard logging functions
+type StdLogger interface {
+	Print(...interface{})
+	Printf(string, ...interface{})
+	Println(...interface{})
+}
 
 // ***********************************************
 //  Types
@@ -111,7 +119,7 @@ func (self *RuleModifier) StoreSlice(dest *[]string) *RuleModifier {
 		// This should never happen if we validate the types
 		srcType := reflect.TypeOf(src)
 		if srcType.Kind() != reflect.Slice {
-			panic(fmt.Sprintf("Attempted to store '%s' which is not a slice", srcType.Kind()))
+			self.parser.Log.Printf("Attempted to store '%s' which is not a slice", srcType.Kind())
 		}
 		for _, value := range src.([]string) {
 			*dest = append(*dest, value)
@@ -319,7 +327,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	if values != nil {
 		group := values.Group(self.Group)
 		if group.HasKey(self.Name) {
-			return self.Cast(self.Name, group.RawValue(self.Name))
+			return self.Cast(self.Name, group.Get(self.Name))
 		}
 	}
 
@@ -463,10 +471,6 @@ func (self *Options) Set(key string, value interface{}, seen bool) *Options {
 	return self
 }
 
-func (self *Options) Get(key string) string {
-	return self.String(key)
-}
-
 // Return true if any of the values in this Option object were seen on the command line
 func (self *Options) ValuesSeen() bool {
 	for _, opt := range self.values {
@@ -499,7 +503,9 @@ func (self *Options) NoArgs() bool {
 func (self *Options) convert(key string, typeName string, convFunc func(value interface{})) {
 	opt, ok := self.values[key]
 	if !ok {
-		panic(fmt.Sprintf("No Such Value '%s' found", key))
+		// TODO: Use the user provided logger instance to inform what happened
+		//self.parser.Log.Printf("No Such Option '%s' found", key)
+		convFunc(nil)
 	}
 	defer func() {
 		if msg := recover(); msg != nil {
@@ -550,7 +556,7 @@ func (self *Options) Bool(key string) bool {
 }
 
 // TODO: Should support more than just []string
-func (self *Options) Slice(key string) []string {
+func (self *Options) StringSlice(key string) []string {
 	var result []string
 	self.convert(key, "[]string", func(value interface{}) {
 		if value != nil {
@@ -563,16 +569,23 @@ func (self *Options) Slice(key string) []string {
 	return result
 }
 
-func (self *Options) IsNil(key string) bool {
+func (self *Options) IsSet(key string) bool {
 	if opt, ok := self.values[key]; ok {
-		return opt.Value == nil
+		return opt.Value != nil
 	}
-	return true
+	return false
 }
 
 func (self *Options) HasKey(key string) bool {
 	_, ok := self.values[key]
 	return ok
+}
+
+func (self *Options) Get(key string) interface{} {
+	if opt, ok := self.values[key]; ok {
+		return opt.Value
+	}
+	return nil
 }
 
 func (self *Options) RawValue(key string) interface{} {
@@ -581,6 +594,13 @@ func (self *Options) RawValue(key string) interface{} {
 	}
 	return nil
 }
+
+// TODO: Add these getters
+/*Float64(key string) : float64
+StringMap(key string) : map[string]interface{}
+StringMapString(key string) : map[string]string
+Time(key string) : time.Time
+Duration(key string) : time.Duration*/
 
 // ***********************************************
 // ArgParser Object
@@ -592,12 +612,12 @@ type ArgParser struct {
 	Name        string
 	WordWrap    int
 	mutex       sync.Mutex
-	etcdPath    string
 	args        []string
 	options     *Options
 	rules       Rules
 	err         error
 	idx         int
+	Log         StdLogger
 }
 
 // Creates a new instance of the argument parser
@@ -607,12 +627,12 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 		"",
 		200,
 		sync.Mutex{},
-		"",
 		[]string{},
 		NewOptions(""),
 		nil,
 		nil,
 		0,
+		nil,
 	}
 	for _, modify := range modifiers {
 		modify(parser)
@@ -621,6 +641,10 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 }
 
 var isOptional = regexp.MustCompile(`^(\W+)([\w|-]*)$`)
+
+func (self *ArgParser) SetLogger(logger StdLogger) {
+	self.Log = logger
+}
 
 func (self *ArgParser) ValidateRules() error {
 	for idx, rule := range self.rules {
@@ -665,14 +689,6 @@ func (self *ArgParser) AddConfig(name string) *RuleModifier {
 	rule := newRule()
 	rule.IsConfig = true
 	return self.AddRule(name, newRuleModifier(rule, self))
-}
-
-func (self *ArgParser) GetEtcdPath() string {
-	return self.etcdPath
-}
-
-func (self *ArgParser) SetEtcdPath(path string) {
-	self.etcdPath = path
 }
 
 func (self *ArgParser) AddRule(name string, modifier *RuleModifier) *RuleModifier {
@@ -785,11 +801,37 @@ func (self *ArgParser) GetOpts() *Options {
 	return self.options
 }
 
-func (self *ArgParser) ParseEtcd(api etcd.KeysAPI) (*Options, error) {
+// ===== ETCD STUFF =====
+
+func buildKeyPath(slugs ...string) string {
+	results := make([]string, 0)
+
+	// Trim any leading or trailing slashes
+	for _, slug := range slugs {
+		results = append(results, strings.Trim(slug, "/"))
+	}
+	return strings.Join(results, "/")
+}
+
+func (self *ArgParser) ParseEtcd(appRoot string, api etcd.KeysAPI) (*Options, error) {
+	values := NewOptions("")
 	for _, rule := range self.rules {
 		if rule.Etcd {
+			key := rule.EtcdKey
+			if key == "" {
+				key = rule.Name
+			}
 			// Build the ETCD key
-
+			key = buildKeyPath(appRoot, rule.Group, key)
+			resp, err := api.Get(context.Background(), key, nil)
+			if err != nil {
+				// TODO: should check for errors of importance!
+				if self.Log != nil {
+					self.Log.Println(err.Error())
+				}
+				continue
+			}
+			values.Group(rule.Group).Set(rule.Name, resp.Node.Value, false)
 		}
 	}
 	return NewOptions(DefaultOptionGroup), nil
@@ -903,12 +945,6 @@ func (self *ArgParser) GenerateOptHelp() string {
 func Name(name string) ParseModifier {
 	return func(parser *ArgParser) {
 		parser.Name = name
-	}
-}
-
-func EtcdPath(path string) ParseModifier {
-	return func(parser *ArgParser) {
-		parser.SetEtcdPath(path)
 	}
 }
 

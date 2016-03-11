@@ -92,13 +92,13 @@ var _ = Describe("ArgParser", func() {
 
 			opt, err := parser.ParseArgs(nil)
 			Expect(err).To(BeNil())
-			Expect(opt.Slice("list")).To(Equal([]string{"foo", "bar", "bit"}))
+			Expect(opt.StringSlice("list")).To(Equal([]string{"foo", "bar", "bit"}))
 			Expect(list).To(Equal([]string{"foo", "bar", "bit"}))
 
 			input := []byte("list=six,five,four\n")
 			opt, err = parser.FromIni(input)
 			Expect(err).To(BeNil())
-			Expect(opt.Slice("list")).To(Equal([]string{"six", "five", "four"}))
+			Expect(opt.StringSlice("list")).To(Equal([]string{"six", "five", "four"}))
 			Expect(list).To(Equal([]string{"six", "five", "four"}))
 		})
 	})
@@ -446,7 +446,7 @@ var _ = Describe("ArgParser", func() {
 			cmdLine := []string{"--list", "one,two,three"}
 			opt, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
-			Expect(opt.Slice("list")).To(Equal([]string{"one", "two", "three"}))
+			Expect(opt.StringSlice("list")).To(Equal([]string{"one", "two", "three"}))
 			Expect(list).To(Equal([]string{"one", "two", "three"}))
 		})
 
@@ -458,7 +458,7 @@ var _ = Describe("ArgParser", func() {
 			cmdLine := []string{"--list", "one"}
 			opt, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
-			Expect(opt.Slice("list")).To(Equal([]string{"one"}))
+			Expect(opt.StringSlice("list")).To(Equal([]string{"one"}))
 			Expect(list).To(Equal([]string{"one"}))
 		})
 
