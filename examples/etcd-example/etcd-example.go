@@ -12,9 +12,8 @@ import (
 
 func main() {
 
-	// Create the parser with program name 'example'
-	// and etcd keys prefixed with exampleApp/
-	parser := args.Parser(args.Name("example"), args.EtcdPath("exampleApp/"))
+	etcdPath : = "exampleApp"
+	parser := args.Parser(args.Name("example"))
 
 	// Since 'Etcd()' is not used, this option is not configurable via etcd
 	parser.AddOption("--etcd-endpoints").Alias("-eP").IsSlice().
@@ -80,7 +79,7 @@ func main() {
 
 	// Simple watch example, When ever a config item changes
 	// in etcd; immediately update our config
-	args.WatchEtcd(parser.EtcdPath(), func(group, key, value string) {
+	args.WatchEtcd("/exampleApp", func(group, key, value string) {
 		parser.Apply(args.NewOptions().Get(group).Set(key, value))
 	})
 

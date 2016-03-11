@@ -201,4 +201,12 @@ func main() {
 		}
 
 	})
+
+	// Sub Parser, Any arguments past the positional arg 'sub1' will be considered by this sub
+	sub := parser.SubParser("volume")
+
+	// parser and will inherit all the opts from the parent parser
+	list := sub.SubParser("list", args.Inherit(parent))
+
+	list.Opt("filter", args.Alias("-f"), args.IsBool(), args.Help("Filter the list by this thingy"))
 }
