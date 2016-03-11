@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 
+	"time"
+
 	"github.com/thrawn01/args"
 )
 
@@ -51,10 +53,11 @@ func main() {
 		w.Write(payload)
 	})
 
+	configFile := appConf.String("config-file")
 	if appConf.Bool("complex-example") {
 		// Complex Example
-		args.WatchFile(opt.String("config-file"), func() {
-			rawValues, err := parser.ParseIni(appConf.String("config-file"))
+		watcher, err := args.WatchFile(configFile, time.Second, func() {
+			rawValues, err := parser.ParseIni(configFile)
 			if err != nil {
 				fmt.Printf("Failed to update config - %s\n", err.Error())
 				return
@@ -76,18 +79,28 @@ func main() {
 				}
 			}
 		})
+		if err != nil {
+			fmt.Printf("Failed to watch '%s' -  %s", configFile, err.Error())
+		}
+		// Shut down the watcher when done
+		defer watcher.Close()
 	} else {
 		// Simple example
-		args.WatchFile(appConf.String("config-file"), func() {
+		watcher, err := args.WatchFile(configFile, time.Second, func() {
 			// You can safely ignore the returned Options{} object here.
 			// the next call to ThreadSafe() from within the handler will
 			// pick up the newly parsed config.
-			appConf, err = parser.FromIni(appConf.String("config-file"))
+			appConf, err = parser.FromIni(configFile)
 			if err != nil {
 				fmt.Printf("Failed to update config - %s\n", err.Error())
 				return
 			}
 		})
+		if err != nil {
+			fmt.Printf("Failed to watch '%s' -  %s", configFile, err.Error())
+		}
+		// Shut down the watcher when done
+		defer watcher.Close()
 	}
 
 	// Listen and serve requests

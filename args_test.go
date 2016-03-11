@@ -681,7 +681,6 @@ var _ = Describe("Options", func() {
 			result := opts.Bool("none")
 			Expect(result).To(Equal(false))
 		})
-
 	})
 	Describe("NoArgs()", func() {
 		It("Should return true if no arguments on the command line", func() {

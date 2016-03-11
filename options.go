@@ -7,9 +7,6 @@ import (
 	"github.com/spf13/cast"
 )
 
-// ***********************************************
-// Options Object
-// ***********************************************
 type Options struct {
 	group  string
 	log    StdLogger
@@ -59,6 +56,13 @@ func (self *ArgParser) NewOptionsFromMap(group string, groups map[string]map[str
 		}
 	}
 	return options
+}
+
+func (left *Options) Compare(right *Options) *Options {
+	panic("Options.Compare() not implemented")
+	/*for _, group := range self.groups {
+
+	}*/
 }
 
 func (self *Options) ThreadSafe() *Options {
