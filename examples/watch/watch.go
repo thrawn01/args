@@ -32,7 +32,7 @@ func main() {
 
 	appConf, err := parser.ParseArgs(nil)
 	if err != nil {
-		log.Fatal(err.Error())
+		fmt.Println(err.Error())
 		os.Exit(-1)
 	}
 
@@ -107,7 +107,7 @@ func main() {
 	log.Printf("Listening for requests on %s", appConf.String("bind"))
 	err = http.ListenAndServe(appConf.String("bind"), nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		os.Exit(-1)
 	}
-
 }
