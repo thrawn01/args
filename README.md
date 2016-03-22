@@ -1,8 +1,12 @@
 ## Argument Parser
 Because I was un-happy about all the other arg parsers
 
+**NOTE: This is very alpha software, the api will continue to evolve**
+
 ## Usage
 ```go
+
+
 package main
 
 import (
@@ -22,35 +26,63 @@ type Config struct {
 func main() {
 	var conf Config
 
-	// Create the parser
-	parser := args.Parser(args.Name("example"))
+	// Create the parser with program name 'example'
+	// and environment variables prefixed with APP_
+	parser := args.NewParser("simple-example", args.EnvPrefix("APP_"))
 
-	parser.Opt("--power-level").StoreInt(&conf.PowerLevel).
+	parser.AddOption("--power-level").StoreInt(&conf.PowerLevel).
 		Env("POWER_LEVEL").Default("10000").Help("set our power level")
 
 	// Store Integers directly into a struct with a default value
-	parser.Opt("--power-level").Alias("-p").StoreInt(&conf.PowerLevel).
+	parser.AddOption("--power-level").Alias("-p").StoreInt(&conf.PowerLevel).
 		Env("POWER_LEVEL").Default("10000").Help("set our power level")
 
-	// Options can begin with -name, --name or even ++name. Most alpha non word character are supported
-	parser.Opt("++power").Alias("+p").IsString().Default("11,000").Help("prefix demo")
+	// Command line options can begin with -name, --name or even ++name
+	// Most non word characters are supported
+	parser.AddOption("++config-file").Alias("+c").IsString().
+		Default("/path/to/config").Help("path to config file")
 
 	// Use the args.Env() function to define an environment variable
-	parser.Opt("--message").Alias("-m").StoreStr(&conf.Message).
+	// NOTE: Since the parser was passed args.EnvPrefix("APP_") the actual
+	// environment variable name is 'APP_MESSAGE'
+	parser.AddOption("--message").Alias("-m").StoreStr(&conf.Message).
 		Env("MESSAGE").Default("over-ten-thousand").Help("send a message")
 
 	// Pass a comma separated list of strings and get a []string
-	parser.Opt("--slice").Alias("-s").StoreSlice(&conf.Slice).Env("LIST").
-		Default("one,two,three").Help("list of messages"))
+	parser.AddOption("--slice").Alias("-s").StoreStringSlice(&conf.StringSlice).Env("LIST").
+		Default("one,two,three").Help("list of messages")
 
 	// Count the number of times an argument is seen
-	parser.Opt("--verbose").Alias("-v").Count().StoreInt(&conf.Verbose).Help("be verbose")
+	parser.AddOption("--verbose").Alias("-v").Count().StoreInt(&conf.Verbose).Help("be verbose")
 
 	// Set bool to true if the argument is present on the command line
-	parser.Opt("--debug").Alias("-d").IsTrue().Help("turn on Debug")
+	parser.AddOption("--debug").Alias("-d").IsTrue().Help("turn on Debug")
 
 	// Specify the type of the arg with IsInt(), IsString(), IsBool() or IsTrue()
-	parser.Opt("--help").Alias("-h").IsTrue().Help("show this help message")
+	parser.AddOption("--help").Alias("-h").IsTrue().Help("show this help message")
+
+	// 'Conf' options are not set via the command line but can be set
+	// via a config file or an environment variable
+	parser.AddConfig("twelve-factor").Env("TWELVE_FACTOR").Help("Demo of config options")
+
+	// Define a 'database' subgroup
+	db := parser.InGroup("database")
+
+	// Add command line options to the subgroup
+	db.AddOption("--host").Alias("-dH").StoreStr(&conf.DbHost).
+		Default("localhost").Help("database hostname")
+
+	// Add subgroup specific config. 'Conf' options are not set via the
+	// command line but can be set via a config file or anything that calls parser.Apply()
+	db.AddConfig("debug").IsTrue().Help("enable database debug")
+
+	// 'Conf' option names are not allowed to start with a non word character like
+	// '--' or '++' so they can not be confused with command line options
+	db.AddConfig("database").IsString().Default("myDatabase").Help("name of database to use")
+
+	// If no type 'IsString', 'IsInt' is specified, defaults to 'IsString'
+	db.AddConfig("user").Help("database user")
+	db.AddConfig("pass").Help("database password")
 
 	// Pass our own argument list, or nil to parse os.Args[]
 	opt, err := parser.ParseArgs(nil)
@@ -60,31 +92,46 @@ func main() {
 	}
 
 	// Fetch values by using the Cast functions
-	fmt.Printf("CAST Power     '%d'\n", opt.Int("power-level"))
-	fmt.Printf("CAST Message   '%s'\n", opt.String("message"))
-	fmt.Printf("CAST Slice     '%s'\n", opt.Slice("slice"))
-	fmt.Printf("CAST Verbose   '%d'\n", opt.Int("verbose"))
-	fmt.Printf("CAST Debug     '%t'\n", opt.Bool("debug"))
+	fmt.Printf("CAST Power        '%d'\n", opt.Int("power-level"))
+	fmt.Printf("CAST Message      '%s'\n", opt.String("message"))
+	fmt.Printf("CAST String Slice '%s'\n", opt.StringSlice("slice"))
+	fmt.Printf("CAST Verbose      '%d'\n", opt.Int("verbose"))
+	fmt.Printf("CAST Debug        '%t'\n", opt.Bool("debug"))
+
+	// Fetch Group values
+	dbAddOption := opt.Group("database")
+	fmt.Printf("CAST DB Host   '%s'\n", dbAddOption.String("host"))
+	fmt.Printf("CAST DB Debug  '%t'\n", dbAddOption.Bool("debug"))
+	fmt.Printf("CAST DB User   '%s'\n", dbAddOption.String("user"))
+	fmt.Printf("CAST DB Pass   '%s'\n", dbAddOption.String("pass"))
+
 	fmt.Println("")
 
 	// Values can also be stored in a struct
-	fmt.Printf("STRUCT Power   '%d'\n", conf.PowerLevel)
-	fmt.Printf("STRUCT Message '%s'\n", conf.Message)
-	fmt.Printf("STRUCT Slice   '%s'\n", conf.Slice)
-	fmt.Printf("STRUCT Verbose '%d'\n", conf.Verbose)
-	fmt.Printf("STRUCT Debug   '%t'\n", opt.Bool("debug"))
+	fmt.Printf("STRUCT Power        '%d'\n", conf.PowerLevel)
+	fmt.Printf("STRUCT Message      '%s'\n", conf.Message)
+	fmt.Printf("STRUCT String Slice '%s'\n", conf.StringSlice)
+	fmt.Printf("STRUCT Verbose      '%d'\n", conf.Verbose)
+	fmt.Printf("STRUCT Debug        '%t'\n", opt.Bool("debug"))
+	fmt.Printf("STRUCT DbHost       '%s'\n", conf.DbHost)
 	fmt.Println("")
 
 	iniFile := []byte(`
 		power-level=20000
-		message=OVER-THEN-THOUSAND!
+		message=OVER-TEN-THOUSAND!
 		slice=three,four,five,six
 		verbose=5
 		debug=true
-    `)
+
+		[database]
+		debug=false
+		host=mysql.thrawn01.org
+		user=my-username
+		pass=my-password
+	`)
 
 	// Make configuration simply by reading arguments from an INI file
-	opt, err = parser.ParseIni(iniFile)
+	opt, err = parser.FromIni(iniFile)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(-1)
@@ -94,7 +141,7 @@ func main() {
 	// on the commandline
 	fmt.Printf("INI Power      '%d'\n", conf.PowerLevel)
 	fmt.Printf("INI Message    '%s'\n", conf.Message)
-	fmt.Printf("INI Slice      '%s'\n", conf.Slice)
+	fmt.Printf("INI Slice      '%s'\n", conf.StringSlice)
 	fmt.Printf("INI Verbose    '%d'\n", conf.Verbose)
 	fmt.Printf("INI Debug      '%t'\n", opt.Bool("debug"))
 	fmt.Println("")
@@ -104,6 +151,7 @@ func main() {
 		parser.PrintHelp()
 		os.Exit(-1)
 	}
+
 }
 ```
 
@@ -150,6 +198,8 @@ exit status 255
 * Support Default Arguments
 * Support Reading arguments from an ini file
 * Support different types of optional prefixes (--, -, ++, +, etc..)
+* Support for Config only options
+* Support for Groups
 * Generate Help Message
 
 ## TODO
@@ -162,7 +212,6 @@ exit status 255
 * Support float type '--float=3.14'
 * Support '-arg=value'
 * Support Parent Parsing
-* Support '-aV' where 'a' is the argument and 'V' is the value
-* DeDent thingy
-
+* Support for ConfigMap
+* Support for Etcd
 
