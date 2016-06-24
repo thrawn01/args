@@ -14,7 +14,7 @@ import (
 
 func main() {
 
-	parser := args.NewParser("watch-example")
+	parser := args.NewParser(args.EtcdPath("watch-example"))
 	parser.AddOption("--bind").Alias("-b").Default("localhost:8080").
 		Help("Interface to bind the server too")
 	parser.AddOption("--complex-example").Alias("-ce").IsBool().
@@ -29,6 +29,16 @@ func main() {
 
 	// Store the password in the config and not passed via the command line
 	parser.AddConfig("password").InGroup("database").Help("database password")
+
+	// Tells us the list of endpoints will be the keys of /watch-example/endpoints/nginx
+	// We can get the keys by using opts.Group("nginx-endpoints").Keys()
+	// Then get the values using opt.Group("nginx-endpoints").String("endpoint1")
+
+	// Config groups define a parse-able group, Groups don't have types, and can't be type checked at parse time.
+	// for ini files it's a section
+	// for etcd it's a directory
+	// for yaml it can be a list of maps
+	parser.AddConfigGroup("nginx-endpoints").Help("a list of nginx endpoints")
 
 	appConf, err := parser.ParseArgs(nil)
 	if err != nil {
@@ -64,49 +74,41 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	keysAPI := etcd.NewKeysAPI(client)
 
 	// Grab values for config options defined with 'Etcd()'
-	appConf, err = parser.FromEtcd(keysAPI, log)
+	appConf, err = parser.FromEtcd(client)
 	if err != nil {
 		fmt.Printf("Etcd or value parse issue - %s\n", err.Error())
 	}
 
-	if appConf.Bool("complex-example") {
-		// Complex Example, where the config changes in etcd do
-		// not get applied until 'config-version' is changed.
-		stagedConf := args.NewOptions(parser)
-		// Watch etcd for any configuration changes
-		args.WatchEtcd(parser.EtcdPath(), func(group, key, value string) {
-			// Apply all the config
-			stagedConf.Get(group).Set(key, value)
-			if group == "" && key == "config-version" {
-				// NOTE: If you are using opt.ThreadSafe() you can safely
-				// ignore the 'opt' returned by Apply(). This is because Apply()
-				// will update parsers internal pointer to the new version of the
-				// config and subsequent calls to opt.ThreadSafe() will always
-				// safely return the new version of the config
+	// etcd config changed don't get applied until 'config-version' is changed.
+	stagedConf := parser.NewOptions()
+	// Watch etcd for any configuration changes
+	cancelWatch := parser.WatchEtcd(client, func(group, key, value string) {
+		// Apply all the key value to staged config
+		stagedConf.Group(group).Set(key, value, false)
+		if group == "" && key == "config-version" {
+			// NOTE: If you are using opt.ThreadSafe() you can safely
+			// ignore the 'opt' returned by Apply(). This is because Apply()
+			// will update parsers internal pointer to the new version of the
+			// config and subsequent calls to opt.ThreadSafe() will always
+			// safely return the new version of the config
 
-				// Apply the new config to the parser
-				appConf, err := parser.Apply(stagedConf)
-				if err != nil {
-					fmt.Printf("Probably a type cast error - %s\n", err.Error())
-					return
-				}
-				// Clear the staged config values
-				stagedConf = args.NewOptions()
-				fmt.Printf("Config has been updated to version %d\n", appConf.Int("config-version"))
+			// Apply the new config to the parser
+			appConf, err := parser.Apply(stagedConf)
+			if err != nil {
+				fmt.Printf("Probably a type cast error - %s\n", err.Error())
+				return
 			}
-		})
-	} else {
-		// Simple watch example, When ever a config item changes
-		// in etcd; immediately update our config
-		args.WatchEtcd("/exampleApp", func(group, key, value string) {
-			parser.Apply(args.NewOptions(parser).Get(group).Set(key, value))
-		})
-	}
-
-	// TODO: Make a third example where we grab the updated etcd config only when 'config-version' changes
+			// Clear the staged config values
+			stagedConf = parser.NewOptions()
+			fmt.Printf("Config has been updated to version %d\n", appConf.Int("config-version"))
+		}
+		if group == "nginx-endpoints" {
+			// Immediately apply the new config when endpoints change
+			parser.Apply(parser.NewOptions().Group(group).Set(key, value, false))
+		}
+	})
 
 	// Listen and serve requests
 	log.Printf("Listening for requests on %s", appConf.String("bind"))
@@ -114,5 +116,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	cancelWatch()
 
 }

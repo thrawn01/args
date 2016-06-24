@@ -277,6 +277,31 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.Group("database").String("hostname")).To(Equal("mysql.com"))
 		})
 	})
+	Describe("RuleModifier.AddConfigGroup()", func() {
+		iniFile := []byte(`
+		power-level=20000
+
+		[endpoints]
+		endpoint1=http://thrawn01.org/1
+		endpoint2=http://thrawn01.org/2
+		endpoint3=http://thrawn01.org/3
+		`)
+
+		It("Should add a new group", func() {
+			parser := args.NewParser()
+			parser.AddOption("--power-level").IsInt()
+			parser.AddConfigGroup("endpoints").Help("List of http endpoints")
+			opt, err := parser.FromIni(iniFile)
+			Expect(err).To(BeNil())
+			Expect(opt.Int("power-level")).To(Equal(20000))
+			Expect(opt.Group("endpoints").ToMap()).To(Equal(map[string]interface{}{
+				"endpoint1": "http://thrawn01.org/1",
+				"endpoint2": "http://thrawn01.org/2",
+				"endpoint3": "http://thrawn01.org/3",
+			}))
+			Expect(opt.Group("endpoints").String("endpoint1")).To(Equal("http://thrawn01.org/1"))
+		})
+	})
 	Describe("RuleModifier.Count()", func() {
 		It("Should count one", func() {
 			parser := args.NewParser()
@@ -648,6 +673,11 @@ var _ = Describe("Options", func() {
 					"bool":   &args.OptionValue{Value: true, Seen: false},
 					"string": &args.OptionValue{Value: "one", Seen: false},
 				},
+				"endpoints": {
+					"endpoint1": &args.OptionValue{Value: "host1", Seen: false},
+					"endpoint2": &args.OptionValue{Value: "host2", Seen: false},
+					"endpoint3": &args.OptionValue{Value: "host3", Seen: false},
+				},
 			})
 
 	})
@@ -682,6 +712,17 @@ var _ = Describe("Options", func() {
 			Expect(result).To(Equal(false))
 		})
 	})
+	Describe("String()", func() {
+		It("Should return values as string", func() {
+			result := opts.String("string")
+			Expect(log.GetEntry()).To(Equal(""))
+			Expect(result).To(Equal("one"))
+		})
+		It("Should return default value if key doesn't exist", func() {
+			result := opts.String("none")
+			Expect(result).To(Equal(""))
+		})
+	})
 	Describe("NoArgs()", func() {
 		It("Should return true if no arguments on the command line", func() {
 			parser := args.NewParser()
@@ -700,6 +741,18 @@ var _ = Describe("Options", func() {
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(2))
 			Expect(opt.NoArgs()).To(Equal(false))
+		})
+	})
+	Describe("ToMap()", func() {
+		It("Should return a map of the group options", func() {
+			Expect(opts.Group("endpoints").ToMap()).To(Equal(map[string]interface{}{
+				"endpoint1": "host1",
+				"endpoint2": "host2",
+				"endpoint3": "host3",
+			}))
+		})
+		It("Should return an empty map if the group doesn't exist", func() {
+			Expect(opts.Group("no-group").ToMap()).To(Equal(map[string]interface{}{}))
 		})
 	})
 })

@@ -20,7 +20,11 @@ type OptionValue struct {
 	Seen  bool // Argument was seen on the commandline
 }
 
-func (self *ArgParser) NewOptions(group string) *Options {
+func (self *ArgParser) NewOptions() *Options {
+	return self.NewOptionsWithGroup(DefaultOptionGroup)
+}
+
+func (self *ArgParser) NewOptionsWithGroup(group string) *Options {
 	groups := make(map[string]*Options)
 	new := &Options{
 		group,
@@ -48,7 +52,7 @@ func (self *ArgParser) NewOptionsWithGroups(group string, groups map[string]*Opt
 }
 
 func (self *ArgParser) NewOptionsFromMap(group string, groups map[string]map[string]*OptionValue) *Options {
-	options := self.NewOptions(group)
+	options := self.NewOptionsWithGroup(group)
 	for groupName, values := range groups {
 		grp := options.Group(groupName)
 		for key, opt := range values {
@@ -80,6 +84,14 @@ func (self *Options) ValuesToString() string {
 		buffer.WriteString(fmt.Sprintf("   %s=%s\n", key, value.Value))
 	}
 	return buffer.String()
+}
+
+func (self *Options) ToMap() map[string]interface{} {
+	result := make(map[string]interface{})
+	for key, value := range self.values {
+		result[key] = value.Value
+	}
+	return result
 }
 
 func (self *Options) GroupsToString() string {

@@ -190,6 +190,13 @@ func (self *RuleModifier) InGroup(group string) *RuleModifier {
 	return self
 }
 
+func (self *RuleModifier) AddConfigGroup(group string) *RuleModifier {
+	self.rule.IsConfigGroup = true
+	self.rule.Group = group
+	modifier := *self
+	return self.parser.AddRule(group, &modifier)
+}
+
 func (self *RuleModifier) Opt(name string) *RuleModifier {
 	return self.AddOption(name)
 }
@@ -226,24 +233,25 @@ func (self *RuleModifier) EtcdKey(key string) *RuleModifier {
 // Rule Object
 // ***********************************************
 type Rule struct {
-	Count      int
-	IsPos      int
-	IsConfig   bool
-	Name       string
-	RuleDesc   string
-	VarName    string
-	Value      interface{}
-	Seen       bool
-	Default    *string
-	Aliases    []string
-	EnvVars    []string
-	EnvPrefix  string
-	Cast       CastFunc
-	Action     ActionFunc
-	StoreValue StoreFunc
-	Group      string
-	Etcd       bool
-	EtcdKey    string
+	Count         int
+	IsPos         int
+	IsConfig      bool
+	IsConfigGroup bool
+	Name          string
+	RuleDesc      string
+	VarName       string
+	Value         interface{}
+	Seen          bool
+	Default       *string
+	Aliases       []string
+	EnvVars       []string
+	EnvPrefix     string
+	Cast          CastFunc
+	Action        ActionFunc
+	StoreValue    StoreFunc
+	Group         string
+	Etcd          bool
+	EtcdKey       string
 }
 
 func newRule() *Rule {
@@ -337,6 +345,10 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 		return value, nil
 	}
 
+	if self.IsConfigGroup {
+		return nil, nil
+	}
+
 	// If provided our map of values, use that
 	if values != nil {
 		group := values.Group(self.Group)
@@ -369,6 +381,21 @@ func (self *Rule) GetEnvValue() (interface{}, error) {
 	return nil, nil
 }
 
+func (self *Rule) EtcdKeyPath(rootPath string) string {
+	results := make([]string, 0)
+
+	slugs := []string{rootPath, self.Group, self.EtcdKey}
+	if self.IsConfigGroup {
+		slugs = []string{rootPath, self.Group}
+	}
+
+	// Trim any leading or trailing slashes
+	for _, slug := range slugs {
+		results = append(results, strings.Trim(slug, "/"))
+	}
+	return strings.Join(results, "/")
+}
+
 // ***********************************************
 // Rules Object
 // ***********************************************
@@ -393,6 +420,7 @@ type ParseModifier func(*ArgParser)
 
 type ArgParser struct {
 	EnvPrefix   string
+	EtcdRoot    string
 	Description string
 	Name        string
 	WordWrap    int
@@ -408,6 +436,7 @@ type ArgParser struct {
 // Creates a new instance of the argument parser
 func NewParser(modifiers ...ParseModifier) *ArgParser {
 	parser := &ArgParser{
+		"",
 		"",
 		"",
 		"",
@@ -461,6 +490,10 @@ func (self *ArgParser) ValidateRules() error {
 
 func (self *ArgParser) InGroup(group string) *RuleModifier {
 	return NewRuleModifier(self).InGroup(group)
+}
+
+func (self *ArgParser) AddConfigGroup(group string) *RuleModifier {
+	return NewRuleModifier(self).AddConfigGroup(group)
 }
 
 func (self *ArgParser) Opt(name string) *RuleModifier {
@@ -562,7 +595,7 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 
 // Gather all the values from our rules, then apply the passed in map to any rules that don't have a computed value.
 func (self *ArgParser) Apply(values *Options) (*Options, error) {
-	results := self.NewOptions("")
+	results := self.NewOptions()
 
 	// for each of the rules
 	for _, rule := range self.rules {
@@ -575,7 +608,17 @@ func (self *ArgParser) Apply(values *Options) (*Options, error) {
 		if rule.StoreValue != nil {
 			rule.StoreValue(value)
 		}
-		results.Group(rule.Group).Set(rule.Name, value, rule.Seen)
+
+		// Config group is an adhoc group of key=values which
+		// do not have a specific type defined
+		if rule.IsConfigGroup {
+			for _, key := range values.Group(rule.Group).Keys() {
+				value := values.Group(rule.Group).Get(key)
+				results.Group(rule.Group).Set(key, value, rule.Seen)
+			}
+		} else {
+			results.Group(rule.Group).Set(rule.Name, value, rule.Seen)
+		}
 	}
 	self.SetOpts(results)
 	return self.GetOpts(), nil
@@ -597,18 +640,8 @@ func (self *ArgParser) GetOpts() *Options {
 
 // ===== ETCD STUFF =====
 
-func buildKeyPath(slugs ...string) string {
-	results := make([]string, 0)
-
-	// Trim any leading or trailing slashes
-	for _, slug := range slugs {
-		results = append(results, strings.Trim(slug, "/"))
-	}
-	return strings.Join(results, "/")
-}
-
-func (self *ArgParser) ParseEtcd(appRoot string, api etcd.KeysAPI) (*Options, error) {
-	values := self.NewOptions("")
+func (self *ArgParser) ParseEtcd(api etcd.KeysAPI) (*Options, error) {
+	values := self.NewOptions()
 	for _, rule := range self.rules {
 		if rule.Etcd {
 			key := rule.EtcdKey
@@ -616,19 +649,76 @@ func (self *ArgParser) ParseEtcd(appRoot string, api etcd.KeysAPI) (*Options, er
 				key = rule.Name
 			}
 			// Build the ETCD key
-			key = buildKeyPath(appRoot, rule.Group, key)
-			resp, err := api.Get(context.Background(), key, nil)
+			etcdKey := rule.EtcdKeyPath(self.EtcdRoot)
+			resp, err := api.Get(context.Background(), etcdKey, nil)
 			if err != nil {
-				// TODO: should check for errors of importance!
+				/*if err == context.Canceled {
+					// ctx is canceled by another routine
+				} else if err == context.DeadlineExceeded {
+					self.log.Println(err.Error())
+					// ctx is attached with a deadline and it exceeded
+				} else if cerr, ok := err.(*etcd.ClusterError); ok {
+					// process (cerr.Errors)
+				} else {
+					// bad cluster endpoints, which are not etcd servers
+				}*/
 				if self.log != nil {
 					self.log.Println(err.Error())
 				}
 				continue
 			}
+			// If it's a dir, assume its a config group
+			if resp.Node.Dir {
+				// TODO: Do things to get each item in the directory and put them in a group
+				values.Group(rule.Group).Set(resp.Node.Key, resp.Node.Value, false)
+			}
 			values.Group(rule.Group).Set(rule.Name, resp.Node.Value, false)
 		}
 	}
-	return self.NewOptions(DefaultOptionGroup), nil
+	return values, nil
+}
+
+func (self *ArgParser) FromEtcd(client etcd.Client) (*Options, error) {
+	options, err := self.ParseEtcd(etcd.NewKeysAPI(client))
+	if err != nil {
+		return options, err
+	}
+	// Apply the etcd values to the commandline and environment variables
+	return self.Apply(options)
+}
+
+func (self *ArgParser) WatchEtcd(client etcd.Client, callBack func(group, key, value string)) context.CancelFunc {
+	api := etcd.NewKeysAPI(client)
+	watcher := api.Watcher(self.EtcdRoot, &etcd.WatcherOptions{
+		AfterIndex: 0,
+		Recursive:  true,
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		for {
+			event, err := watcher.Next(ctx)
+			if err != nil {
+				if err == context.Canceled {
+					return
+				}
+				self.log.Printf("WatchEtcd: %s", err.Error())
+			}
+			switch event.Action {
+			case "set":
+				self.log.Printf("SET Key %s - Value %s", event.Node.Key, event.Node.Value)
+				break
+			case "del":
+				self.log.Printf("EXPIRE Key %s - Value %s", event.Node.Key, event.Node.Value)
+				break
+			case "expire":
+				// TODO: should distinguish between dirs and values
+				self.log.Printf("EXPIRE Key %s - Value %s", event.Node.Key, event.Node.Value)
+				break
+			}
+		}
+	}()
+	return cancel
 }
 
 // Parse the INI file and the Apply() the values to the parser
@@ -648,7 +738,7 @@ func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
 	if err != nil {
 		return nil, err
 	}
-	values := self.NewOptions("")
+	values := self.NewOptions()
 	for _, section := range cfg.Sections() {
 		group := cfg.Section(section.Name())
 		for _, key := range group.KeyStrings() {
@@ -683,7 +773,7 @@ func (self *ArgParser) match(rules Rules) (bool, error) {
 
 func (self *ArgParser) printRules() {
 	for _, rule := range self.rules {
-		fmt.Printf("Rule: %s - '%s'\n", rule.Name, rule.Value)
+		fmt.Printf("Rule: %s - '%+v'\n", rule.Name, rule.Value)
 	}
 }
 
@@ -757,6 +847,12 @@ func WrapLen(length int) ParseModifier {
 func EnvPrefix(prefix string) ParseModifier {
 	return func(parser *ArgParser) {
 		parser.EnvPrefix = prefix
+	}
+}
+
+func EtcdPath(path string) ParseModifier {
+	return func(parser *ArgParser) {
+		parser.EtcdRoot = path
 	}
 }
 
