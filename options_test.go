@@ -31,7 +31,7 @@ var _ = Describe("Options", func() {
 	Describe("log", func() {
 		It("Should log to StdLogger when cast fails", func() {
 			result := opts.Int("string")
-			Expect(log.GetEntry()).To(Equal("Unable to Cast \"one\" to int for key 'string'"))
+			Expect(log.GetEntry()).To(Equal("Unable to Cast \"one\" to int for key 'string'|"))
 			Expect(result).To(Equal(0))
 		})
 	})

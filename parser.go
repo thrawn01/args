@@ -5,15 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"regexp"
 	"sort"
 	"sync"
 	"time"
-
-	etcd "github.com/coreos/etcd/client"
-	"github.com/go-ini/ini"
-	"golang.org/x/net/context"
 )
 
 const MAX_BACKOFF_WAIT = 2 * time.Second
@@ -242,177 +237,6 @@ func (self *ArgParser) GetOpts() *Options {
 	return self.options
 }
 
-// ===== ETCD STUFF =====
-
-func (self *ArgParser) ParseEtcd(api etcd.KeysAPI) (*Options, error) {
-	values := self.NewOptions()
-	for _, rule := range self.rules {
-		if rule.Etcd {
-			fmt.Printf("path: %s\n", rule.EtcdPath)
-			fmt.Printf("key: %s\n", rule.EtcdKey)
-			resp, err := api.Get(context.Background(), rule.EtcdPath, nil)
-			if err != nil {
-				/*if err == context.Canceled {
-					// ctx is canceled by another routine
-				} else if err == context.DeadlineExceeded {
-					self.log.Println(err.Error())
-					// ctx is attached with a deadline and it exceeded
-				} else if cerr, ok := err.(*etcd.ClusterError); ok {
-					// process (cerr.Errors)
-				} else {
-					// bad cluster endpoints, which are not etcd servers
-				}*/
-				if self.log != nil {
-					self.log.Println(err.Error())
-				}
-				continue
-			}
-			// If it's a directory and this rule is a config group
-			if resp.Node.Dir {
-				if rule.IsConfigGroup {
-					// Retrieve all the key=values in the directory
-					for _, node := range resp.Node.Nodes {
-						// That are not directories
-						if node.Dir {
-							continue
-						}
-						values.Group(rule.Group).Set(path.Base(node.Key), node.Value, false)
-					}
-				}
-				// Should we silently fail if the rule is not for a
-				// config group, but the node is a directory?
-				continue
-			}
-			values.Group(rule.Group).Set(rule.Name, resp.Node.Value, false)
-		}
-	}
-	return values, nil
-}
-
-func (self *ArgParser) generateEtcdPathKeys() {
-	for _, rule := range self.rules {
-		if rule.Etcd {
-			rule.EtcdPath = rule.EtcdKeyPath(self.EtcdRoot)
-		}
-	}
-}
-
-func (self *ArgParser) FromEtcd(client etcd.Client) (*Options, error) {
-	self.generateEtcdPathKeys()
-	options, err := self.ParseEtcd(etcd.NewKeysAPI(client))
-	if err != nil {
-		return options, err
-	}
-	// Apply the etcd values to the commandline and environment variables
-	return self.Apply(options)
-}
-
-func (self *ArgParser) Wait() {
-	self.attempts = self.attempts + 1
-	delay := time.Duration(self.attempts) * 2 * time.Millisecond
-	if delay > MAX_BACKOFF_WAIT {
-		delay = MAX_BACKOFF_WAIT
-	}
-	self.log.Printf("WatchEtcd Retry in %v ...", delay)
-	time.Sleep(delay)
-}
-
-func (self *ArgParser) WatchEtcd(client etcd.Client, callBack func(group, key, value string)) context.CancelFunc {
-	self.generateEtcdPathKeys()
-
-	fmt.Printf("WatchEtcd\n")
-	api := etcd.NewKeysAPI(client)
-	watcher := api.Watcher(self.EtcdRoot, &etcd.WatcherOptions{
-		AfterIndex: 0,
-		Recursive:  true,
-	})
-	ctx, cancel := context.WithCancel(context.Background())
-
-	var isRunning sync.WaitGroup
-	isRunning.Add(1)
-	go func() {
-		// Notify the goroutine is running
-		isRunning.Done()
-		for {
-			fmt.Printf("for\n")
-			event, err := watcher.Next(ctx)
-			fmt.Printf("Next\n")
-			if err != nil {
-				if err == context.Canceled {
-					fmt.Printf("return\n")
-					return
-				}
-				fmt.Printf("WatchEtcd: %s\n", err.Error())
-				self.log.Printf("WatchEtcd: %s", err.Error())
-				self.Wait()
-				continue
-			}
-			self.attempts = 0
-			switch event.Action {
-			case "set":
-				fmt.Printf("SET Key %s - Value %s\n", event.Node.Key, event.Node.Value)
-				rule := self.FindEtcdRule(path.Dir(event.Node.Key))
-				if rule != nil {
-					callBack(rule.Group, path.Base(event.Node.Key), event.Node.Value)
-				}
-				break
-			case "del":
-			case "expire":
-				fmt.Printf("DEL or EXPIRE Key %s - Value %s\n", event.Node.Key, event.Node.Value)
-				rule := self.FindEtcdRule(event.Node.Key)
-				if rule != nil {
-					if event.Node.Dir {
-						// if the group and value is set to "", indicates
-						// the group directory was deleted
-						callBack(rule.Group, "", "")
-					} else {
-						// If the value is set to "", indicates the value was deleted on etcd
-						callBack(rule.Group, path.Base(event.Node.Key), "")
-					}
-				}
-				break
-			}
-		}
-	}()
-	// Wait until the goroutine is running before we return ,this ensures any updates
-	// our application might make to etcd will be picked up by WatchEtcd()
-	isRunning.Wait()
-	return cancel
-}
-
-// Parse the INI file and the Apply() the values to the parser
-func (self *ArgParser) FromIni(input []byte) (*Options, error) {
-	options, err := self.ParseIni(input)
-	if err != nil {
-		return options, err
-	}
-	// Apply the ini file values to the commandline and environment variables
-	return self.Apply(options)
-}
-
-// Parse the INI file and return the raw parsed options
-func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
-	// Parse the file return a map of the contents
-	cfg, err := ini.Load(input)
-	if err != nil {
-		return nil, err
-	}
-	values := self.NewOptions()
-	for _, section := range cfg.Sections() {
-		group := cfg.Section(section.Name())
-		for _, key := range group.KeyStrings() {
-			// Always use our default option group name for the DEFAULT section
-			name := section.Name()
-			if name == "DEFAULT" {
-				name = DefaultOptionGroup
-			}
-			values.Group(name).Set(key, group.Key(key).String(), false)
-		}
-
-	}
-	return values, nil
-}
-
 func (self *ArgParser) match(rules Rules) (bool, error) {
 	// Find a Rule that matches this argument
 	for _, rule := range rules {
@@ -428,16 +252,6 @@ func (self *ArgParser) match(rules Rules) (bool, error) {
 	}
 	// No Rules matched our arguments and there was no error
 	return false, nil
-}
-
-func (self *ArgParser) FindEtcdRule(etcdPath string) *Rule {
-	for _, rule := range self.rules {
-		fmt.Printf("compare %s\n", rule.EtcdPath)
-		if etcdPath == rule.EtcdPath {
-			return rule
-		}
-	}
-	return nil
 }
 
 func (self *ArgParser) printRules() {

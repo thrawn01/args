@@ -23,15 +23,15 @@ func NewTestLogger() *TestLogger {
 }
 
 func (self *TestLogger) Print(stuff ...interface{}) {
-	self.result = self.result + "\n" + fmt.Sprint(stuff...)
+	self.result = self.result + fmt.Sprint(stuff...) + "|"
 }
 
 func (self *TestLogger) Printf(format string, stuff ...interface{}) {
-	self.result = self.result + "\n" + fmt.Sprintf(format, stuff...)
+	self.result = self.result + fmt.Sprintf(format, stuff...) + "|"
 }
 
 func (self *TestLogger) Println(stuff ...interface{}) {
-	self.result = self.result + "\n" + fmt.Sprintln(stuff...)
+	self.result = self.result + fmt.Sprintln(stuff...) + "|"
 }
 
 func (self *TestLogger) GetEntry() string {
