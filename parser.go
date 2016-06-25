@@ -5,14 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"regexp"
 	"sort"
 	"sync"
+	"time"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/go-ini/ini"
 	"golang.org/x/net/context"
 )
+
+const MAX_BACKOFF_WAIT = 2 * time.Second
 
 type ParseModifier func(*ArgParser)
 
@@ -28,6 +32,7 @@ type ArgParser struct {
 	rules       Rules
 	err         error
 	idx         int
+	attempts    int
 	log         StdLogger
 }
 
@@ -45,7 +50,8 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 		nil,
 		nil,
 		0,
-		nil,
+		0,
+		DefaultLogger,
 	}
 	for _, modify := range modifiers {
 		modify(parser)
@@ -242,13 +248,9 @@ func (self *ArgParser) ParseEtcd(api etcd.KeysAPI) (*Options, error) {
 	values := self.NewOptions()
 	for _, rule := range self.rules {
 		if rule.Etcd {
-			key := rule.EtcdKey
-			if key == "" {
-				key = rule.Name
-			}
-			// Build the ETCD key
-			etcdKey := rule.EtcdKeyPath(self.EtcdRoot)
-			resp, err := api.Get(context.Background(), etcdKey, nil)
+			fmt.Printf("path: %s\n", rule.EtcdPath)
+			fmt.Printf("key: %s\n", rule.EtcdKey)
+			resp, err := api.Get(context.Background(), rule.EtcdPath, nil)
 			if err != nil {
 				/*if err == context.Canceled {
 					// ctx is canceled by another routine
@@ -265,10 +267,21 @@ func (self *ArgParser) ParseEtcd(api etcd.KeysAPI) (*Options, error) {
 				}
 				continue
 			}
-			// If it's a dir, assume its a config group
+			// If it's a directory and this rule is a config group
 			if resp.Node.Dir {
-				// TODO: Do things to get each item in the directory and put them in a group
-				values.Group(rule.Group).Set(resp.Node.Key, resp.Node.Value, false)
+				if rule.IsConfigGroup {
+					// Retrieve all the key=values in the directory
+					for _, node := range resp.Node.Nodes {
+						// That are not directories
+						if node.Dir {
+							continue
+						}
+						values.Group(rule.Group).Set(path.Base(node.Key), node.Value, false)
+					}
+				}
+				// Should we silently fail if the rule is not for a
+				// config group, but the node is a directory?
+				continue
 			}
 			values.Group(rule.Group).Set(rule.Name, resp.Node.Value, false)
 		}
@@ -276,7 +289,16 @@ func (self *ArgParser) ParseEtcd(api etcd.KeysAPI) (*Options, error) {
 	return values, nil
 }
 
+func (self *ArgParser) generateEtcdPathKeys() {
+	for _, rule := range self.rules {
+		if rule.Etcd {
+			rule.EtcdPath = rule.EtcdKeyPath(self.EtcdRoot)
+		}
+	}
+}
+
 func (self *ArgParser) FromEtcd(client etcd.Client) (*Options, error) {
+	self.generateEtcdPathKeys()
 	options, err := self.ParseEtcd(etcd.NewKeysAPI(client))
 	if err != nil {
 		return options, err
@@ -285,37 +307,76 @@ func (self *ArgParser) FromEtcd(client etcd.Client) (*Options, error) {
 	return self.Apply(options)
 }
 
+func (self *ArgParser) Wait() {
+	self.attempts = self.attempts + 1
+	delay := time.Duration(self.attempts) * 2 * time.Millisecond
+	if delay > MAX_BACKOFF_WAIT {
+		delay = MAX_BACKOFF_WAIT
+	}
+	self.log.Printf("WatchEtcd Retry in %v ...", delay)
+	time.Sleep(delay)
+}
+
 func (self *ArgParser) WatchEtcd(client etcd.Client, callBack func(group, key, value string)) context.CancelFunc {
+	self.generateEtcdPathKeys()
+
+	fmt.Printf("WatchEtcd\n")
 	api := etcd.NewKeysAPI(client)
 	watcher := api.Watcher(self.EtcdRoot, &etcd.WatcherOptions{
 		AfterIndex: 0,
 		Recursive:  true,
 	})
-
 	ctx, cancel := context.WithCancel(context.Background())
+
+	var isRunning sync.WaitGroup
+	isRunning.Add(1)
 	go func() {
+		// Notify the goroutine is running
+		isRunning.Done()
 		for {
+			fmt.Printf("for\n")
 			event, err := watcher.Next(ctx)
+			fmt.Printf("Next\n")
 			if err != nil {
 				if err == context.Canceled {
+					fmt.Printf("return\n")
 					return
 				}
+				fmt.Printf("WatchEtcd: %s\n", err.Error())
 				self.log.Printf("WatchEtcd: %s", err.Error())
+				self.Wait()
+				continue
 			}
+			self.attempts = 0
 			switch event.Action {
 			case "set":
-				self.log.Printf("SET Key %s - Value %s", event.Node.Key, event.Node.Value)
+				fmt.Printf("SET Key %s - Value %s\n", event.Node.Key, event.Node.Value)
+				rule := self.FindEtcdRule(path.Dir(event.Node.Key))
+				if rule != nil {
+					callBack(rule.Group, path.Base(event.Node.Key), event.Node.Value)
+				}
 				break
 			case "del":
-				self.log.Printf("EXPIRE Key %s - Value %s", event.Node.Key, event.Node.Value)
-				break
 			case "expire":
-				// TODO: should distinguish between dirs and values
-				self.log.Printf("EXPIRE Key %s - Value %s", event.Node.Key, event.Node.Value)
+				fmt.Printf("DEL or EXPIRE Key %s - Value %s\n", event.Node.Key, event.Node.Value)
+				rule := self.FindEtcdRule(event.Node.Key)
+				if rule != nil {
+					if event.Node.Dir {
+						// if the group and value is set to "", indicates
+						// the group directory was deleted
+						callBack(rule.Group, "", "")
+					} else {
+						// If the value is set to "", indicates the value was deleted on etcd
+						callBack(rule.Group, path.Base(event.Node.Key), "")
+					}
+				}
 				break
 			}
 		}
 	}()
+	// Wait until the goroutine is running before we return ,this ensures any updates
+	// our application might make to etcd will be picked up by WatchEtcd()
+	isRunning.Wait()
 	return cancel
 }
 
@@ -367,6 +428,16 @@ func (self *ArgParser) match(rules Rules) (bool, error) {
 	}
 	// No Rules matched our arguments and there was no error
 	return false, nil
+}
+
+func (self *ArgParser) FindEtcdRule(etcdPath string) *Rule {
+	for _, rule := range self.rules {
+		fmt.Printf("compare %s\n", rule.EtcdPath)
+		if etcdPath == rule.EtcdPath {
+			return rule
+		}
+	}
+	return nil
 }
 
 func (self *ArgParser) printRules() {

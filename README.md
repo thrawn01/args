@@ -200,6 +200,7 @@ exit status 255
 * Support different types of optional prefixes (--, -, ++, +, etc..)
 * Support for Config only options
 * Support for Groups
+* Support for Etcd
 * Generate Help Message
 
 ## TODO
@@ -213,5 +214,4 @@ exit status 255
 * Support '-arg=value'
 * Support Parent Parsing
 * Support for ConfigMap
-* Support for Etcd
 

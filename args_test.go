@@ -19,19 +19,19 @@ type TestLogger struct {
 }
 
 func NewTestLogger() *TestLogger {
-	return &TestLogger{}
+	return &TestLogger{""}
 }
 
 func (self *TestLogger) Print(stuff ...interface{}) {
-	self.result = fmt.Sprint(stuff...)
+	self.result = self.result + "\n" + fmt.Sprint(stuff...)
 }
 
 func (self *TestLogger) Printf(format string, stuff ...interface{}) {
-	self.result = fmt.Sprintf(format, stuff...)
+	self.result = self.result + "\n" + fmt.Sprintf(format, stuff...)
 }
 
 func (self *TestLogger) Println(stuff ...interface{}) {
-	self.result = fmt.Sprintln(stuff...)
+	self.result = self.result + "\n" + fmt.Sprintln(stuff...)
 }
 
 func (self *TestLogger) GetEntry() string {

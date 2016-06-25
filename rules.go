@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"reflect"
 	"sort"
 	"strings"
@@ -213,6 +214,7 @@ type Rule struct {
 	Group         string
 	Etcd          bool
 	EtcdKey       string
+	EtcdPath      string
 }
 
 func newRule() *Rule {
@@ -343,18 +345,15 @@ func (self *Rule) GetEnvValue() (interface{}, error) {
 }
 
 func (self *Rule) EtcdKeyPath(rootPath string) string {
-	results := make([]string, 0)
+	rootPath = strings.TrimPrefix(rootPath, "/")
+	if self.EtcdKey == "" {
+		self.EtcdKey = self.Name
+	}
 
-	slugs := []string{rootPath, self.Group, self.EtcdKey}
 	if self.IsConfigGroup {
-		slugs = []string{rootPath, self.Group}
+		return path.Join("/", rootPath, self.Group)
 	}
-
-	// Trim any leading or trailing slashes
-	for _, slug := range slugs {
-		results = append(results, strings.Trim(slug, "/"))
-	}
-	return strings.Join(results, "/")
+	return path.Join("/", rootPath, self.Group, self.EtcdKey)
 }
 
 // ***********************************************
