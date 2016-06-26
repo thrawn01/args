@@ -1,49 +1,65 @@
 package args
 
 import (
-	"fmt"
 	"path"
 	"sync"
 	"time"
 
-	etcd "github.com/coreos/etcd/client"
+	etcd "github.com/coreos/etcd/clientv3"
 	"golang.org/x/net/context"
 )
 
-func (self *ArgParser) ParseEtcd(api etcd.KeysAPI) (*Options, error) {
+const MAX_BACKOFF_WAIT = 2 * time.Second
+
+// Which options to pass to etcd client depends on the rule type
+func (self *ArgParser) chooseOption(rule *Rule) etcd.OpOption {
+	if rule.IsConfigGroup {
+		return etcd.WithPrefix()
+	}
+	return func(op *etcd.Op) {}
+}
+
+func (self *ArgParser) ParseEtcd(client *etcd.Client) (*Options, error) {
 	values := self.NewOptions()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer func() { cancel() }()
+
 	for _, rule := range self.rules {
-		if rule.Etcd {
-			resp, err := api.Get(context.Background(), rule.EtcdPath, nil)
-			if err != nil {
-				if self.log != nil {
-					self.log.Printf("args.ParseEtcd(): Failed to fetch key '%s' - '%s'",
-						rule.EtcdPath, err.Error())
-				}
-				continue
+		if !rule.Etcd {
+			continue
+		}
+		resp, err := client.Get(ctx, rule.EtcdPath, self.chooseOption(rule))
+		if err != nil {
+			if self.log != nil {
+				self.log.Printf("args.ParseEtcd(): Failed to fetch key '%s' - '%s'",
+					rule.EtcdPath, err.Error())
 			}
-			// If it's a directory and this rule is a config group
-			if resp.Node.Dir {
-				if rule.IsConfigGroup {
-					// Retrieve all the key=values in the directory
-					for _, node := range resp.Node.Nodes {
-						// That are not directories
-						if node.Dir {
-							continue
-						}
-						values.Group(rule.Group).Set(path.Base(node.Key), node.Value, false)
-					}
-				}
-				// Should we silently fail if the rule is not for a
-				// config group, but the node is a directory?
-				continue
+			continue
+		}
+		// Does this mean it wasn't found?
+		if len(resp.Kvs) == 0 {
+			self.log.Printf("args.ParseEtcd(): key '%s' not found", rule.EtcdPath)
+			continue
+		}
+		// Handle ConfigGroups
+		if len(resp.Kvs) != 1 && rule.IsConfigGroup {
+			// Retrieve all the key=values in the directory
+			for _, node := range resp.Kvs {
+				values.Group(rule.Group).Set(path.Base(string(node.Key)), string(node.Value), false)
 			}
-			values.Group(rule.Group).Set(rule.Name, resp.Node.Value, false)
+		} else if len(resp.Kvs) == 1 {
+			values.Group(rule.Group).Set(rule.Name, string(resp.Kvs[0].Value), false)
+		} else {
+			self.log.Printf("args.ParseEtcd(): Expected 1 Key=Value response but got multiple for key '%s'",
+				rule.EtcdPath)
+
 		}
 	}
 	return values, nil
 }
 
+// Generate rule.EtcdPath for all rules using the parsers set EtcRoot
 func (self *ArgParser) generateEtcdPathKeys() {
 	for _, rule := range self.rules {
 		if rule.Etcd {
@@ -52,9 +68,10 @@ func (self *ArgParser) generateEtcdPathKeys() {
 	}
 }
 
-func (self *ArgParser) FromEtcd(client etcd.Client) (*Options, error) {
+func (self *ArgParser) FromEtcd(client *etcd.Client) (*Options, error) {
 	self.generateEtcdPathKeys()
-	options, err := self.ParseEtcd(etcd.NewKeysAPI(client))
+
+	options, err := self.ParseEtcd(client)
 	if err != nil {
 		return options, err
 	}
@@ -72,42 +89,53 @@ func (self *ArgParser) Sleep() {
 	time.Sleep(delay)
 }
 
-func (self *ArgParser) WatchEtcd(client etcd.Client, callBack func(*ChangeEvent)) context.CancelFunc {
+type WatchCancelFunc func()
+
+func (self *ArgParser) WatchEtcd(client *etcd.Client, callBack func(*ChangeEvent)) WatchCancelFunc {
+	var isRunning sync.WaitGroup
+	var done chan struct{}
+
 	self.generateEtcdPathKeys()
 
-	api := etcd.NewKeysAPI(client)
-	watcher := api.Watcher(self.EtcdRoot, &etcd.WatcherOptions{
-		AfterIndex: 0,
-		Recursive:  true,
-	})
-	ctx, cancel := context.WithCancel(context.Background())
-
-	var isRunning sync.WaitGroup
 	isRunning.Add(1)
 	go func() {
+		var resp etcd.WatchResponse
+		var ok bool
 		// Notify we are running
 		isRunning.Done()
 		for {
-			fmt.Printf("Watching....\n")
-			event, err := watcher.Next(ctx)
-			if err != nil {
-				if err == context.Canceled {
-					fmt.Printf("return\n")
+			// Always attempt to watch, until the user tells us to stop
+			ctx, cancel := context.WithCancel(context.Background())
+			watchChan := client.Watch(ctx, self.EtcdRoot, etcd.WithPrefix())
+			for {
+				select {
+				case resp, ok = <-watchChan:
+					if !ok {
+						goto Retry
+					}
+					if resp.Canceled {
+						self.log.Printf("args.WatchEtcd(): Etcd Cancelled watch with '%s'",
+							resp.Err())
+					}
+					for _, event := range resp.Events {
+						callBack(NewChangeEvent(self.rules, event))
+					}
+				case <-done:
+					cancel()
 					return
 				}
-				fmt.Printf("WatchEtcd: %s\n", err.Error())
-				self.log.Printf("WatchEtcd: %s", err.Error())
-				self.Sleep()
-				continue
 			}
-			self.attempts = 0
-			callBack(NewChangeEvent(self.rules, event))
+		Retry:
+			// Cancel our current context and sleep
+			cancel()
+			self.Sleep()
 		}
 	}()
+
 	// Wait until the goroutine is running before we return, this ensures any updates
 	// our application might make to etcd will be picked up by WatchEtcd()
 	isRunning.Wait()
-	return cancel
+	return func() { close(done) }
 }
 
 // A ChangeEvent is a representation of an etcd key=value update, delete or expire. Args attempts to match
@@ -132,14 +160,13 @@ func findEtcdRule(etcdPath string, rules Rules) *Rule {
 
 // Given args.Rules and etcd.Response, attempt to match the response to the rules and return
 // a new ChangeEvent.
-func NewChangeEvent(rules Rules, event *etcd.Response) *ChangeEvent {
-	rule := findEtcdRule(path.Dir(event.Node.Key), rules)
-	deleted := (event.Action == "del" || event.Action == "expire")
+func NewChangeEvent(rules Rules, event *etcd.Event) *ChangeEvent {
+	rule := findEtcdRule(path.Dir(string(event.Kv.Key)), rules)
 	return &ChangeEvent{
 		Rule:    rule,
 		Group:   rule.Group,
-		Key:     path.Base(event.Node.Key),
-		Value:   event.Node.Value,
-		Deleted: deleted,
+		Key:     path.Base(string(event.Kv.Key)),
+		Value:   string(event.Kv.Value),
+		Deleted: event.Type.String() == "DELETE",
 	}
 }

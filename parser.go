@@ -8,10 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"sync"
-	"time"
 )
-
-const MAX_BACKOFF_WAIT = 2 * time.Second
 
 type ParseModifier func(*ArgParser)
 
