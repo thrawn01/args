@@ -13,29 +13,34 @@ import (
 type ParseModifier func(*ArgParser)
 
 type ArgParser struct {
-	EnvPrefix   string
-	EtcdRoot    string
-	Description string
-	Name        string
-	WordWrap    int
-	mutex       sync.Mutex
-	args        []string
-	options     *Options
-	rules       Rules
-	err         error
-	idx         int
-	attempts    int
-	log         StdLogger
+	Command              *Rule
+	EnvPrefix            string
+	EtcdRoot             string
+	Description          string
+	Name                 string
+	WordWrap             int
+	StopParsingOnCommand bool
+	mutex                sync.Mutex
+	args                 []string
+	options              *Options
+	rules                Rules
+	err                  error
+	idx                  int
+	attempts             int
+	log                  StdLogger
 }
 
 // Creates a new instance of the argument parser
 func NewParser(modifiers ...ParseModifier) *ArgParser {
+	// TODO: Fix this... is stupid
 	parser := &ArgParser{
+		nil,
 		"",
 		"",
 		"",
 		"",
 		200,
+		false,
 		sync.Mutex{},
 		[]string{},
 		nil,
@@ -59,6 +64,12 @@ func (self *ArgParser) SetLog(logger StdLogger) {
 
 func (self *ArgParser) GetLog() StdLogger {
 	return self.log
+}
+
+// Takes the current parser and return a new parser with
+// any arguments already parsed removed from argv and none of the rules of the parent
+func (self *ArgParser) SubParser() *ArgParser {
+	return nil
 }
 
 func (self *ArgParser) ValidateRules() error {
@@ -110,6 +121,14 @@ func (self *ArgParser) AddConfig(name string) *RuleModifier {
 	return self.AddRule(name, newRuleModifier(rule, self))
 }
 
+func (self *ArgParser) AddCommand(name string, cmdFunc CommandFunc) *RuleModifier {
+	rule := newRule()
+	rule.CommandFunc = cmdFunc
+	rule.Type = CommandRule
+	// Make a new RuleModifier using self as the template
+	return self.AddRule(name, newRuleModifier(rule, self))
+}
+
 func (self *ArgParser) AddRule(name string, modifier *RuleModifier) *RuleModifier {
 	rule := modifier.GetRule()
 
@@ -151,6 +170,21 @@ func (self *ArgParser) ParseArgs(args *[]string) (*Options, error) {
 	return self.parseUntil(*args, "--")
 }
 
+func (self *ArgParser) ParseAndRun(args *[]string, data interface{}) (int, error) {
+	_, err := self.ParseArgs(args)
+	if err != nil {
+		return -1, err
+	}
+
+	// If user didn't provide a command via the commandline
+	if self.Command == nil {
+		self.PrintHelp()
+	}
+
+	retCode := self.Command.CommandFunc(self, data)
+	return retCode, nil
+}
+
 func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, error) {
 	self.args = args
 	self.idx = 0
@@ -171,21 +205,40 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 	// Process command line arguments until we find our terminator
 	for ; self.idx < len(self.args); self.idx++ {
 		if self.args[self.idx] == terminator {
-			return self.Apply(nil)
+			goto Apply
 		}
 		// Match our arguments with rules expected
 		//fmt.Printf("====== Attempting to match: %d:%s - ", self.idx, self.args[self.idx])
-		matched, err := self.match(self.rules)
+		rule, err := self.match(self.rules)
 		if err != nil {
 			return nil, err
 		}
-
-		if !matched {
-			//fmt.Printf("Failed to Match\n")
-			// TODO: If we didn't match any options and user asked us to fail on
-			// unmatched arguments return an error here
+		if rule != nil {
+			// If we matched a command
+			if rule.Type == CommandRule {
+				if self.Command == nil {
+					self.Command = rule
+					// Remove the command from our arguments before preceding
+					self.args = append(self.args[:self.idx], self.args[self.idx+1:]...)
+					if self.idx != 0 {
+						self.idx--
+					}
+					// If user asked us to stop parsing arguments after finding a command
+					if self.StopParsingOnCommand {
+						goto Apply
+					}
+				} else {
+					// Only one command is allowed at a time. This other match
+					// must be a positional argument or a subcommand
+					rule.Seen = false
+				}
+			}
 		}
+		//fmt.Printf("Failed to Match\n")
+		// TODO: If we didn't match any options and user asked us to fail on
+		// unmatched arguments return an error here
 	}
+Apply:
 	return self.Apply(nil)
 }
 
@@ -233,21 +286,21 @@ func (self *ArgParser) GetOpts() *Options {
 	return self.options
 }
 
-func (self *ArgParser) match(rules Rules) (bool, error) {
+func (self *ArgParser) match(rules Rules) (*Rule, error) {
 	// Find a Rule that matches this argument
 	for _, rule := range rules {
 		matched, err := rule.Match(self.args, &self.idx)
 		if err != nil {
 			// This Rule did match our argument but had an error
-			return true, err
+			return rule, err
 		}
 		if matched {
 			//fmt.Printf("Matched '%s' with '%s'\n", rule.Name, rule.Value)
-			return true, nil
+			return rule, nil
 		}
 	}
 	// No Rules matched our arguments and there was no error
-	return false, nil
+	return nil, nil
 }
 
 func (self *ArgParser) printRules() {

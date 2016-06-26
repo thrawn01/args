@@ -188,7 +188,18 @@ func (self *RuleModifier) EtcdKey(key string) *RuleModifier {
 // ***********************************************
 // Rule Object
 // ***********************************************
+
+type CastFunc func(string, interface{}) (interface{}, error)
+type ActionFunc func(*Rule, string, []string, *int) error
+type StoreFunc func(interface{})
+type CommandFunc func(*ArgParser, interface{}) int
+
+const (
+	CommandRule = 1
+)
+
 type Rule struct {
+	Type          int
 	Count         int
 	IsPos         int
 	IsConfig      bool
@@ -205,6 +216,7 @@ type Rule struct {
 	Cast          CastFunc
 	Action        ActionFunc
 	StoreValue    StoreFunc
+	CommandFunc   CommandFunc
 	Group         string
 	EtcdKey       string
 	EtcdPath      string

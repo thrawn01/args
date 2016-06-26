@@ -33,10 +33,10 @@ func main() {
 	parser.AddOption("--endpoint").Alias("-e").
 		Help("Our API REST Endpoint")
 
-	parser.AddCommand("create").Action(func(parent *args.ArgParser) int {
+	parser.AddCommand("create", func(parent *args.ArgParser, data interface{}) int {
 		// CREATE Specific Options
 		parser := parent.SubParser()
-		parser.AddRequired("message").Positional().Help("The message to create")
+		//parser.AddRequired("message").Positional().Help("The message to create")
 
 		// Parse the additional arguments for 'create'
 		opts, err := parser.ParseArgs(nil)
@@ -82,9 +82,36 @@ func main() {
 		return 0
 	})
 
-	_, err := parser.ParseArgs(nil)
+	// Also for convenience we should make a ParseAndRun() Command that does all of this for the user
+	retCode, err := parser.ParseAndRun(nil, nil)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(retCode)
+	}
+	os.Exit(retCode)
+
+	/*opts, err := parser.ParseArgs(nil)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(-1)
 	}
+
+	// Ask the Parser if it saw a command on the commandline
+	if !parser.CommandSeen() {
+		parser.PrintHelp()
+		os.Exit(-1)
+	}
+
+	// Now that we know a command was chosen we could handle global stuff here,
+	// like connections to resources and such
+	data.connection = NewHttpConnection(opts)
+
+	// Data will be passed in to the command function
+	retCode, err := parser.RunCommand(data)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(-1)
+	}
+	os.Exit(retCode)*/
+
 }

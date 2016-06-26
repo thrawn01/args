@@ -30,13 +30,6 @@ func (self *NullLogger) Printf(string, ...interface{}) {}
 func (self *NullLogger) Println(...interface{})        {}
 
 // ***********************************************
-//  Types
-// ***********************************************
-type CastFunc func(string, interface{}) (interface{}, error)
-type ActionFunc func(*Rule, string, []string, *int) error
-type StoreFunc func(interface{})
-
-// ***********************************************
 // PUBLIC FUNCTIONS
 // ***********************************************
 func Name(name string) ParseModifier {
