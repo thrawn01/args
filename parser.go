@@ -205,15 +205,14 @@ func (self *ArgParser) Apply(values *Options) (*Options, error) {
 			rule.StoreValue(value)
 		}
 
-		// Config group is an adhoc group of key=values which
-		// do not have a specific type defined
-		if rule.IsConfigGroup {
+		// Special Case here for Config Groups
+		if rule.IsConfigGroup && values != nil {
 			for _, key := range values.Group(rule.Group).Keys() {
 				value := values.Group(rule.Group).Get(key)
-				results.Group(rule.Group).Set(key, value, rule.Seen)
+				results.Group(rule.Group).SetSeen(key, value, rule.Seen)
 			}
 		} else {
-			results.Group(rule.Group).Set(rule.Name, value, rule.Seen)
+			results.Group(rule.Group).SetSeen(rule.Name, value, rule.Seen)
 		}
 	}
 	self.SetOpts(results)

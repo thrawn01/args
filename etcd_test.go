@@ -85,7 +85,7 @@ var _ = Describe("ArgParser", func() {
 			parser.SetLog(log)
 			parser.AddConfig("--bind").Etcd()
 
-			etcdPut(client, parser.EtcdRoot, "/bind", "thrawn01.org:3366")
+			etcdPut(client, parser.EtcdRoot, "/DEFAULT/bind", "thrawn01.org:3366")
 			opts, err := parser.FromEtcd(client)
 			Expect(err).To(BeNil())
 			Expect(log.GetEntry()).To(Equal(""))
@@ -154,20 +154,15 @@ var _ = Describe("ArgParser", func() {
 
 			// TODO: change this func to accept an Update{} object
 			cancelWatch := parser.WatchEtcd(client, func(event *args.ChangeEvent) {
-				//fmt.Printf("callback - %s - %s - %s\n", event.Group, event.Key, event.Value)
-				// This takes an update object, and updates the opts with the latest which might
-				// be what most people want. others will have the power to update how and when they like
-				//parser.Apply(opts.Update(update))
-
-				if event.Group == "endpoints" {
-					parser.Apply(opts.Group(event.Group).Set(event.Key, event.Value, false))
-				}
+				parser.Apply(opts.FromChangeEvent(event))
+				// Tell the test to continue, Change event was handled
 				close(done)
 			})
 			// Add a new endpoint
 			etcdPut(client, parser.EtcdRoot, "/endpoints/endpoint2", "http://endpoint2.com:3366")
-			// Wait until our call back is called
+			// Wait until the change event is handled
 			<-done
+			// Stop the watch
 			cancelWatch()
 			// Get the updated options
 			opts = parser.GetOpts()
@@ -182,6 +177,6 @@ var _ = Describe("ArgParser", func() {
 		// TODO
 		It("Should continue to attempt to reconnect if the etcd client disconnects", func() {})
 		// TODO
-		It("Should apply any change using opt.Update()", func() {})
+		It("Should apply any change using opt.FromChangeEvent()", func() {})
 	})
 })

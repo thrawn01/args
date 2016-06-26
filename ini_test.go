@@ -7,6 +7,12 @@ import (
 )
 
 var _ = Describe("ArgParser", func() {
+	var log *TestLogger
+
+	BeforeEach(func() {
+		log = NewTestLogger()
+	})
+
 	Describe("FromIni()", func() {
 		It("Should provide arg values from INI file", func() {
 			parser := args.NewParser()
@@ -60,6 +66,37 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"six", "five", "four"}))
 			Expect(list).To(Equal([]string{"six", "five", "four"}))
+		})
+	})
+	Describe("ArgParser.AddConfigGroup()", func() {
+		It("Should Parser an adhoc group from the ini file", func() {
+			cmdLine := []string{"--one", "one-thing"}
+			parser := args.NewParser()
+			parser.SetLog(log)
+			parser.AddOption("--one").IsString()
+			parser.AddConfigGroup("candy-bars")
+
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(log.GetEntry()).To(Equal(""))
+			Expect(opt.String("one")).To(Equal("one-thing"))
+
+			iniFile := []byte(`
+				one=true
+
+				[candy-bars]
+				snickers=300 Cals
+				fruit-snacks=100 Cals
+				m&ms=400 Cals
+			`)
+			opts, err := parser.FromIni(iniFile)
+			Expect(err).To(BeNil())
+			Expect(opts.Group("candy-bars").ToMap()).To(Equal(map[string]interface{}{
+				"snickers":     "300 Cals",
+				"fruit-snacks": "100 Cals",
+				"m&ms":         "400 Cals",
+			}))
+
 		})
 	})
 })

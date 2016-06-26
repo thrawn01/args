@@ -45,12 +45,12 @@ func (self *ArgParser) ParseEtcd(client *etcd.Client) (*Options, error) {
 		if rule.IsConfigGroup {
 			// Iterate through all the key=values for this group
 			for _, node := range resp.Kvs {
-				values.Group(rule.Group).Set(path.Base(string(node.Key)), string(node.Value), false)
+				values.Group(rule.Group).Set(path.Base(string(node.Key)), string(node.Value))
 			}
 		} else if len(resp.Kvs) == 1 {
-			values.Group(rule.Group).Set(rule.Name, string(resp.Kvs[0].Value), false)
+			values.Group(rule.Group).Set(rule.Name, string(resp.Kvs[0].Value))
 		} else {
-			values.Group(rule.Group).Set(rule.Name, string(resp.Kvs[0].Value), false)
+			values.Group(rule.Group).Set(rule.Name, string(resp.Kvs[0].Value))
 			self.log.Printf("args.ParseEtcd(): Expected 1 Key=Value response but got multiple for key '%s'",
 				rule.EtcdPath)
 		}

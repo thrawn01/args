@@ -28,7 +28,7 @@ func (self *ArgParser) ParseIni(input []byte) (*Options, error) {
 			if name == "DEFAULT" {
 				name = DefaultOptionGroup
 			}
-			values.Group(name).Set(key, group.Key(key).String(), false)
+			values.Group(name).Set(key, group.Key(key).String())
 		}
 
 	}

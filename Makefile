@@ -9,7 +9,7 @@ endif
 
 ETCD_DOCKER_IMAGE=quay.io/coreos/etcd:v3.0.0-beta.0
 
-start-docker:
+start-etcd:
 	@echo Checking Docker Containers
 	@if [ $(shell docker ps -a | grep -ci args-etcd) -eq 0 ]; then \
 		echo Starting Docker Container args-etcd; \
@@ -28,18 +28,18 @@ start-docker:
 		docker start args-etcd > /dev/null; \
 	fi
 
-stop-docker:
+stop-etcd:
 	@if [ $(shell docker ps -a | grep -ci args-etcd) -eq 1 ]; then \
 		echo Stopping Container args-etcd; \
 		docker stop args-etcd > /dev/null; \
 	fi
 
-test: start-docker
+test: start-etcd
 	@echo Running Tests
 	@go test .
 
-etcd-example:
-	go build -o bin/etcd-example examples/etcd/etcd.go
+etcd-endpoints:
+	go build -o bin/etcd-endpoints examples/etcd/etcd-endpoints.go
 
-all: start-docker test
+all: start-etcd test
 

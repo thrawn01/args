@@ -56,7 +56,7 @@ func (self *ArgParser) NewOptionsFromMap(group string, groups map[string]map[str
 	for groupName, values := range groups {
 		grp := options.Group(groupName)
 		for key, opt := range values {
-			grp.Set(key, opt.Value, opt.Seen)
+			grp.SetSeen(key, opt.Value, opt.Seen)
 		}
 	}
 	return options
@@ -128,9 +128,29 @@ func (self *Options) Group(group string) *Options {
 	return opts
 }
 
-func (self *Options) Set(key string, value interface{}, seen bool) *Options {
+func (self *Options) FromChangeEvent(event *ChangeEvent) *Options {
+	if event.Deleted {
+		self.Group(event.Group).Del(event.Key)
+	} else {
+		self.Group(event.Group).Set(event.Key, event.Value)
+	}
+	return self
+}
+
+func (self *Options) Del(key string) *Options {
+	delete(self.values, "key")
+	return self
+}
+
+// Just like Set() but also record if the key was seen on the commandline
+func (self *Options) SetSeen(key string, value interface{}, seen bool) *Options {
 	self.values[key] = &OptionValue{value, seen}
 	return self
+}
+
+// Set an option with a key and value
+func (self *Options) Set(key string, value interface{}) *Options {
+	return self.SetSeen(key, value, false)
 }
 
 // Return true if any of the values in this Option object were seen on the command line

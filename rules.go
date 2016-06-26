@@ -353,6 +353,9 @@ func (self *Rule) EtcdKeyPath(rootPath string) string {
 	if self.IsConfigGroup {
 		return path.Join("/", rootPath, self.Group)
 	}
+	if self.Group == DefaultOptionGroup {
+		return path.Join("/", rootPath, "DEFAULT", self.EtcdKey)
+	}
 	return path.Join("/", rootPath, self.Group, self.EtcdKey)
 }
 
