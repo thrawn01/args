@@ -266,6 +266,9 @@ func (self *ArgParser) GenerateHelp() string {
 	result.WriteString("Usage:\n")
 	// Super generic usage message
 	result.WriteString(fmt.Sprintf("  %s [OPTIONS]\n", self.Name))
+	result.WriteString("\n")
+	result.WriteString(WordWrap(self.Description, 0, 80))
+	result.WriteString("\n")
 	result.WriteString("\nOptions:\n")
 	result.WriteString(self.GenerateOptHelp())
 	return result.String()

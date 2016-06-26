@@ -78,12 +78,32 @@ var _ = Describe("ArgParser", func() {
 	})
 
 	Describe("FromEtcd()", func() {
+		It("Should default to /please-set-a-name if no args.Name() or args.EtcdPath() specified", func() {
+			okToTestEtcd()
+
+			parser := args.NewParser()
+			parser.SetLog(log)
+			parser.AddConfig("--bind")
+			_, err := parser.FromEtcd(client)
+			Expect(err).To(BeNil())
+			Expect(parser.EtcdRoot).To(Equal("/please-set-a-name"))
+		})
+		It("Should use args.Name() if args.EtcdPath() not specified", func() {
+			okToTestEtcd()
+
+			parser := args.NewParser(args.Name("my-name"))
+			parser.SetLog(log)
+			parser.AddConfig("--bind")
+			_, err := parser.FromEtcd(client)
+			Expect(err).To(BeNil())
+			Expect(parser.EtcdRoot).To(Equal("/my-name"))
+		})
 		It("Should fetch 'bind' value from /EtcdRoot/bind", func() {
 			okToTestEtcd()
 
 			parser := args.NewParser(args.EtcdPath(etcdRoot))
 			parser.SetLog(log)
-			parser.AddConfig("--bind").Etcd()
+			parser.AddConfig("--bind")
 
 			etcdPut(client, parser.EtcdRoot, "/DEFAULT/bind", "thrawn01.org:3366")
 			opts, err := parser.FromEtcd(client)
@@ -96,7 +116,7 @@ var _ = Describe("ArgParser", func() {
 
 			parser := args.NewParser(args.EtcdPath(etcdRoot))
 			parser.SetLog(log)
-			parser.AddConfigGroup("endpoints").Etcd()
+			parser.AddConfigGroup("endpoints")
 
 			etcdPut(client, parser.EtcdRoot, "/endpoints/endpoint1", "http://endpoint1.com:3366")
 
@@ -123,7 +143,7 @@ var _ = Describe("ArgParser", func() {
 
 			parser := args.NewParser(args.EtcdPath(etcdRoot))
 			parser.SetLog(log)
-			parser.AddConfig("--bind").Etcd()
+			parser.AddConfig("--bind")
 
 			etcdPut(client, parser.EtcdRoot, "/not-found", "foo")
 			opts, err := parser.FromEtcd(client)
@@ -138,7 +158,7 @@ var _ = Describe("ArgParser", func() {
 
 			parser := args.NewParser(args.EtcdPath(etcdRoot))
 			parser.SetLog(log)
-			parser.AddConfigGroup("endpoints").Etcd()
+			parser.AddConfigGroup("endpoints")
 
 			etcdPut(client, parser.EtcdRoot, "/endpoints/endpoint1", "http://endpoint1.com:3366")
 
@@ -154,6 +174,12 @@ var _ = Describe("ArgParser", func() {
 
 			// TODO: change this func to accept an Update{} object
 			cancelWatch := parser.WatchEtcd(client, func(event *args.ChangeEvent) {
+				// Always check for errors
+				if event.Err != nil {
+					fmt.Printf("Watch Error - %s\n", event.Err.Error())
+					close(done)
+					return
+				}
 				parser.Apply(opts.FromChangeEvent(event))
 				// Tell the test to continue, Change event was handled
 				close(done)

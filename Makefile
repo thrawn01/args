@@ -1,4 +1,4 @@
-.PHONY: start-docker stop-docker test
+.PHONY: start-etcd stop-etcd test etcd-endpoints examples all
 .DEFAULT_GOAL := all
 
 export ARGS_DOCKER_HOST=localhost
@@ -42,4 +42,6 @@ etcd-endpoints:
 	go build -o bin/etcd-endpoints examples/etcd/etcd-endpoints.go
 
 all: start-etcd test
+
+examples: etcd-endpoints
 

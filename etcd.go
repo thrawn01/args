@@ -1,7 +1,10 @@
 package args
 
 import (
+	"errors"
+	"fmt"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,9 +29,6 @@ func (self *ArgParser) ParseEtcd(client *etcd.Client) (*Options, error) {
 	defer func() { cancel() }()
 
 	for _, rule := range self.rules {
-		if !rule.Etcd {
-			continue
-		}
 		resp, err := client.Get(ctx, rule.EtcdPath, self.chooseOption(rule))
 		if err != nil {
 			if self.log != nil {
@@ -61,9 +61,17 @@ func (self *ArgParser) ParseEtcd(client *etcd.Client) (*Options, error) {
 // Generate rule.EtcdPath for all rules using the parsers set EtcRoot
 func (self *ArgParser) generateEtcdPathKeys() {
 	for _, rule := range self.rules {
-		if rule.Etcd {
-			rule.EtcdPath = rule.EtcdKeyPath(self.EtcdRoot)
+		if self.EtcdRoot == "" {
+			if self.Name == "" {
+				self.EtcdRoot = "please-set-a-name"
+			} else {
+				self.EtcdRoot = self.Name
+			}
 		}
+		// Do this so users are not surprised self.EtcdRoot isn't prefixed with "/"
+		self.EtcdRoot = "/" + strings.TrimPrefix(self.EtcdRoot, "/")
+		// Build the full etcd key path
+		rule.EtcdPath = rule.EtcdKeyPath(self.EtcdRoot)
 	}
 }
 
@@ -112,11 +120,12 @@ func (self *ArgParser) WatchEtcd(client *etcd.Client, callBack func(*ChangeEvent
 						goto Retry
 					}
 					if resp.Canceled {
-						self.log.Printf("args.WatchEtcd(): Etcd Cancelled watch with '%s'",
-							resp.Err())
+						msg := fmt.Sprintf("args.WatchEtcd(): Etcd Cancelled watch with '%s'", resp.Err())
+						self.log.Printf(msg)
+						callBack(&ChangeEvent{Err: errors.New(msg)})
 					}
 					for _, event := range resp.Events {
-						callBack(NewChangeEvent(self.rules, event))
+						callBack(NewChangeEvent(self.rules, event, nil))
 					}
 				case <-done:
 					cancel()
@@ -145,6 +154,7 @@ type ChangeEvent struct {
 	Key     string
 	Value   string
 	Deleted bool
+	Err     error
 }
 
 func findEtcdRule(etcdPath string, rules Rules) *Rule {
@@ -158,7 +168,7 @@ func findEtcdRule(etcdPath string, rules Rules) *Rule {
 
 // Given args.Rules and etcd.Response, attempt to match the response to the rules and return
 // a new ChangeEvent.
-func NewChangeEvent(rules Rules, event *etcd.Event) *ChangeEvent {
+func NewChangeEvent(rules Rules, event *etcd.Event, err error) *ChangeEvent {
 	rule := findEtcdRule(path.Dir(string(event.Kv.Key)), rules)
 	return &ChangeEvent{
 		Rule:    rule,
@@ -166,5 +176,6 @@ func NewChangeEvent(rules Rules, event *etcd.Event) *ChangeEvent {
 		Key:     path.Base(string(event.Kv.Key)),
 		Value:   string(event.Kv.Value),
 		Deleted: event.Type.String() == "DELETE",
+		Err:     nil,
 	}
 }

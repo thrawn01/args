@@ -180,13 +180,7 @@ func (self *RuleModifier) AddConfig(name string) *RuleModifier {
 	return self.parser.AddRule(name, newRuleModifier(&rule, self.parser))
 }
 
-func (self *RuleModifier) Etcd() *RuleModifier {
-	self.rule.Etcd = true
-	return self
-}
-
 func (self *RuleModifier) EtcdKey(key string) *RuleModifier {
-	self.rule.Etcd = true
 	self.rule.EtcdKey = key
 	return self
 }
@@ -212,7 +206,6 @@ type Rule struct {
 	Action        ActionFunc
 	StoreValue    StoreFunc
 	Group         string
-	Etcd          bool
 	EtcdKey       string
 	EtcdPath      string
 }

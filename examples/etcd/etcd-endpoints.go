@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	parser := args.NewParser(args.EtcdPath("etcd-endpoints"),
+	parser := args.NewParser(args.Name("etcd-endpoints"), args.EtcdPath("etcd-endpoints"),
 		args.Desc("Example endpoint service"))
 
 	// A Comma Separated list of etcd endpoints
@@ -21,22 +21,30 @@ func main() {
 		Help("A Comma Separated list of etcd server endpoints")
 
 	// A Command line only option
-	parser.AddOption("--bind").Alias("-b").Default("localhost:8080").
+	parser.AddOption("--bind").Alias("-b").Default("localhost:1234").
 		Help("Interface to bind the server too")
 
 	// Just to demonstrate a single key/value in etcd
-	parser.AddConfig("api-key").Alias("-k").Default("default-key").Etcd().
-		Help("A fake api-key")
+	parser.AddConfig("api-key").Alias("-k").Default("default-key")
+	Help("A fake api-key")
+
+	// Print Help message
+	parser.AddOption("--help").Alias("-h").IsTrue().Help("show this help message")
 
 	// This represents an etcd prefix of /etcd-endpoints/nginx-endpoints any key/value
 	// stored under this prefix in etcd will be in the 'nginx-endpoints' group
-	parser.AddConfigGroup("nginx-endpoints").Etcd().
-		Help("a list of nginx endpoints")
+	parser.AddConfigGroup("nginx-endpoints")
+	Help("a list of nginx endpoints")
 
 	// Parse the command line arguments
 	opts, err := parser.ParseArgs(nil)
 	if err != nil {
 		log.Fatal(err.Error())
+		os.Exit(-1)
+	}
+
+	if opts.Bool("help") {
+		parser.PrintHelp()
 		os.Exit(-1)
 	}
 
