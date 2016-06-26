@@ -42,18 +42,17 @@ func (self *ArgParser) ParseEtcd(client *etcd.Client) (*Options, error) {
 			self.log.Printf("args.ParseEtcd(): key '%s' not found", rule.EtcdPath)
 			continue
 		}
-		// Handle ConfigGroups
-		if len(resp.Kvs) != 1 && rule.IsConfigGroup {
-			// Retrieve all the key=values in the directory
+		if rule.IsConfigGroup {
+			// Iterate through all the key=values for this group
 			for _, node := range resp.Kvs {
 				values.Group(rule.Group).Set(path.Base(string(node.Key)), string(node.Value), false)
 			}
 		} else if len(resp.Kvs) == 1 {
 			values.Group(rule.Group).Set(rule.Name, string(resp.Kvs[0].Value), false)
 		} else {
+			values.Group(rule.Group).Set(rule.Name, string(resp.Kvs[0].Value), false)
 			self.log.Printf("args.ParseEtcd(): Expected 1 Key=Value response but got multiple for key '%s'",
 				rule.EtcdPath)
-
 		}
 	}
 	return values, nil
@@ -93,7 +92,7 @@ type WatchCancelFunc func()
 
 func (self *ArgParser) WatchEtcd(client *etcd.Client, callBack func(*ChangeEvent)) WatchCancelFunc {
 	var isRunning sync.WaitGroup
-	var done chan struct{}
+	done := make(chan struct{})
 
 	self.generateEtcdPathKeys()
 
@@ -101,12 +100,11 @@ func (self *ArgParser) WatchEtcd(client *etcd.Client, callBack func(*ChangeEvent
 	go func() {
 		var resp etcd.WatchResponse
 		var ok bool
-		// Notify we are running
-		isRunning.Done()
 		for {
 			// Always attempt to watch, until the user tells us to stop
 			ctx, cancel := context.WithCancel(context.Background())
 			watchChan := client.Watch(ctx, self.EtcdRoot, etcd.WithPrefix())
+			isRunning.Done() // Notify we are watching
 			for {
 				select {
 				case resp, ok = <-watchChan:

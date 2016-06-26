@@ -50,8 +50,8 @@ func etcdClientFactory() *etcd.Client {
 
 func etcdPut(client *etcd.Client, root, key, value string) {
 	// Context Timeout for 2 seconds
-	ctx, _ := context.WithTimeout(context.Background(), time.Second*2)
-	//defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
 
 	// Set the value in the etcd store
 	_, err := client.Put(ctx, path.Join(root, key), value)
@@ -61,18 +61,27 @@ func etcdPut(client *etcd.Client, root, key, value string) {
 }
 
 var _ = Describe("ArgParser", func() {
-	FDescribe("FromEtcd()", func() {
-		client := etcdClientFactory()
-		//defer client.Close()
-		etcdRoot := newRootPath()
-		var log *TestLogger
+	var client *etcd.Client
+	var etcdRoot string
+	var log *TestLogger
 
+	BeforeEach(func() {
+		client = etcdClientFactory()
+		etcdRoot = newRootPath()
+		log = NewTestLogger()
+	})
+
+	AfterEach(func() {
+		if client != nil {
+			client.Close()
+		}
+	})
+
+	Describe("FromEtcd()", func() {
 		It("Should fetch 'bind' value from /EtcdRoot/bind", func() {
 			okToTestEtcd()
 
-			// Must mark etcd config and command line options with Etcd()
 			parser := args.NewParser(args.EtcdPath(etcdRoot))
-			log = NewTestLogger()
 			parser.SetLog(log)
 			parser.AddConfig("--bind").Etcd()
 
@@ -86,15 +95,22 @@ var _ = Describe("ArgParser", func() {
 			okToTestEtcd()
 
 			parser := args.NewParser(args.EtcdPath(etcdRoot))
-			log = NewTestLogger()
 			parser.SetLog(log)
 			parser.AddConfigGroup("endpoints").Etcd()
 
 			etcdPut(client, parser.EtcdRoot, "/endpoints/endpoint1", "http://endpoint1.com:3366")
+
+			opts, err := parser.FromEtcd(client)
+			Expect(err).To(BeNil())
+			Expect(log.GetEntry()).To(Equal(""))
+			Expect(opts.Group("endpoints").ToMap()).To(Equal(map[string]interface{}{
+				"endpoint1": "http://endpoint1.com:3366",
+			}))
+
 			etcdPut(client, parser.EtcdRoot, "/endpoints/endpoint2",
 				"{ \"host\": \"endpoint2\", \"port\": \"3366\" }")
 
-			opts, err := parser.FromEtcd(client)
+			opts, err = parser.FromEtcd(client)
 			Expect(err).To(BeNil())
 			Expect(log.GetEntry()).To(Equal(""))
 			Expect(opts.Group("endpoints").ToMap()).To(Equal(map[string]interface{}{
@@ -102,38 +118,43 @@ var _ = Describe("ArgParser", func() {
 				"endpoint2": "{ \"host\": \"endpoint2\", \"port\": \"3366\" }",
 			}))
 		})
+		It("Should be ok if config option not found in etcd store", func() {
+			okToTestEtcd()
+
+			parser := args.NewParser(args.EtcdPath(etcdRoot))
+			parser.SetLog(log)
+			parser.AddConfig("--bind").Etcd()
+
+			etcdPut(client, parser.EtcdRoot, "/not-found", "foo")
+			opts, err := parser.FromEtcd(client)
+			Expect(err).To(BeNil())
+			Expect(log.GetEntry()).To(ContainSubstring("not found"))
+			Expect(opts.String("bind")).To(Equal(""))
+		})
 	})
 	Describe("WatchEtcd", func() {
-		client := etcdClientFactory()
-		defer func() { client.Close() }()
-		etcdRoot := newRootPath()
-		var log *TestLogger
-
 		It("Should watch /EtcdRoot/endpoints for new values", func() {
 			okToTestEtcd()
 
 			parser := args.NewParser(args.EtcdPath(etcdRoot))
-			log = NewTestLogger()
 			parser.SetLog(log)
-
 			parser.AddConfigGroup("endpoints").Etcd()
 
 			etcdPut(client, parser.EtcdRoot, "/endpoints/endpoint1", "http://endpoint1.com:3366")
 
 			_, err := parser.FromEtcd(client)
-			// Get a pointer to the current options
 			opts := parser.GetOpts()
-
 			Expect(err).To(BeNil())
 			Expect(log.GetEntry()).To(Equal(""))
 			Expect(opts.Group("endpoints").ToMap()).To(Equal(map[string]interface{}{
 				"endpoint1": "http://endpoint1.com:3366",
 			}))
+
 			done := make(chan struct{})
 
 			// TODO: change this func to accept an Update{} object
 			cancelWatch := parser.WatchEtcd(client, func(event *args.ChangeEvent) {
-				fmt.Printf("callback - %s - %s - %s\n", event.Group, event.Key, event.Value)
+				//fmt.Printf("callback - %s - %s - %s\n", event.Group, event.Key, event.Value)
 				// This takes an update object, and updates the opts with the latest which might
 				// be what most people want. others will have the power to update how and when they like
 				//parser.Apply(opts.Update(update))
@@ -147,8 +168,6 @@ var _ = Describe("ArgParser", func() {
 			etcdPut(client, parser.EtcdRoot, "/endpoints/endpoint2", "http://endpoint2.com:3366")
 			// Wait until our call back is called
 			<-done
-			// TODO: This should close a channel, update our watch to multi channel waiting machine =)
-			fmt.Printf("Calling Cancel\n")
 			cancelWatch()
 			// Get the updated options
 			opts = parser.GetOpts()
@@ -160,6 +179,9 @@ var _ = Describe("ArgParser", func() {
 			}))
 
 		})
-
+		// TODO
+		It("Should continue to attempt to reconnect if the etcd client disconnects", func() {})
+		// TODO
+		It("Should apply any change using opt.Update()", func() {})
 	})
 })
