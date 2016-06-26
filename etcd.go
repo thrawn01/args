@@ -1,12 +1,12 @@
 package args
 
 import (
-	"errors"
-	"fmt"
 	"path"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 
 	etcd "github.com/coreos/etcd/clientv3"
 	"golang.org/x/net/context"
@@ -98,7 +98,7 @@ func (self *ArgParser) Sleep() {
 
 type WatchCancelFunc func()
 
-func (self *ArgParser) WatchEtcd(client *etcd.Client, callBack func(*ChangeEvent)) WatchCancelFunc {
+func (self *ArgParser) WatchEtcd(client *etcd.Client, callBack func(*ChangeEvent, error)) WatchCancelFunc {
 	var isRunning sync.WaitGroup
 	done := make(chan struct{})
 
@@ -120,12 +120,11 @@ func (self *ArgParser) WatchEtcd(client *etcd.Client, callBack func(*ChangeEvent
 						goto Retry
 					}
 					if resp.Canceled {
-						msg := fmt.Sprintf("args.WatchEtcd(): Etcd Cancelled watch with '%s'", resp.Err())
-						self.log.Printf(msg)
-						callBack(&ChangeEvent{Err: errors.New(msg)})
+						callBack(nil, errors.Wrap(resp.Err(),
+							"args.WatchEtcd() ETCD Cancelled Watch"))
 					}
 					for _, event := range resp.Events {
-						callBack(NewChangeEvent(self.rules, event, nil))
+						callBack(NewChangeEvent(self.rules, event), nil)
 					}
 				case <-done:
 					cancel()
@@ -154,7 +153,6 @@ type ChangeEvent struct {
 	Key     string
 	Value   string
 	Deleted bool
-	Err     error
 }
 
 func findEtcdRule(etcdPath string, rules Rules) *Rule {
@@ -168,7 +166,7 @@ func findEtcdRule(etcdPath string, rules Rules) *Rule {
 
 // Given args.Rules and etcd.Response, attempt to match the response to the rules and return
 // a new ChangeEvent.
-func NewChangeEvent(rules Rules, event *etcd.Event, err error) *ChangeEvent {
+func NewChangeEvent(rules Rules, event *etcd.Event) *ChangeEvent {
 	rule := findEtcdRule(path.Dir(string(event.Kv.Key)), rules)
 	return &ChangeEvent{
 		Rule:    rule,
@@ -176,6 +174,5 @@ func NewChangeEvent(rules Rules, event *etcd.Event, err error) *ChangeEvent {
 		Key:     path.Base(string(event.Kv.Key)),
 		Value:   string(event.Kv.Value),
 		Deleted: event.Type.String() == "DELETE",
-		Err:     nil,
 	}
 }

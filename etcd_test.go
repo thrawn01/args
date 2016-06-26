@@ -173,10 +173,10 @@ var _ = Describe("ArgParser", func() {
 			done := make(chan struct{})
 
 			// TODO: change this func to accept an Update{} object
-			cancelWatch := parser.WatchEtcd(client, func(event *args.ChangeEvent) {
+			cancelWatch := parser.WatchEtcd(client, func(event *args.ChangeEvent, err error) {
 				// Always check for errors
-				if event.Err != nil {
-					fmt.Printf("Watch Error - %s\n", event.Err.Error())
+				if err != nil {
+					fmt.Printf("Watch Error - %s\n", err.Error())
 					close(done)
 					return
 				}
