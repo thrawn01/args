@@ -34,9 +34,12 @@ stop-docker:
 		docker stop args-etcd > /dev/null; \
 	fi
 
-test:
+test: start-docker
 	@echo Running Tests
 	@go test .
+
+etcd-example:
+	go build -o bin/etcd-example examples/etcd/etcd.go
 
 all: start-docker test
 
