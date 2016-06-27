@@ -85,6 +85,74 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.Int("power-level")).To(Equal(1))
 		})
 	})
+
+	Describe("ArgParser.AddPositional()", func() {
+		cmdLine := []string{"one", "two", "three", "four"}
+
+		It("Should create positional rule first", func() {
+			parser := args.NewParser()
+			parser.AddPositional("first").IsString()
+			rule := parser.GetRules()[0]
+			Expect(rule.Name).To(Equal("first"))
+			Expect(rule.IsPos).To(Equal(1))
+		})
+		It("Should match first position 'one'", func() {
+			parser := args.NewParser()
+			parser.AddPositional("first").IsString()
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.String("first")).To(Equal("one"))
+		})
+		It("Should match first positionals in order of declaration", func() {
+			parser := args.NewParser()
+			parser.AddPositional("first").IsString()
+			parser.AddPositional("second").IsString()
+			parser.AddPositional("third").IsString()
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.String("first")).To(Equal("one"))
+			Expect(opt.String("second")).To(Equal("two"))
+			Expect(opt.String("third")).To(Equal("three"))
+		})
+		It("Should handle no positionals if declared", func() {
+			parser := args.NewParser()
+			parser.AddPositional("first").IsString()
+			parser.AddPositional("second").IsString()
+			parser.AddPositional("third").IsString()
+
+			cmdLine := []string{"one", "two"}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.String("first")).To(Equal("one"))
+			Expect(opt.String("second")).To(Equal("two"))
+			Expect(opt.String("third")).To(Equal(""))
+		})
+		It("Should mixing optionals and positionals", func() {
+			parser := args.NewParser()
+			parser.AddOption("--verbose").IsTrue()
+			parser.AddOption("--first").IsString()
+			parser.AddPositional("second").IsString()
+			parser.AddPositional("third").IsString()
+
+			cmdLine := []string{"--first", "one", "two", "--verbose"}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.String("first")).To(Equal("one"))
+			Expect(opt.String("second")).To(Equal("two"))
+			Expect(opt.String("third")).To(Equal(""))
+			Expect(opt.Bool("verbose")).To(Equal(true))
+		})
+		It("Should raise an error if an optional and a positional share the same name", func() {
+			parser := args.NewParser()
+			parser.AddOption("--first").IsString()
+			parser.AddPositional("first").IsString()
+
+			cmdLine := []string{"--first", "one", "one"}
+			_, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(Not(BeNil()))
+			Expect(err.Error()).To(Equal("Duplicate option with same name as 'first'"))
+		})
+	})
 	Describe("ArgParser.AddConfig()", func() {
 		cmdLine := []string{"--power-level", "--power-level"}
 		It("Should add new config only rule", func() {
@@ -163,6 +231,34 @@ var _ = Describe("ArgParser", func() {
 			"  -c, --cat-level     Lorem ipsum dolor sit amet, consecteturadipiscing elit, se\n" +
 			"                     d do eiusmod tempor incididunt ut labore etmollit anim id\n" +
 			"                      est laborum."))*/
+		})
+	})
+	Describe("ArgParser.AddCommand()", func() {
+		It("Should run a command if seen on the command line", func() {
+			parser := args.NewParser()
+			called := false
+			parser.AddCommand("command1", func(parent *args.ArgParser, data interface{}) int {
+				called = true
+				return 0
+			})
+			cmdLine := []string{"command1"}
+			retCode, err := parser.ParseAndRun(&cmdLine, nil)
+			Expect(err).To(BeNil())
+			Expect(retCode).To(Equal(0))
+			Expect(called).To(Equal(true))
+		})
+		It("Should not confuse a command with a following positional", func() {
+			parser := args.NewParser()
+			called := 0
+			parser.AddCommand("set", func(parent *args.ArgParser, data interface{}) int {
+				called++
+				return 0
+			})
+			cmdLine := []string{"set", "set"}
+			retCode, err := parser.ParseAndRun(&cmdLine, nil)
+			Expect(err).To(BeNil())
+			Expect(retCode).To(Equal(0))
+			Expect(called).To(Equal(1))
 		})
 	})
 })

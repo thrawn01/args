@@ -220,6 +220,7 @@ type Rule struct {
 	Group         string
 	EtcdKey       string
 	EtcdPath      string
+	NotGreedy     bool
 }
 
 func newRule() *Rule {
@@ -259,13 +260,27 @@ func (self *Rule) MatchesAlias(args []string, idx *int) (bool, string) {
 }
 
 func (self *Rule) Match(args []string, idx *int) (bool, error) {
+	var alias string
+	var matched bool
+
 	if self.IsConfig {
 		return false, nil
 	}
-	matched, alias := self.MatchesAlias(args, idx)
-	//fmt.Printf("Matched: %s - %s\n", matched, alias)
-	if !matched {
-		return false, nil
+
+	if self.IsPos == 0 {
+		matched, alias = self.MatchesAlias(args, idx)
+		//fmt.Printf("Matched Optional Arg: %v - %s\n", matched, alias)
+		if !matched {
+			return false, nil
+		}
+	} else {
+		// If we are a positional and we have already been seen, and not greedy
+		if self.Seen && self.NotGreedy {
+			// Do not match this argument
+			return false, nil
+		}
+		// TODO: Handle Greedy
+		//fmt.Printf("Matched Positional Arg: %s\n", args[*idx])
 	}
 	self.Seen = true
 
@@ -278,11 +293,14 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 		return true, nil
 	}
 
-	// If no actions are specified assume a value follows this argument and should be converted
-	*idx++
-	if len(args) <= *idx {
-		return true, errors.New(fmt.Sprintf("Expected '%s' to have an argument", alias))
+	if self.IsPos == 0 {
+		// If no actions are specified assume a value follows this argument and should be converted
+		*idx++
+		if len(args) <= *idx {
+			return true, errors.New(fmt.Sprintf("Expected '%s' to have an argument", alias))
+		}
 	}
+
 	//fmt.Printf("arg: %s value: %s\n", alias, args[*idx])
 	value, err := self.Cast(alias, args[*idx])
 	if err != nil {

@@ -201,11 +201,11 @@ exit status 255
 * Support for Config only options
 * Support for Groups
 * Support for Etcd
+* Support Positional Arguments
 * Generate Help Message
 
 ## TODO
 * Custom Help and Usage
-* Support Positional Arguments
 * Support SubParsing
 * Support counting arguments in this format -vvvv
 * Support list of ints,floats,etc.. '--list my,list,of,things'
@@ -214,4 +214,6 @@ exit status 255
 * Support '-arg=value'
 * Support Parent Parsing
 * Support for ConfigMap
+* Support Greedy Positional Arguments
+
 

@@ -121,10 +121,20 @@ func (self *ArgParser) AddConfig(name string) *RuleModifier {
 	return self.AddRule(name, newRuleModifier(rule, self))
 }
 
+func (self *ArgParser) AddPositional(name string) *RuleModifier {
+	rule := newRule()
+	rule.IsPos++
+	rule.NotGreedy = true
+	return self.AddRule(name, newRuleModifier(rule, self))
+}
+
 func (self *ArgParser) AddCommand(name string, cmdFunc CommandFunc) *RuleModifier {
 	rule := newRule()
-	rule.CommandFunc = cmdFunc
 	rule.Type = CommandRule
+	rule.CommandFunc = cmdFunc
+	rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
+		return nil
+	}
 	// Make a new RuleModifier using self as the template
 	return self.AddRule(name, newRuleModifier(rule, self))
 }
@@ -146,10 +156,8 @@ func (self *ArgParser) AddRule(name string, modifier *RuleModifier) *RuleModifie
 			rule.Name = group[2]
 		}
 	} else {
-		// If it's not a config only option
-		if !rule.IsConfig {
-			// If must be a positional
-			rule.IsPos = 1
+		if rule.Type == CommandRule {
+			rule.Aliases = append(rule.Aliases, name)
 		}
 		rule.Name = name
 	}
@@ -179,6 +187,7 @@ func (self *ArgParser) ParseAndRun(args *[]string, data interface{}) (int, error
 	// If user didn't provide a command via the commandline
 	if self.Command == nil {
 		self.PrintHelp()
+		return -1, nil
 	}
 
 	retCode := self.Command.CommandFunc(self, data)
@@ -214,9 +223,11 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 			return nil, err
 		}
 		if rule != nil {
+			//fmt.Printf("Found rule - %+v\n", rule)
 			// If we matched a command
 			if rule.Type == CommandRule {
 				if self.Command == nil {
+					//fmt.Printf("Set Command\n")
 					self.Command = rule
 					// Remove the command from our arguments before preceding
 					self.args = append(self.args[:self.idx], self.args[self.idx+1:]...)
