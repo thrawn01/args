@@ -221,6 +221,16 @@ func (self *Options) IsSet(key string) bool {
 	return false
 }
 
+// Returns true only if all of the keys given have values set
+func (self *Options) Required(keys []string) bool {
+	for _, key := range keys {
+		if !self.IsSet(key) {
+			return false
+		}
+	}
+	return true
+}
+
 func (self *Options) HasKey(key string) bool {
 	_, ok := self.values[key]
 	return ok

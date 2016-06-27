@@ -85,7 +85,11 @@ func main() {
 	}
 
 	// Watch etcd for any configuration changes
-	cancelWatch := parser.WatchEtcd(client, func(event *args.ChangeEvent) {
+	cancelWatch := parser.WatchEtcd(client, func(event *args.ChangeEvent, err error) {
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
 		// This takes a ChangeEvent and updates the opts with the latest changes
 		parser.Apply(opts.FromChangeEvent(event))
 	})

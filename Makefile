@@ -1,4 +1,4 @@
-.PHONY: start-etcd stop-etcd test etcd-endpoints examples all
+.PHONY: start-etcd stop-etcd test examples all
 .DEFAULT_GOAL := all
 
 export ARGS_DOCKER_HOST=localhost
@@ -38,10 +38,13 @@ test: start-etcd
 	@echo Running Tests
 	@go test .
 
-etcd-endpoints:
-	go build -o bin/etcd-endpoints examples/etcd/etcd-endpoints.go
+bin/etcd-endpoints-service: examples/etcd/etcd-endpoints-service.go
+	go build -o bin/etcd-endpoints-service examples/etcd/etcd-endpoints-service.go
+
+bin/etcd-endpoints-client:
+	go build -o bin/etcd-endpoints-client examples/etcd/etcd-endpoints-client.go
 
 all: start-etcd test
 
-examples: etcd-endpoints
+examples: bin/etcd-endpoints-service bin/etcd-endpoints-client
 
