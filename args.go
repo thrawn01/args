@@ -62,6 +62,12 @@ func EtcdPath(path string) ParseModifier {
 	}
 }
 
+func NoHelp() ParseModifier {
+	return func(parser *ArgParser) {
+		parser.NoHelp = true
+	}
+}
+
 // ***********************************************
 // Public Word Formatting Functions
 // ***********************************************
@@ -247,4 +253,24 @@ func castStringSlice(name string, value interface{}) (interface{}, error) {
 
 	// Split the values separated by comma's
 	return strings.Split(strValue, ","), nil
+}
+
+// Returns true if the error was because help message was printed
+func AskedForHelp(err error) bool {
+	obj, ok := err.(HelpErrorInterface)
+	return ok && obj.IsHelpError()
+}
+
+type HelpErrorInterface interface {
+	IsHelpError() bool
+}
+
+type HelpError struct{}
+
+func (e *HelpError) Error() string {
+	return ""
+}
+
+func (e *HelpError) IsHelpError() bool {
+	return true
 }

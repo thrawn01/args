@@ -67,6 +67,14 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.StringSlice("list")).To(Equal([]string{"six", "five", "four"}))
 			Expect(list).To(Equal([]string{"six", "five", "four"}))
 		})
+		It("Should raise an error if a Config is required but not provided", func() {
+			parser := args.NewParser()
+			parser.AddConfig("one").Required()
+			input := []byte("two=this is one value\nthree=this is two value\n")
+			_, err := parser.FromIni(input)
+			Expect(err).To(Not(BeNil()))
+			Expect(err.Error()).To(Equal("config 'one' is required"))
+		})
 	})
 	Describe("ArgParser.AddConfigGroup()", func() {
 		It("Should Parser an adhoc group from the ini file", func() {

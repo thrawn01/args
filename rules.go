@@ -109,6 +109,12 @@ func (self *RuleModifier) Alias(aliasName string) *RuleModifier {
 	return self
 }
 
+// Makes this option or positional argument required
+func (self *RuleModifier) Required() *RuleModifier {
+	self.rule.SetFlags(IsRequired)
+	return self
+}
+
 func (self *RuleModifier) StoreStr(dest *string) *RuleModifier {
 	return self.StoreString(dest)
 }
@@ -164,6 +170,7 @@ func (self *RuleModifier) Opt(name string) *RuleModifier {
 }
 
 func (self *RuleModifier) AddOption(name string) *RuleModifier {
+	self.rule.SetFlags(IsOption)
 	modifier := *self
 	// Make a new RuleModifier using self as the template
 	return self.parser.AddRule(name, &modifier)
@@ -200,6 +207,7 @@ const (
 	IsConfig
 	IsConfigGroup
 	IsRequired
+	IsOption
 )
 
 type Rule struct {
@@ -249,7 +257,7 @@ func (self *Rule) GenerateHelp() (string, string) {
 	var parens []string
 	paren := ""
 
-	if self.HasFlags(IsCommand) {
+	if !self.HasFlags(IsCommand) {
 		if self.Default != nil {
 			parens = append(parens, fmt.Sprintf("Default=%s", *self.Default))
 		}
@@ -327,8 +335,19 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	return true, nil
 }
 
+// Returns the appropriate required warning to display to the user
+func (self *Rule) RequiredMessage() string {
+	switch {
+	case self.Flags&IsPositional != 0:
+		return fmt.Sprintf("positional '%s' is required", self.Name)
+	case self.Flags&IsConfig != 0:
+		return fmt.Sprintf("config '%s' is required", self.Name)
+	default:
+		return fmt.Sprintf("option '%s' is required", self.Aliases[0])
+	}
+}
+
 func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
-	// TODO: Do count better?
 	if self.Count != 0 {
 		self.Value = self.Count
 	}
@@ -364,6 +383,11 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	if self.Default != nil {
 		return self.Cast(self.Name, *self.Default)
 	}
+
+	if self.HasFlags(IsRequired) {
+		return nil, errors.New(self.RequiredMessage())
+	}
+
 	// Return the default value for our type choice
 	value, _ = self.Cast(self.Name, nil)
 	return value, nil

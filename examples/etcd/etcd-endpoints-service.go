@@ -49,9 +49,9 @@ func main() {
 		os.Exit(-1)
 	}
 
-	// Simple handler that prints out a list of endpoints
+	// Simple handler that returns a list of endpoints to the caller
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// GetOpts is a thread safe get of the current options
+		// GetOpts is a thread safe way to get the current options
 		conf := parser.GetOpts()
 
 		// Convert the nginx-endpoints group to a map
@@ -101,5 +101,4 @@ func main() {
 		log.Fatal(err)
 	}
 	cancelWatch()
-
 }

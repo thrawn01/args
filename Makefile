@@ -44,7 +44,10 @@ bin/etcd-endpoints-service: examples/etcd/etcd-endpoints-service.go
 bin/etcd-endpoints-client:
 	go build -o bin/etcd-endpoints-client examples/etcd/etcd-endpoints-client.go
 
-all: start-etcd test
+all: examples
 
 examples: bin/etcd-endpoints-service bin/etcd-endpoints-client
+
+clean:
+	rm bin/*
 

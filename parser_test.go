@@ -8,11 +8,18 @@ import (
 
 var _ = Describe("ArgParser", func() {
 	Describe("ArgParser.ParseArgs(nil)", func() {
-		parser := args.NewParser()
 		It("Should return error if AddOption() was never called", func() {
+			parser := args.NewParser(args.NoHelp())
 			_, err := parser.ParseArgs(nil)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Must create some options to match with args.AddOption() before calling arg.ParseArgs()"))
+		})
+		It("Should add Help option if none provided", func() {
+			parser := args.NewParser()
+			_, err := parser.ParseArgs(nil)
+			Expect(err).To(BeNil())
+			rule := parser.GetRules()[0]
+			Expect(rule.Name).To(Equal("help"))
 		})
 	})
 	Describe("ArgParser.AddOption()", func() {
@@ -84,6 +91,15 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(1))
 		})
+		It("Should raise an error if a option is required but not provided", func() {
+			parser := args.NewParser()
+			parser.AddOption("--power-level").Required()
+			cmdLine := []string{""}
+			_, err := parser.ParseArgs(&cmdLine)
+
+			Expect(err).To(Not(BeNil()))
+			Expect(err.Error()).To(Equal("option '--power-level' is required"))
+		})
 	})
 
 	Describe("ArgParser.AddPositional()", func() {
@@ -152,6 +168,16 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("Duplicate option with same name as 'first'"))
 		})
+		It("Should raise an error if a positional is required but not provided", func() {
+			parser := args.NewParser()
+			parser.AddPositional("first").Required()
+			parser.AddPositional("second").Required()
+
+			cmdLine := []string{"one"}
+			_, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(Not(BeNil()))
+			Expect(err.Error()).To(Equal("positional 'second' is required"))
+		})
 	})
 	Describe("ArgParser.AddConfig()", func() {
 		cmdLine := []string{"--power-level", "--power-level"}
@@ -209,7 +235,7 @@ var _ = Describe("ArgParser", func() {
 				Alias("-c").
 				Help(`Lorem ipsum dolor sit amet, consectetur
 			mollit anim id est laborum.`)
-			msg := parser.GenerateOptHelp()
+			msg := parser.GenerateHelpSection(args.IsOption)
 			Expect(msg).To(Equal("  -p, --power-level   Specify our power level " +
 				"\n  -c, --cat-level     Lorem ipsum dolor sit amet, consecteturmollit anim id est" +
 				"\n                      laborum. \n"))
@@ -259,6 +285,52 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(BeNil())
 			Expect(retCode).To(Equal(0))
 			Expect(called).To(Equal(1))
+		})
+		It("Should provide a sub parser with that will not confuse a following positional", func() {
+			parser := args.NewParser()
+			called := 0
+			parser.AddCommand("set", func(parent *args.ArgParser, data interface{}) int {
+				parent.AddPositional("first").Required()
+				parent.AddPositional("second").Required()
+				opts, err := parent.ParseArgs(nil)
+				Expect(err).To(BeNil())
+				Expect(opts.String("first")).To(Equal("foo"))
+				Expect(opts.String("second")).To(Equal("bar"))
+
+				called++
+				return 0
+			})
+			cmdLine := []string{"set", "foo", "bar"}
+			retCode, err := parser.ParseAndRun(&cmdLine, nil)
+			Expect(err).To(BeNil())
+			Expect(retCode).To(Equal(0))
+			Expect(called).To(Equal(1))
+
+		})
+		It("Should allow sub commands to be a thing", func() {
+			parser := args.NewParser()
+			called := 0
+			parser.AddCommand("volume", func(parent *args.ArgParser, data interface{}) int {
+				parent.AddCommand("create", func(subParent *args.ArgParser, data interface{}) int {
+					subParent.AddPositional("volume-name").Required()
+					opts, err := subParent.ParseArgs(nil)
+					Expect(err).To(BeNil())
+					Expect(opts.String("volume-name")).To(Equal("my-new-volume"))
+
+					called++
+					return 0
+				})
+				retCode, err := parent.ParseAndRun(nil, nil)
+				Expect(err).To(BeNil())
+				Expect(retCode).To(Equal(0))
+				return retCode
+			})
+			cmdLine := []string{"volume", "create", "my-new-volume"}
+			retCode, err := parser.ParseAndRun(&cmdLine, nil)
+			Expect(err).To(BeNil())
+			Expect(retCode).To(Equal(0))
+			Expect(called).To(Equal(1))
+
 		})
 	})
 })

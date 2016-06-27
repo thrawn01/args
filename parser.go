@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"sort"
 	"sync"
+
+	"github.com/fatih/structs"
 )
 
 type ParseModifier func(*ArgParser)
@@ -19,7 +21,9 @@ type ArgParser struct {
 	Description          string
 	Name                 string
 	WordWrap             int
+	IsSubParser          bool
 	StopParsingOnCommand bool
+	NoHelp               bool
 	mutex                sync.Mutex
 	args                 []string
 	options              *Options
@@ -32,23 +36,10 @@ type ArgParser struct {
 
 // Creates a new instance of the argument parser
 func NewParser(modifiers ...ParseModifier) *ArgParser {
-	// TODO: Fix this... is stupid
 	parser := &ArgParser{
-		nil,
-		"",
-		"",
-		"",
-		"",
-		200,
-		false,
-		sync.Mutex{},
-		[]string{},
-		nil,
-		nil,
-		nil,
-		0,
-		0,
-		DefaultLogger,
+		WordWrap: 200,
+		mutex:    sync.Mutex{},
+		log:      DefaultLogger,
 	}
 	for _, modify := range modifiers {
 		modify(parser)
@@ -56,7 +47,7 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 	return parser
 }
 
-var isOptional = regexp.MustCompile(`^(\W+)([\w|-]*)$`)
+var regexIsOptional = regexp.MustCompile(`^(\W+)([\w|-]*)$`)
 
 func (self *ArgParser) SetLog(logger StdLogger) {
 	self.log = logger
@@ -108,7 +99,9 @@ func (self *ArgParser) Opt(name string) *RuleModifier {
 }
 
 func (self *ArgParser) AddOption(name string) *RuleModifier {
-	return self.AddRule(name, NewRuleModifier(self))
+	rule := newRule()
+	rule.SetFlags(IsOption)
+	return self.AddRule(name, newRuleModifier(rule, self))
 }
 
 func (self *ArgParser) Cfg(name string) *RuleModifier {
@@ -147,9 +140,9 @@ func (self *ArgParser) AddRule(name string, modifier *RuleModifier) *RuleModifie
 	rule.EnvPrefix = self.EnvPrefix
 
 	// If name begins with a non word character, assume it's an optional argument
-	if isOptional.MatchString(name) {
+	if regexIsOptional.MatchString(name) {
 		// Attempt to extract the name
-		group := isOptional.FindStringSubmatch(name)
+		group := regexIsOptional.FindStringSubmatch(name)
 		if group == nil {
 			panic(fmt.Sprintf("Invalid optional argument name '%s'", name))
 		} else {
@@ -171,12 +164,25 @@ func (self *ArgParser) GetRules() Rules {
 	return self.rules
 }
 
-// Parses command line arguments using os.Args if 'args' is nil
-func (self *ArgParser) ParseArgs(args *[]string) (*Options, error) {
-	if args == nil {
-		return self.parseUntil(os.Args[1:], "--")
+func (self *ArgParser) Copy() *ArgParser {
+	parser := NewParser()
+	src := structs.New(self)
+	dest := structs.New(parser)
+
+	// Copy all the public values
+	for _, field := range src.Fields() {
+		if field.IsExported() {
+			dest.Field(field.Name()).Set(field.Value())
+		}
 	}
-	return self.parseUntil(*args, "--")
+
+	parser.args = self.args
+	parser.rules = self.rules
+	parser.log = self.log
+
+	parser.Command = nil
+	parser.IsSubParser = true
+	return parser
 }
 
 func (self *ArgParser) ParseAndRun(args *[]string, data interface{}) (int, error) {
@@ -191,12 +197,45 @@ func (self *ArgParser) ParseAndRun(args *[]string, data interface{}) (int, error
 		return -1, nil
 	}
 
-	retCode := self.Command.CommandFunc(self, data)
+	parser := self.Copy()
+	parser.IsSubParser = true
+	retCode := self.Command.CommandFunc(parser, data)
 	return retCode, nil
 }
 
+func (self *ArgParser) HasHelpOption() bool {
+	for _, rule := range self.rules {
+		if rule.Name == "help" {
+			return true
+		}
+		for _, alias := range rule.Aliases {
+			if alias == "-h" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Parses command line arguments using os.Args if 'args' is nil
+func (self *ArgParser) ParseArgs(args *[]string) (*Options, error) {
+	if args != nil {
+		self.args = *args
+	} else if args == nil && !self.IsSubParser {
+		// If args is nil and we are not a subparser
+		self.args = os.Args[1:]
+	}
+
+	if self.HasHelpOption() {
+		self.NoHelp = true
+	} else if !self.NoHelp {
+		// Add help option if --help or -h are not already taken by other options
+		self.AddOption("--help").Alias("-h").IsTrue().Help("Display this help message and exit")
+	}
+	return self.parseUntil(self.args, "--")
+}
+
 func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, error) {
-	self.args = args
 	self.idx = 0
 
 	// Sanity Check
@@ -251,7 +290,15 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 		// unmatched arguments return an error here
 	}
 Apply:
-	return self.Apply(nil)
+	opts, err := self.Apply(nil)
+	if err != nil {
+		return opts, err
+	}
+	if !self.NoHelp && opts.Bool("help") {
+		self.PrintHelp()
+		return opts, &HelpError{}
+	}
+	return opts, nil
 }
 
 // Gather all the values from our rules, then apply the passed in map to any rules that don't have a computed value.
@@ -265,6 +312,7 @@ func (self *ArgParser) Apply(values *Options) (*Options, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		// If we have a Store() for this rule apply it here
 		if rule.StoreValue != nil {
 			rule.StoreValue(value)
@@ -282,16 +330,7 @@ func (self *ArgParser) Apply(values *Options) (*Options, error) {
 	}
 
 	self.SetOpts(results)
-
-	// Preform Required Checks
-	if err := self.CheckRequired(results); err != nil {
-		return self.GetOpts(), err
-	}
 	return self.GetOpts(), nil
-}
-
-func (self *ArgParser) CheckRequired(values *Options) error {
-	return nil
 }
 
 func (self *ArgParser) SetOpts(options *Options) {
@@ -344,23 +383,19 @@ func (self *ArgParser) GenerateHelp() string {
 	result.WriteString("\n")
 	result.WriteString(WordWrap(self.Description, 0, 80))
 	result.WriteString("\n")
-	if self.HasCommands() {
-		result.WriteString("\nCommands:\n")
-		result.WriteString(self.GenerateCommandsHelp())
-	}
-	result.WriteString("\nOptions:\n")
-	result.WriteString(self.GenerateOptHelp())
-	return result.String()
-}
 
-// Returns true if the user has defined commands by calling AddCommand()
-func (self *ArgParser) HasCommands() bool {
-	for _, rule := range self.rules {
-		if rule.HasFlags(IsCommand) {
-			return true
-		}
+	commands := self.GenerateHelpSection(IsCommand)
+	if commands != "" {
+		result.WriteString("\nCommands:\n")
+		result.WriteString(commands)
 	}
-	return false
+
+	options := self.GenerateHelpSection(IsOption)
+	if options != "" {
+		result.WriteString("\nOptions:\n")
+		result.WriteString(options)
+	}
+	return result.String()
 }
 
 type HelpMsg struct {
@@ -368,43 +403,14 @@ type HelpMsg struct {
 	Message string
 }
 
-func (self *ArgParser) GenerateOptHelp() string {
+func (self *ArgParser) GenerateHelpSection(flags int64) string {
 	var result bytes.Buffer
 	var options []HelpMsg
 
 	// Ask each rule to generate a Help message for the options
 	maxLen := 0
 	for _, rule := range self.rules {
-		if rule.HasFlags(IsCommand) {
-			continue
-		}
-		flags, message := rule.GenerateHelp()
-		if len(flags) > maxLen {
-			maxLen = len(flags)
-		}
-		options = append(options, HelpMsg{flags, message})
-	}
-
-	// Set our indent length
-	indent := maxLen + 3
-	flagFmt := fmt.Sprintf("%%-%ds%%s\n", indent)
-
-	for _, opt := range options {
-		message := WordWrap(opt.Message, indent, self.WordWrap)
-		result.WriteString(fmt.Sprintf(flagFmt, opt.Flags, message))
-	}
-	return result.String()
-}
-
-func (self *ArgParser) GenerateCommandsHelp() string {
-	// TODO: Fix rule types and make this less copy and paste!!!!!
-	var result bytes.Buffer
-	var options []HelpMsg
-
-	// Ask each rule to generate a Help message for the options
-	maxLen := 0
-	for _, rule := range self.rules {
-		if rule.HasFlags(IsCommand) {
+		if !rule.HasFlags(flags) {
 			continue
 		}
 		flags, message := rule.GenerateHelp()
