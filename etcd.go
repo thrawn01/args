@@ -16,7 +16,7 @@ const MAX_BACKOFF_WAIT = 2 * time.Second
 
 // Which options to pass to etcd client depends on the rule type
 func (self *ArgParser) chooseOption(rule *Rule) etcd.OpOption {
-	if rule.IsConfigGroup {
+	if rule.HasFlags(IsConfigGroup) {
 		return etcd.WithPrefix()
 	}
 	return func(op *etcd.Op) {}
@@ -42,7 +42,7 @@ func (self *ArgParser) ParseEtcd(client *etcd.Client) (*Options, error) {
 			self.log.Printf("args.ParseEtcd(): key '%s' not found", rule.EtcdPath)
 			continue
 		}
-		if rule.IsConfigGroup {
+		if rule.HasFlags(IsConfigGroup) {
 			// Iterate through all the key=values for this group
 			for _, node := range resp.Kvs {
 				values.Group(rule.Group).Set(path.Base(string(node.Key)), string(node.Value))

@@ -153,7 +153,7 @@ func (self *RuleModifier) InGroup(group string) *RuleModifier {
 }
 
 func (self *RuleModifier) AddConfigGroup(group string) *RuleModifier {
-	self.rule.IsConfigGroup = true
+	self.rule.SetFlags(IsConfigGroup)
 	self.rule.Group = group
 	modifier := *self
 	return self.parser.AddRule(group, &modifier)
@@ -176,7 +176,7 @@ func (self *RuleModifier) Cfg(name string) *RuleModifier {
 func (self *RuleModifier) AddConfig(name string) *RuleModifier {
 	// Make a new Rule using self.rule as the template
 	rule := *self.rule
-	rule.IsConfig = true
+	rule.SetFlags(IsConfig)
 	return self.parser.AddRule(name, newRuleModifier(&rule, self.parser))
 }
 
@@ -195,36 +195,50 @@ type StoreFunc func(interface{})
 type CommandFunc func(*ArgParser, interface{}) int
 
 const (
-	CommandRule = 1
+	IsCommand int64 = 1 << iota
+	IsPositional
+	IsConfig
+	IsConfigGroup
+	IsRequired
 )
 
 type Rule struct {
-	Type          int
-	Count         int
-	IsPos         int
-	IsConfig      bool
-	IsConfigGroup bool
-	Name          string
-	RuleDesc      string
-	VarName       string
-	Value         interface{}
-	Seen          bool
-	Default       *string
-	Aliases       []string
-	EnvVars       []string
-	EnvPrefix     string
-	Cast          CastFunc
-	Action        ActionFunc
-	StoreValue    StoreFunc
-	CommandFunc   CommandFunc
-	Group         string
-	EtcdKey       string
-	EtcdPath      string
-	NotGreedy     bool
+	Count       int
+	Order       int
+	Name        string
+	RuleDesc    string
+	VarName     string
+	Value       interface{}
+	Seen        bool
+	Default     *string
+	Aliases     []string
+	EnvVars     []string
+	EnvPrefix   string
+	Cast        CastFunc
+	Action      ActionFunc
+	StoreValue  StoreFunc
+	CommandFunc CommandFunc
+	Group       string
+	EtcdKey     string
+	EtcdPath    string
+	NotGreedy   bool
+	Flags       int64
 }
 
 func newRule() *Rule {
 	return &Rule{Cast: castString, Group: DefaultOptionGroup}
+}
+
+func (self *Rule) HasFlags(flag int64) bool {
+	return self.Flags&flag != 0
+}
+
+func (self *Rule) SetFlags(flag int64) {
+	self.Flags = (self.Flags | flag)
+}
+
+func (self *Rule) ClearFlags(flag int64) {
+	self.Flags = (self.Flags ^ flag)
 }
 
 func (self *Rule) Validate() error {
@@ -234,15 +248,18 @@ func (self *Rule) Validate() error {
 func (self *Rule) GenerateHelp() (string, string) {
 	var parens []string
 	paren := ""
-	if self.Default != nil {
-		parens = append(parens, fmt.Sprintf("Default=%s", *self.Default))
-	}
-	if len(self.EnvVars) != 0 {
-		envs := strings.Join(self.EnvVars, ",")
-		parens = append(parens, fmt.Sprintf("Env=%s", envs))
-	}
-	if len(parens) != 0 {
-		paren = fmt.Sprintf("(%s)", strings.Join(parens, " "))
+
+	if self.HasFlags(IsCommand) {
+		if self.Default != nil {
+			parens = append(parens, fmt.Sprintf("Default=%s", *self.Default))
+		}
+		if len(self.EnvVars) != 0 {
+			envs := strings.Join(self.EnvVars, ",")
+			parens = append(parens, fmt.Sprintf("Env=%s", envs))
+		}
+		if len(parens) != 0 {
+			paren = fmt.Sprintf("(%s)", strings.Join(parens, " "))
+		}
 	}
 
 	// TODO: This sort should happen when we validate rules
@@ -263,24 +280,24 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	var alias string
 	var matched bool
 
-	if self.IsConfig {
+	if self.HasFlags(IsConfig) {
 		return false, nil
 	}
 
-	if self.IsPos == 0 {
-		matched, alias = self.MatchesAlias(args, idx)
-		//fmt.Printf("Matched Optional Arg: %v - %s\n", matched, alias)
-		if !matched {
-			return false, nil
-		}
-	} else {
+	if self.HasFlags(IsPositional) {
 		// If we are a positional and we have already been seen, and not greedy
 		if self.Seen && self.NotGreedy {
 			// Do not match this argument
 			return false, nil
 		}
 		// TODO: Handle Greedy
+	} else {
 		//fmt.Printf("Matched Positional Arg: %s\n", args[*idx])
+		matched, alias = self.MatchesAlias(args, idx)
+		//fmt.Printf("Matched Optional Arg: %v - %s\n", matched, alias)
+		if !matched {
+			return false, nil
+		}
 	}
 	self.Seen = true
 
@@ -293,7 +310,7 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 		return true, nil
 	}
 
-	if self.IsPos == 0 {
+	if !self.HasFlags(IsPositional) {
 		// If no actions are specified assume a value follows this argument and should be converted
 		*idx++
 		if len(args) <= *idx {
@@ -331,7 +348,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 		return value, nil
 	}
 
-	if self.IsConfigGroup {
+	if self.HasFlags(IsConfigGroup) {
 		return nil, nil
 	}
 
@@ -373,7 +390,7 @@ func (self *Rule) EtcdKeyPath(rootPath string) string {
 		self.EtcdKey = self.Name
 	}
 
-	if self.IsConfigGroup {
+	if self.HasFlags(IsConfigGroup) {
 		return path.Join("/", rootPath, self.Group)
 	}
 	if self.Group == DefaultOptionGroup {
@@ -392,7 +409,7 @@ func (self Rules) Len() int {
 }
 
 func (self Rules) Less(left, right int) bool {
-	return self[left].IsPos < self[right].IsPos
+	return self[left].Order < self[right].Order
 }
 
 func (self Rules) Swap(left, right int) {

@@ -117,20 +117,21 @@ func (self *ArgParser) Cfg(name string) *RuleModifier {
 
 func (self *ArgParser) AddConfig(name string) *RuleModifier {
 	rule := newRule()
-	rule.IsConfig = true
+	rule.SetFlags(IsConfig)
 	return self.AddRule(name, newRuleModifier(rule, self))
 }
 
 func (self *ArgParser) AddPositional(name string) *RuleModifier {
 	rule := newRule()
-	rule.IsPos++
+	rule.Order++
+	rule.SetFlags(IsPositional)
 	rule.NotGreedy = true
 	return self.AddRule(name, newRuleModifier(rule, self))
 }
 
 func (self *ArgParser) AddCommand(name string, cmdFunc CommandFunc) *RuleModifier {
 	rule := newRule()
-	rule.Type = CommandRule
+	rule.SetFlags(IsCommand)
 	rule.CommandFunc = cmdFunc
 	rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
 		return nil
@@ -156,7 +157,7 @@ func (self *ArgParser) AddRule(name string, modifier *RuleModifier) *RuleModifie
 			rule.Name = group[2]
 		}
 	} else {
-		if rule.Type == CommandRule {
+		if rule.HasFlags(IsCommand) {
 			rule.Aliases = append(rule.Aliases, name)
 		}
 		rule.Name = name
@@ -225,7 +226,7 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 		if rule != nil {
 			//fmt.Printf("Found rule - %+v\n", rule)
 			// If we matched a command
-			if rule.Type == CommandRule {
+			if rule.HasFlags(IsCommand) {
 				if self.Command == nil {
 					//fmt.Printf("Set Command\n")
 					self.Command = rule
@@ -270,7 +271,7 @@ func (self *ArgParser) Apply(values *Options) (*Options, error) {
 		}
 
 		// Special Case here for Config Groups
-		if rule.IsConfigGroup && values != nil {
+		if rule.HasFlags(IsConfigGroup) && values != nil {
 			for _, key := range values.Group(rule.Group).Keys() {
 				value := values.Group(rule.Group).Get(key)
 				results.Group(rule.Group).SetSeen(key, value, rule.Seen)
@@ -279,8 +280,18 @@ func (self *ArgParser) Apply(values *Options) (*Options, error) {
 			results.Group(rule.Group).SetSeen(rule.Name, value, rule.Seen)
 		}
 	}
+
 	self.SetOpts(results)
+
+	// Preform Required Checks
+	if err := self.CheckRequired(results); err != nil {
+		return self.GetOpts(), err
+	}
 	return self.GetOpts(), nil
+}
+
+func (self *ArgParser) CheckRequired(values *Options) error {
+	return nil
 }
 
 func (self *ArgParser) SetOpts(options *Options) {
@@ -333,23 +344,69 @@ func (self *ArgParser) GenerateHelp() string {
 	result.WriteString("\n")
 	result.WriteString(WordWrap(self.Description, 0, 80))
 	result.WriteString("\n")
+	if self.HasCommands() {
+		result.WriteString("\nCommands:\n")
+		result.WriteString(self.GenerateCommandsHelp())
+	}
 	result.WriteString("\nOptions:\n")
 	result.WriteString(self.GenerateOptHelp())
 	return result.String()
 }
 
+// Returns true if the user has defined commands by calling AddCommand()
+func (self *ArgParser) HasCommands() bool {
+	for _, rule := range self.rules {
+		if rule.HasFlags(IsCommand) {
+			return true
+		}
+	}
+	return false
+}
+
+type HelpMsg struct {
+	Flags   string
+	Message string
+}
+
 func (self *ArgParser) GenerateOptHelp() string {
 	var result bytes.Buffer
-
-	type HelpMsg struct {
-		Flags   string
-		Message string
-	}
 	var options []HelpMsg
 
 	// Ask each rule to generate a Help message for the options
 	maxLen := 0
 	for _, rule := range self.rules {
+		if rule.HasFlags(IsCommand) {
+			continue
+		}
+		flags, message := rule.GenerateHelp()
+		if len(flags) > maxLen {
+			maxLen = len(flags)
+		}
+		options = append(options, HelpMsg{flags, message})
+	}
+
+	// Set our indent length
+	indent := maxLen + 3
+	flagFmt := fmt.Sprintf("%%-%ds%%s\n", indent)
+
+	for _, opt := range options {
+		message := WordWrap(opt.Message, indent, self.WordWrap)
+		result.WriteString(fmt.Sprintf(flagFmt, opt.Flags, message))
+	}
+	return result.String()
+}
+
+func (self *ArgParser) GenerateCommandsHelp() string {
+	// TODO: Fix rule types and make this less copy and paste!!!!!
+	var result bytes.Buffer
+	var options []HelpMsg
+
+	// Ask each rule to generate a Help message for the options
+	maxLen := 0
+	for _, rule := range self.rules {
+		if rule.HasFlags(IsCommand) {
+			continue
+		}
 		flags, message := rule.GenerateHelp()
 		if len(flags) > maxLen {
 			maxLen = len(flags)

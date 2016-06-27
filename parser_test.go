@@ -23,14 +23,14 @@ var _ = Describe("ArgParser", func() {
 			parser.AddOption("--one").Count()
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
-			Expect(rule.IsPos).To(Equal(0))
+			Expect(rule.Order).To(Equal(0))
 		})
 		It("Should create optional rule ++one", func() {
 			parser := args.NewParser()
 			parser.AddOption("++one").Count()
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
-			Expect(rule.IsPos).To(Equal(0))
+			Expect(rule.Order).To(Equal(0))
 		})
 
 		It("Should create optional rule -one", func() {
@@ -38,7 +38,7 @@ var _ = Describe("ArgParser", func() {
 			parser.AddOption("-one").Count()
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
-			Expect(rule.IsPos).To(Equal(0))
+			Expect(rule.Order).To(Equal(0))
 		})
 
 		It("Should create optional rule +one", func() {
@@ -46,7 +46,7 @@ var _ = Describe("ArgParser", func() {
 			parser.AddOption("+one").Count()
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
-			Expect(rule.IsPos).To(Equal(0))
+			Expect(rule.Order).To(Equal(0))
 		})
 
 		It("Should match --one", func() {
@@ -94,7 +94,7 @@ var _ = Describe("ArgParser", func() {
 			parser.AddPositional("first").IsString()
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("first"))
-			Expect(rule.IsPos).To(Equal(1))
+			Expect(rule.Order).To(Equal(1))
 		})
 		It("Should match first position 'one'", func() {
 			parser := args.NewParser()
