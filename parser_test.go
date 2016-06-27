@@ -1,6 +1,8 @@
 package args_test
 
 import (
+	"os"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/thrawn01/args"
@@ -326,6 +328,30 @@ var _ = Describe("ArgParser", func() {
 				return retCode
 			})
 			cmdLine := []string{"volume", "create", "my-new-volume"}
+			retCode, err := parser.ParseAndRun(&cmdLine, nil)
+			Expect(err).To(BeNil())
+			Expect(retCode).To(Equal(0))
+			Expect(called).To(Equal(1))
+
+		})
+		It("Should respect auto added help option in commands", func() {
+			parser := args.NewParser()
+			// Capture the help message via Pipe()
+			_, ioWriter, _ := os.Pipe()
+			parser.HelpIO = ioWriter
+
+			called := 0
+			parser.AddCommand("set", func(parent *args.ArgParser, data interface{}) int {
+				parent.AddPositional("first").Required()
+				_, err := parent.ParseArgs(nil)
+				Expect(err).To(Not(BeNil()))
+				Expect(err.Error()).To(Equal(""))
+				Expect(args.AskedForHelp(err)).To(Equal(true))
+
+				called++
+				return 0
+			})
+			cmdLine := []string{"set", "-h"}
 			retCode, err := parser.ParseAndRun(&cmdLine, nil)
 			Expect(err).To(BeNil())
 			Expect(retCode).To(Equal(0))

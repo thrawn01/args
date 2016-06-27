@@ -103,7 +103,9 @@ func main() {
 	// Parse the --endpoint argument, and run our commands if provided
 	_, err := parser.ParseAndRun(nil, nil)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "-- %s\n", err.Error())
+		if !args.AskedForHelp(err) {
+			fmt.Fprintf(os.Stderr, "-- %s\n", err.Error())
+		}
 		os.Exit(1)
 	}
 }

@@ -41,7 +41,7 @@ test: start-etcd
 bin/etcd-endpoints-service: examples/etcd/etcd-endpoints-service.go
 	go build -o bin/etcd-endpoints-service examples/etcd/etcd-endpoints-service.go
 
-bin/etcd-endpoints-client:
+bin/etcd-endpoints-client: examples/etcd/etcd-endpoints-client.go
 	go build -o bin/etcd-endpoints-client examples/etcd/etcd-endpoints-client.go
 
 all: examples

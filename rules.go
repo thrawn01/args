@@ -208,6 +208,7 @@ const (
 	IsConfigGroup
 	IsRequired
 	IsOption
+	NoValue
 )
 
 type Rule struct {
@@ -367,6 +368,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 		return value, nil
 	}
 
+	// TODO: Move this logic from here, This method should be all about getting the value
 	if self.HasFlags(IsConfigGroup) {
 		return nil, nil
 	}
@@ -384,9 +386,13 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 		return self.Cast(self.Name, *self.Default)
 	}
 
+	// TODO: Move this logic from here, This method should be all about getting the value
 	if self.HasFlags(IsRequired) {
 		return nil, errors.New(self.RequiredMessage())
 	}
+
+	// Flag that we found no value for this rule
+	self.SetFlags(NoValue)
 
 	// Return the default value for our type choice
 	value, _ = self.Cast(self.Name, nil)

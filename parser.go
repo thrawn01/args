@@ -12,6 +12,8 @@ import (
 	"github.com/fatih/structs"
 )
 
+var regexIsOptional = regexp.MustCompile(`^(\W+)([\w|-]*)$`)
+
 type ParseModifier func(*ArgParser)
 
 type ArgParser struct {
@@ -23,7 +25,9 @@ type ArgParser struct {
 	WordWrap             int
 	IsSubParser          bool
 	StopParsingOnCommand bool
-	NoHelp               bool
+	AddHelp              bool
+	HelpIO               *os.File
+	helpAdded            bool
 	mutex                sync.Mutex
 	args                 []string
 	options              *Options
@@ -40,6 +44,8 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 		WordWrap: 200,
 		mutex:    sync.Mutex{},
 		log:      DefaultLogger,
+		AddHelp:  true,
+		HelpIO:   os.Stdout,
 	}
 	for _, modify := range modifiers {
 		modify(parser)
@@ -47,7 +53,27 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 	return parser
 }
 
-var regexIsOptional = regexp.MustCompile(`^(\W+)([\w|-]*)$`)
+func (self *ArgParser) Copy() *ArgParser {
+	parser := NewParser()
+	src := structs.New(self)
+	dest := structs.New(parser)
+
+	// Copy all the public values
+	for _, field := range src.Fields() {
+		if field.IsExported() {
+			dest.Field(field.Name()).Set(field.Value())
+		}
+	}
+
+	parser.args = self.args
+	parser.rules = self.rules
+	parser.log = self.log
+	parser.helpAdded = self.helpAdded
+
+	parser.Command = nil
+	parser.IsSubParser = true
+	return parser
+}
 
 func (self *ArgParser) SetLog(logger StdLogger) {
 	self.log = logger
@@ -164,27 +190,6 @@ func (self *ArgParser) GetRules() Rules {
 	return self.rules
 }
 
-func (self *ArgParser) Copy() *ArgParser {
-	parser := NewParser()
-	src := structs.New(self)
-	dest := structs.New(parser)
-
-	// Copy all the public values
-	for _, field := range src.Fields() {
-		if field.IsExported() {
-			dest.Field(field.Name()).Set(field.Value())
-		}
-	}
-
-	parser.args = self.args
-	parser.rules = self.rules
-	parser.log = self.log
-
-	parser.Command = nil
-	parser.IsSubParser = true
-	return parser
-}
-
 func (self *ArgParser) ParseAndRun(args *[]string, data interface{}) (int, error) {
 	_, err := self.ParseArgs(args)
 	if err != nil {
@@ -226,11 +231,10 @@ func (self *ArgParser) ParseArgs(args *[]string) (*Options, error) {
 		self.args = os.Args[1:]
 	}
 
-	if self.HasHelpOption() {
-		self.NoHelp = true
-	} else if !self.NoHelp {
+	if self.AddHelp && !self.HasHelpOption() {
 		// Add help option if --help or -h are not already taken by other options
 		self.AddOption("--help").Alias("-h").IsTrue().Help("Display this help message and exit")
+		self.helpAdded = true
 	}
 	return self.parseUntil(self.args, "--")
 }
@@ -266,39 +270,36 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 			//fmt.Printf("Found rule - %+v\n", rule)
 			// If we matched a command
 			if rule.HasFlags(IsCommand) {
-				if self.Command == nil {
-					//fmt.Printf("Set Command\n")
-					self.Command = rule
-					// Remove the command from our arguments before preceding
-					self.args = append(self.args[:self.idx], self.args[self.idx+1:]...)
-					if self.idx != 0 {
-						self.idx--
-					}
-					// If user asked us to stop parsing arguments after finding a command
-					if self.StopParsingOnCommand {
-						goto Apply
-					}
-				} else {
-					// Only one command is allowed at a time. This other match
-					// must be a positional argument or a subcommand
+				// If we already found a command token on the commandline
+				if self.Command != nil {
+					// Ignore this match, it must be a sub command or a positional argument
 					rule.Seen = false
+				}
+				self.Command = rule
+				// Remove the command argument so we don't process it again in our sub parser
+				self.args = append(self.args[:self.idx], self.args[self.idx+1:]...)
+				self.idx--
+				// If user asked us to stop parsing arguments after finding a command
+				// This might be useful if the user wants arguments found before the command
+				// to apply only to the parent processor
+				if self.StopParsingOnCommand {
+					goto Apply
 				}
 			}
 		}
-		//fmt.Printf("Failed to Match\n")
-		// TODO: If we didn't match any options and user asked us to fail on
-		// unmatched arguments return an error here
 	}
 Apply:
 	opts, err := self.Apply(nil)
-	if err != nil {
-		return opts, err
-	}
-	if !self.NoHelp && opts.Bool("help") {
+	// TODO: Wrap post parsing validation stuff into a method
+	// TODO: This should include the isRequired check
+	// return self.PostValidation(self.Apply(nil))
+
+	// If we specified a command, we probably do not want help even if we see -h on the commandline
+	if self.helpAdded && opts.Bool("help") && self.Command == nil {
 		self.PrintHelp()
 		return opts, &HelpError{}
 	}
-	return opts, nil
+	return opts, err
 }
 
 // Gather all the values from our rules, then apply the passed in map to any rules that don't have a computed value.
@@ -310,7 +311,8 @@ func (self *ArgParser) Apply(values *Options) (*Options, error) {
 		// Get the computed value
 		value, err := rule.ComputedValue(values)
 		if err != nil {
-			return nil, err
+			self.err = err
+			continue
 		}
 
 		// If we have a Store() for this rule apply it here
@@ -330,7 +332,7 @@ func (self *ArgParser) Apply(values *Options) (*Options, error) {
 	}
 
 	self.SetOpts(results)
-	return self.GetOpts(), nil
+	return self.GetOpts(), self.err
 }
 
 func (self *ArgParser) SetOpts(options *Options) {
@@ -371,7 +373,7 @@ func (self *ArgParser) printRules() {
 }
 
 func (self *ArgParser) PrintHelp() {
-	fmt.Println(self.GenerateHelp())
+	fmt.Fprintln(self.HelpIO, self.GenerateHelp())
 }
 
 func (self *ArgParser) GenerateHelp() string {

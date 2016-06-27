@@ -64,7 +64,7 @@ func EtcdPath(path string) ParseModifier {
 
 func NoHelp() ParseModifier {
 	return func(parser *ArgParser) {
-		parser.NoHelp = true
+		parser.AddHelp = false
 	}
 }
 
