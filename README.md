@@ -304,4 +304,4 @@ Here is the help message
 * Example for k8s configMap
 * Ability to include Config() options in help message
 * if AddOption() is called with a name that doesn’t begin with a prefix, apply some default rules to match - or — prefix
-
+* Add support for updating etcd values from the Option{} object. (shouldn't be hard)
