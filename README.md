@@ -1,7 +1,45 @@
-## Argument Parser
-Because I was un-happy about all the other arg parsers
+**NOTE: This is alpha software, the api will continue to evolve**
 
-**NOTE: This is very alpha software, the api will continue to evolve**
+## Introduction
+An argument parser build for distributed services and support for CLI clients and server hot config reloading
+
+## Development Guide
+
+Install glide package management
+
+On Mac OS X you can install the latest release via Homebrew:
+```
+brew install glide
+```
+
+On Ubuntu Precise(12.04), Trusty (14.04), Wily (15.10) or Xenial (16.04) you can install from our PPA:
+
+```
+sudo add-apt-repository ppa:masterminds/glide && sudo apt-get update
+sudo apt-get install glide
+```
+
+Fetch the source
+```
+go get -d github.com/thrawn01/args
+```
+
+Run glide on the sources and build the examples
+```
+cd $GOPATH/src/github.com/thrawn01/args
+glide install
+make examples
+```
+
+Run the tests
+```
+make test
+```
+**NOTE: tests require etcd v3.0.0 running**
+
+```make test``` will attempt to start a docker container running etcd on the local machine,
+ensure you have docker installed before running the test target.
+
 
 ## Usage
 ```go
