@@ -2,7 +2,6 @@ package args
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -10,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/fatih/structs"
+	"github.com/pkg/errors"
 )
 
 var regexIsOptional = regexp.MustCompile(`^(\W+)([\w|-]*)$`)
@@ -34,6 +34,7 @@ type ArgParser struct {
 	rules                Rules
 	err                  error
 	idx                  int
+	posCount             int
 	attempts             int
 	log                  StdLogger
 }
@@ -72,6 +73,7 @@ func (self *ArgParser) SubParser() *ArgParser {
 	parser.log = self.log
 	parser.helpAdded = self.helpAdded
 	parser.addHelp = self.addHelp
+	parser.options = self.options
 
 	// Remove all Commands from our rules
 	for i := len(parser.rules) - 1; i >= 0; i-- {
@@ -100,17 +102,17 @@ func (self *ArgParser) ValidateRules() error {
 		next := idx + 1
 		if next < len(self.rules) {
 			for ; next < len(self.rules); next++ {
-				if rule.Name == self.rules[next].Name {
-					return errors.New(fmt.Sprintf("Duplicate option with same name as '%s'", rule.Name))
+				// If the name and groups are the same
+				if rule.Name == self.rules[next].Name && rule.Group == self.rules[next].Group {
+					return errors.New(fmt.Sprintf("Duplicate option '%s' defined", rule.Name))
 				}
 			}
 		}
-
 		// Ensure user didn't set a bad default value
 		if rule.Cast != nil && rule.Default != nil {
-			_, err := rule.Cast("args.Default()", *rule.Default)
+			_, err := rule.Cast(rule.Name, *rule.Default)
 			if err != nil {
-				panic(err.Error())
+				return errors.Wrap(err, "Bad default value")
 			}
 		}
 	}
@@ -147,7 +149,8 @@ func (self *ArgParser) AddConfig(name string) *RuleModifier {
 
 func (self *ArgParser) AddPositional(name string) *RuleModifier {
 	rule := newRule()
-	rule.Order++
+	self.posCount++
+	rule.Order = self.posCount
 	rule.SetFlags(IsPositional)
 	rule.NotGreedy = true
 	return self.AddRule(name, newRuleModifier(rule, self))
@@ -200,7 +203,12 @@ func (self *ArgParser) ParseAndRun(args *[]string, data interface{}) (int, error
 	if err != nil {
 		return -1, err
 	}
+	return self.RunCommand(data)
+}
 
+// Run the command chosen via the command line, err != nil
+// if no command was found on the commandline
+func (self *ArgParser) RunCommand(data interface{}) (int, error) {
 	// If user didn't provide a command via the commandline
 	if self.Command == nil {
 		self.PrintHelp()
@@ -370,9 +378,9 @@ func (self *ArgParser) match(rules Rules) (*Rule, error) {
 	return nil, nil
 }
 
-func (self *ArgParser) printRules() {
+func (self *ArgParser) PrintRules() {
 	for _, rule := range self.rules {
-		fmt.Printf("Rule: %s - '%+v'\n", rule.Name, rule.Value)
+		fmt.Printf("Rule: %s - '%+v'\n", rule.Name, rule)
 	}
 }
 

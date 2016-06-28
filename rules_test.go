@@ -53,6 +53,21 @@ var _ = Describe("RuleModifier", func() {
 			Expect(opt.Int("power-level")).To(Equal(1))
 			Expect(opt.Group("database").String("hostname")).To(Equal("mysql.com"))
 		})
+		It("Regression: Should not modify the original group rule, but a new group rule", func() {
+			parser := args.NewParser()
+			db := parser.InGroup("database")
+			db.AddOption("--host").Alias("-dH").Default("localhost")
+			db.AddConfig("debug").IsTrue()
+
+			_, err := parser.ParseArgs(nil)
+			Expect(err).To(BeNil())
+
+			rule := parser.GetRules()[0]
+			Expect(rule.Name).To(Equal("host"))
+			rule = parser.GetRules()[1]
+			Expect(rule.Name).To(Equal("debug"))
+			Expect(len(rule.Aliases)).To(Equal(0))
+		})
 	})
 	Describe("RuleModifier.AddConfigGroup()", func() {
 		iniFile := []byte(`
@@ -304,20 +319,12 @@ var _ = Describe("RuleModifier", func() {
 			Expect(value).To(Equal(10))
 		})
 
-		It("Should panic if default value does not match AddOption() type", func() {
+		It("Should return err if default value does not match AddOption() type", func() {
 			parser := args.NewParser()
-			panicCaught := false
-
-			defer func() {
-				msg := recover()
-				Expect(msg).ToNot(BeNil())
-				Expect(msg).To(ContainSubstring("args.Default"))
-				panicCaught = true
-			}()
-
 			parser.AddOption("--power-level").IsInt().Default("over-ten-thousand")
-			parser.ParseArgs(nil)
-			Expect(panicCaught).To(Equal(true))
+			_, err := parser.ParseArgs(nil)
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(ContainSubstring("Bad default value"))
 		})
 	})
 	Describe("RuleModifier.Env()", func() {

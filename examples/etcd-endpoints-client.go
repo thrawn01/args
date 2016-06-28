@@ -23,11 +23,11 @@ func etcdClientFactory(opts *args.Options) (*etcd.Client, error) {
 	return client, nil
 }
 
-func Add(parent *args.ArgParser, data interface{}) int {
-	parent.AddPositional("name").Required().Help("The name of the new endpoint")
-	parent.AddPositional("url").Required().Help("The url of the new endpoint")
+func Add(subParser *args.ArgParser, data interface{}) int {
+	subParser.AddPositional("name").Required().Help("The name of the new endpoint")
+	subParser.AddPositional("url").Required().Help("The url of the new endpoint")
 
-	opts, err := parent.ParseArgs(nil)
+	opts, err := subParser.ParseArgs(nil)
 	if err != nil {
 		fmt.Println(err.Error())
 		return 1
@@ -56,10 +56,10 @@ func Add(parent *args.ArgParser, data interface{}) int {
 	return 0
 }
 
-func Delete(parent *args.ArgParser, data interface{}) int {
-	parent.AddPositional("name").Required().Help("The name of the endpoint to delete")
+func Delete(subParser *args.ArgParser, data interface{}) int {
+	subParser.AddPositional("name").Required().Help("The name of the endpoint to delete")
 
-	opts, err := parent.ParseArgs(nil)
+	opts, err := subParser.ParseArgs(nil)
 	if err != nil {
 		fmt.Println(err.Error())
 		return 1

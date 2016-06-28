@@ -50,9 +50,15 @@ bin/etcd-endpoints-service: examples/etcd-endpoints-service.go
 bin/etcd-endpoints-client: examples/etcd-endpoints-client.go
 	go build -o bin/etcd-endpoints-client examples/etcd-endpoints-client.go
 
+bin/chicken-http-client: examples/chicken-http-client.go
+	go build -o bin/chicken-http-client examples/chicken-http-client.go
+
+bin/demo: examples/demo.go
+	go build -o bin/demo examples/demo.go
+
 all: examples
 
-examples: bin/etcd-endpoints-service bin/etcd-endpoints-client bin/etcd-config-service bin/etcd-config-client
+examples: bin/etcd-endpoints-service bin/etcd-endpoints-client bin/etcd-config-service bin/etcd-config-client bin/chicken-http-client bin/demo
 
 clean:
 	rm bin/*

@@ -1,4 +1,4 @@
-package simple
+package main
 
 import (
 	"fmt"
@@ -13,6 +13,8 @@ type Config struct {
 	StringSlice []string
 	Verbose     int
 	DbHost      string
+	TheQuestion string
+	TheAnswer   int
 }
 
 func main() {
@@ -20,10 +22,8 @@ func main() {
 
 	// Create the parser with program name 'example'
 	// and environment variables prefixed with APP_
-	parser := args.NewParser("simple-example", args.EnvPrefix("APP_"))
-
-	parser.AddOption("--power-level").StoreInt(&conf.PowerLevel).
-		Env("POWER_LEVEL").Default("10000").Help("set our power level")
+	parser := args.NewParser(args.Name("demo"), args.EnvPrefix("APP_"),
+		args.Desc("This is a demo app to showcase some features of args"))
 
 	// Store Integers directly into a struct with a default value
 	parser.AddOption("--power-level").Alias("-p").StoreInt(&conf.PowerLevel).
@@ -40,7 +40,7 @@ func main() {
 	parser.AddOption("--message").Alias("-m").StoreStr(&conf.Message).
 		Env("MESSAGE").Default("over-ten-thousand").Help("send a message")
 
-	// Pass a comma separated list of strings and get a []string
+	// Pass a comma separated list of strings and get a []string slice
 	parser.AddOption("--slice").Alias("-s").StoreStringSlice(&conf.StringSlice).Env("LIST").
 		Default("one,two,three").Help("list of messages")
 
@@ -52,6 +52,14 @@ func main() {
 
 	// Specify the type of the arg with IsInt(), IsString(), IsBool() or IsTrue()
 	parser.AddOption("--help").Alias("-h").IsTrue().Help("show this help message")
+
+	// Add Required positional arguments
+	parser.AddPositional("the-question").Required().
+		StoreStr(&conf.TheQuestion).Help("Before you have an answer")
+
+	// Add Optional positional arguments
+	parser.AddPositional("the-answer").IsInt().Default("42").
+		StoreInt(&conf.TheAnswer).Help("It must be 42")
 
 	// 'Conf' options are not set via the command line but can be set
 	// via a config file or an environment variable
@@ -72,7 +80,7 @@ func main() {
 	// '--' or '++' so they can not be confused with command line options
 	db.AddConfig("database").IsString().Default("myDatabase").Help("name of database to use")
 
-	// If no type 'IsString', 'IsInt' is specified, defaults to 'IsString'
+	// If no type is specified, defaults to 'IsString'
 	db.AddConfig("user").Help("database user")
 	db.AddConfig("pass").Help("database password")
 
@@ -80,15 +88,42 @@ func main() {
 	opt, err := parser.ParseArgs(nil)
 	if err != nil {
 		fmt.Println(err.Error())
+		parser.PrintHelp()
 		os.Exit(-1)
 	}
 
+	// Demo default variables in a struct
+	fmt.Printf("Power        '%d'\n", conf.PowerLevel)
+	fmt.Printf("Message      '%s'\n", conf.Message)
+	fmt.Printf("String Slice '%s'\n", conf.StringSlice)
+	fmt.Printf("DbHost       '%s'\n", conf.DbHost)
+	fmt.Printf("TheAnswer    '%d'\n", conf.TheAnswer)
+	fmt.Println("")
+
+	// If user asked for --help or there were no options passed
+	if opt.NoArgs() || opt.Bool("help") {
+		parser.PrintHelp()
+		os.Exit(-1)
+	}
+
+	fmt.Println("")
+	fmt.Println("==================")
+	fmt.Println(" Direct Cast")
+	fmt.Println("==================")
+
 	// Fetch values by using the Cast functions
-	fmt.Printf("CAST Power        '%d'\n", opt.Int("power-level"))
-	fmt.Printf("CAST Message      '%s'\n", opt.String("message"))
-	fmt.Printf("CAST String Slice '%s'\n", opt.StringSlice("slice"))
-	fmt.Printf("CAST Verbose      '%d'\n", opt.Int("verbose"))
-	fmt.Printf("CAST Debug        '%t'\n", opt.Bool("debug"))
+	fmt.Printf("Power               '%d'\n", opt.Int("power-level"))
+	fmt.Printf("Message             '%s'\n", opt.String("message"))
+	fmt.Printf("String Slice        '%s'\n", opt.StringSlice("slice"))
+	fmt.Printf("Verbose             '%d'\n", opt.Int("verbose"))
+	fmt.Printf("Debug               '%t'\n", opt.Bool("debug"))
+	fmt.Printf("TheAnswer           '%d'\n", opt.Int("the-answer"))
+	fmt.Printf("TheAnswer as String '%s'\n", opt.String("the-answer"))
+
+	fmt.Println("")
+	fmt.Println("==================")
+	fmt.Println(" Database Group")
+	fmt.Println("==================")
 
 	// Fetch Group values
 	dbAddOption := opt.Group("database")
@@ -97,15 +132,6 @@ func main() {
 	fmt.Printf("CAST DB User   '%s'\n", dbAddOption.String("user"))
 	fmt.Printf("CAST DB Pass   '%s'\n", dbAddOption.String("pass"))
 
-	fmt.Println("")
-
-	// Values can also be stored in a struct
-	fmt.Printf("STRUCT Power        '%d'\n", conf.PowerLevel)
-	fmt.Printf("STRUCT Message      '%s'\n", conf.Message)
-	fmt.Printf("STRUCT String Slice '%s'\n", conf.StringSlice)
-	fmt.Printf("STRUCT Verbose      '%d'\n", conf.Verbose)
-	fmt.Printf("STRUCT Debug        '%t'\n", opt.Bool("debug"))
-	fmt.Printf("STRUCT DbHost       '%s'\n", conf.DbHost)
 	fmt.Println("")
 
 	iniFile := []byte(`
@@ -122,12 +148,17 @@ func main() {
 		pass=my-password
 	`)
 
-	// Make configuration simply by reading arguments from an INI file
+	// Make configuration simple by reading arguments from an INI file
 	opt, err = parser.FromIni(iniFile)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(-1)
 	}
+
+	fmt.Println("")
+	fmt.Println("==================")
+	fmt.Println("From INI file")
+	fmt.Println("==================")
 
 	// Values from the config file are used only if the argument is not present
 	// on the commandline
@@ -137,18 +168,4 @@ func main() {
 	fmt.Printf("INI Verbose    '%d'\n", conf.Verbose)
 	fmt.Printf("INI Debug      '%t'\n", opt.Bool("debug"))
 	fmt.Println("")
-
-	// If user asked for --help or there were no options passed
-	if opt.NoArgs() || opt.Bool("help") {
-		parser.PrintHelp()
-		os.Exit(-1)
-	}
-
-	/* Un-implemented SubParser Example
-	// Sub Parser, Any arguments past the positional arg 'sub1' will be considered by this sub
-	sub := parser.SubParser("volume")
-
-	// parser and will inherit all the opts from the parent parser
-	list := sub.SubParser("list", args.Inherit(parent))
-	list.AddOption("volumes") ????*/
 }

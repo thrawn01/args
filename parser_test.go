@@ -168,7 +168,16 @@ var _ = Describe("ArgParser", func() {
 			cmdLine := []string{"--first", "one", "one"}
 			_, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(Not(BeNil()))
-			Expect(err.Error()).To(Equal("Duplicate option with same name as 'first'"))
+			Expect(err.Error()).To(Equal("Duplicate option 'first' defined"))
+		})
+		It("Should raise if options and configs share the same name", func() {
+			parser := args.NewParser()
+			parser.AddOption("--debug").IsTrue()
+			parser.AddConfig("debug").IsBool()
+
+			_, err := parser.ParseArgs(nil)
+			Expect(err).To(Not(BeNil()))
+			Expect(err.Error()).To(Equal("Duplicate option 'debug' defined"))
 		})
 		It("Should raise an error if a positional is required but not provided", func() {
 			parser := args.NewParser()

@@ -75,6 +75,23 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("config 'one' is required"))
 		})
+		It("Should not raise if options and configs share the same name, but are in diff groups", func() {
+			parser := args.NewParser()
+			parser.AddOption("--debug").IsTrue()
+			parser.AddConfig("debug").InGroup("database").IsBool()
+
+			cmdLine := []string{"--debug"}
+			opts, err := parser.ParseArgs(&cmdLine)
+
+			iniFile := []byte(`
+				[database]
+				debug=false
+			`)
+			opts, err = parser.FromIni(iniFile)
+			Expect(err).To(BeNil())
+			Expect(opts.Bool("debug")).To(Equal(true))
+			Expect(opts.Group("database").Bool("debug")).To(Equal(false))
+		})
 	})
 	Describe("ArgParser.AddConfigGroup()", func() {
 		It("Should Parser an adhoc group from the ini file", func() {

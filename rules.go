@@ -1,13 +1,14 @@
 package args
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path"
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 type RuleModifier struct {
@@ -159,10 +160,12 @@ func (self *RuleModifier) InGroup(group string) *RuleModifier {
 }
 
 func (self *RuleModifier) AddConfigGroup(group string) *RuleModifier {
-	self.rule.SetFlags(IsConfigGroup)
-	self.rule.Group = group
-	modifier := *self
-	return self.parser.AddRule(group, &modifier)
+	var newRule Rule
+	newRule = *self.rule
+	newRule.SetFlags(IsConfigGroup)
+	newRule.Group = group
+	// Make a new RuleModifier using self as the template
+	return self.parser.AddRule(group, newRuleModifier(&newRule, self.parser))
 }
 
 func (self *RuleModifier) Opt(name string) *RuleModifier {
@@ -170,10 +173,11 @@ func (self *RuleModifier) Opt(name string) *RuleModifier {
 }
 
 func (self *RuleModifier) AddOption(name string) *RuleModifier {
-	self.rule.SetFlags(IsOption)
-	modifier := *self
+	var newRule Rule
+	newRule = *self.rule
+	newRule.SetFlags(IsOption)
 	// Make a new RuleModifier using self as the template
-	return self.parser.AddRule(name, &modifier)
+	return self.parser.AddRule(name, newRuleModifier(&newRule, self.parser))
 }
 
 func (self *RuleModifier) Cfg(name string) *RuleModifier {
@@ -181,10 +185,11 @@ func (self *RuleModifier) Cfg(name string) *RuleModifier {
 }
 
 func (self *RuleModifier) AddConfig(name string) *RuleModifier {
+	var newRule Rule
+	newRule = *self.rule
 	// Make a new Rule using self.rule as the template
-	rule := *self.rule
-	rule.SetFlags(IsConfig)
-	return self.parser.AddRule(name, newRuleModifier(&rule, self.parser))
+	newRule.SetFlags(IsConfig)
+	return self.parser.AddRule(name, newRuleModifier(&newRule, self.parser))
 }
 
 func (self *RuleModifier) EtcdKey(key string) *RuleModifier {
@@ -305,7 +310,7 @@ func (self *Rule) MatchesAlias(args []string, idx *int) (bool, string) {
 }
 
 func (self *Rule) Match(args []string, idx *int) (bool, error) {
-	var alias string
+	name := self.Name
 	var matched bool
 
 	if self.HasFlags(IsConfig) {
@@ -321,7 +326,7 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 		// TODO: Handle Greedy
 	} else {
 		//fmt.Printf("Matched Positional Arg: %s\n", args[*idx])
-		matched, alias = self.MatchesAlias(args, idx)
+		matched, name = self.MatchesAlias(args, idx)
 		//fmt.Printf("Matched Optional Arg: %v - %s\n", matched, alias)
 		if !matched {
 			return false, nil
@@ -331,7 +336,7 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 
 	// If user defined an action
 	if self.Action != nil {
-		err := self.Action(self, alias, args, idx)
+		err := self.Action(self, name, args, idx)
 		if err != nil {
 			return true, err
 		}
@@ -342,12 +347,12 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 		// If no actions are specified assume a value follows this argument and should be converted
 		*idx++
 		if len(args) <= *idx {
-			return true, errors.New(fmt.Sprintf("Expected '%s' to have an argument", alias))
+			return true, errors.New(fmt.Sprintf("Expected '%s' to have an argument", name))
 		}
 	}
 
 	//fmt.Printf("arg: %s value: %s\n", alias, args[*idx])
-	value, err := self.Cast(alias, self.UnEscape(args[*idx]))
+	value, err := self.Cast(name, self.UnEscape(args[*idx]))
 	if err != nil {
 		return true, err
 	}
