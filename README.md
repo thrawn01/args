@@ -264,6 +264,25 @@ INI Debug      'true'
 
 Here is the help message
 ```
+$ bin/demo -h
+Usage: demo [OPTIONS] the-question [the-answer]
+
+This is a demo app to showcase some features of args
+
+Positionals:
+  the-question   Before you have an answer
+  the-answer     It must be 42
+
+Options:
+  +c, ++config-file   path to config file (Default=/path/to/config)
+  -m, --message       send a message (Default=over-ten-thousand Env=MESSAGE)
+  -s, --slice         list of messages (Default=one,two,three Env=LIST)
+  -v, --verbose       be verbose
+  -d, --debug         turn on Debug
+  -h, --help          show this help message
+  -p, --power-level   set our power level (Default=10000 Env=POWER_LEVEL)
+  -dH, --host         database hostname (Default=localhost)
+
 ```
 
 ## Stuff that works
