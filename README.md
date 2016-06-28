@@ -1,7 +1,7 @@
 **NOTE: This is alpha software, the api will continue to evolve**
 
 ## Introduction
-An argument parser build for distributed services and support for CLI clients and server hot config reloading
+An argument parser built for distributed services with support for CLI clients and server hot config reloading
 
 ## Development Guide
 
