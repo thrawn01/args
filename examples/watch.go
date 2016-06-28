@@ -1,4 +1,4 @@
-package watch
+package main
 
 import (
 	"encoding/json"

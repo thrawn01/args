@@ -38,15 +38,21 @@ test: start-etcd
 	@echo Running Tests
 	@go test .
 
-bin/etcd-endpoints-service: examples/etcd/etcd-endpoints-service.go
-	go build -o bin/etcd-endpoints-service examples/etcd/etcd-endpoints-service.go
+bin/etcd-config-service: examples/etcd-config-service.go
+	go build -o bin/etcd-config-service examples/etcd-config-service.go
 
-bin/etcd-endpoints-client: examples/etcd/etcd-endpoints-client.go
-	go build -o bin/etcd-endpoints-client examples/etcd/etcd-endpoints-client.go
+bin/etcd-config-client: examples/etcd-config-client.go
+	go build -o bin/etcd-config-client examples/etcd-config-client.go
+
+bin/etcd-endpoints-service: examples/etcd-endpoints-service.go
+	go build -o bin/etcd-endpoints-service examples/etcd-endpoints-service.go
+
+bin/etcd-endpoints-client: examples/etcd-endpoints-client.go
+	go build -o bin/etcd-endpoints-client examples/etcd-endpoints-client.go
 
 all: examples
 
-examples: bin/etcd-endpoints-service bin/etcd-endpoints-client
+examples: bin/etcd-endpoints-service bin/etcd-endpoints-client bin/etcd-config-service bin/etcd-config-client
 
 clean:
 	rm bin/*

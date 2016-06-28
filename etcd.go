@@ -157,7 +157,11 @@ type ChangeEvent struct {
 
 func findEtcdRule(etcdPath string, rules Rules) *Rule {
 	for _, rule := range rules {
-		if etcdPath == rule.EtcdPath {
+		comparePath := etcdPath
+		if rule.HasFlags(IsConfigGroup) {
+			comparePath = path.Dir(etcdPath)
+		}
+		if comparePath == rule.EtcdPath {
 			return rule
 		}
 	}
@@ -167,10 +171,15 @@ func findEtcdRule(etcdPath string, rules Rules) *Rule {
 // Given args.Rules and etcd.Response, attempt to match the response to the rules and return
 // a new ChangeEvent.
 func NewChangeEvent(rules Rules, event *etcd.Event) *ChangeEvent {
-	rule := findEtcdRule(path.Dir(string(event.Kv.Key)), rules)
+	var group string
+
+	rule := findEtcdRule(string(event.Kv.Key), rules)
+	if rule != nil {
+		group = rule.Group
+	}
 	return &ChangeEvent{
 		Rule:    rule,
-		Group:   rule.Group,
+		Group:   group,
 		Key:     path.Base(string(event.Kv.Key)),
 		Value:   string(event.Kv.Value),
 		Deleted: event.Type.String() == "DELETE",
