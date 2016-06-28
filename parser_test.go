@@ -180,6 +180,17 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("positional 'second' is required"))
 		})
+		It("Should respect escaped sequences in positionals", func() {
+			parser := args.NewParser()
+			parser.AddOption("--me").IsTrue()
+			parser.AddPositional("first").Required()
+
+			cmdLine := []string{"\\-\\-me"}
+			opts, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opts.String("first")).To(Equal("--me"))
+			Expect(opts.Bool("me")).To(Equal(false))
+		})
 	})
 	Describe("ArgParser.AddConfig()", func() {
 		cmdLine := []string{"--power-level", "--power-level"}
@@ -332,7 +343,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(BeNil())
 			Expect(retCode).To(Equal(0))
 			Expect(called).To(Equal(1))
-
 		})
 		It("Should respect auto added help option in commands", func() {
 			parser := args.NewParser()
@@ -356,7 +366,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(BeNil())
 			Expect(retCode).To(Equal(0))
 			Expect(called).To(Equal(1))
-
 		})
 	})
 })

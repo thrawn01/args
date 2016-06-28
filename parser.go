@@ -25,10 +25,10 @@ type ArgParser struct {
 	WordWrap             int
 	IsSubParser          bool
 	StopParsingOnCommand bool
-	AddHelp              bool
 	HelpIO               *os.File
 	helpAdded            bool
 	mutex                sync.Mutex
+	addHelp              bool
 	args                 []string
 	options              *Options
 	rules                Rules
@@ -44,7 +44,7 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 		WordWrap: 200,
 		mutex:    sync.Mutex{},
 		log:      DefaultLogger,
-		AddHelp:  true,
+		addHelp:  true,
 		HelpIO:   os.Stdout,
 	}
 	for _, modify := range modifiers {
@@ -53,7 +53,9 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 	return parser
 }
 
-func (self *ArgParser) Copy() *ArgParser {
+// Takes the current parser and return a new parser with
+// appropriate for use within a command function
+func (self *ArgParser) SubParser() *ArgParser {
 	parser := NewParser()
 	src := structs.New(self)
 	dest := structs.New(parser)
@@ -69,7 +71,16 @@ func (self *ArgParser) Copy() *ArgParser {
 	parser.rules = self.rules
 	parser.log = self.log
 	parser.helpAdded = self.helpAdded
+	parser.addHelp = self.addHelp
 
+	// Remove all Commands from our rules
+	for i := len(parser.rules) - 1; i >= 0; i-- {
+		if parser.rules[i].HasFlags(IsCommand) {
+			// Remove the rule
+			parser.rules = append(parser.rules[:i], parser.rules[i+1:]...)
+		}
+	}
+	// Clear the selected Commands
 	parser.Command = nil
 	parser.IsSubParser = true
 	return parser
@@ -81,12 +92,6 @@ func (self *ArgParser) SetLog(logger StdLogger) {
 
 func (self *ArgParser) GetLog() StdLogger {
 	return self.log
-}
-
-// Takes the current parser and return a new parser with
-// any arguments already parsed removed from argv and none of the rules of the parent
-func (self *ArgParser) SubParser() *ArgParser {
-	return nil
 }
 
 func (self *ArgParser) ValidateRules() error {
@@ -202,8 +207,7 @@ func (self *ArgParser) ParseAndRun(args *[]string, data interface{}) (int, error
 		return -1, nil
 	}
 
-	parser := self.Copy()
-	parser.IsSubParser = true
+	parser := self.SubParser()
 	retCode := self.Command.CommandFunc(parser, data)
 	return retCode, nil
 }
@@ -231,7 +235,7 @@ func (self *ArgParser) ParseArgs(args *[]string) (*Options, error) {
 		self.args = os.Args[1:]
 	}
 
-	if self.AddHelp && !self.HasHelpOption() {
+	if self.addHelp && !self.HasHelpOption() {
 		// Add help option if --help or -h are not already taken by other options
 		self.AddOption("--help").Alias("-h").IsTrue().Help("Display this help message and exit")
 		self.helpAdded = true
@@ -379,9 +383,10 @@ func (self *ArgParser) PrintHelp() {
 func (self *ArgParser) GenerateHelp() string {
 	var result bytes.Buffer
 	// TODO: Improve this once we have positional arguments
-	result.WriteString("Usage:\n")
 	// Super generic usage message
-	result.WriteString(fmt.Sprintf("  %s [OPTIONS]\n", self.Name))
+	result.WriteString(fmt.Sprintf("Usage: %s %s %s\n", self.Name,
+		self.GenerateUsage(IsOption),
+		self.GenerateUsage(IsPositional)))
 	result.WriteString("\n")
 	result.WriteString(WordWrap(self.Description, 0, 80))
 	result.WriteString("\n")
@@ -392,10 +397,34 @@ func (self *ArgParser) GenerateHelp() string {
 		result.WriteString(commands)
 	}
 
+	positional := self.GenerateHelpSection(IsPositional)
+	if positional != "" {
+		result.WriteString("\nPositionals:\n")
+		result.WriteString(positional)
+	}
+
 	options := self.GenerateHelpSection(IsOption)
 	if options != "" {
 		result.WriteString("\nOptions:\n")
 		result.WriteString(options)
+	}
+	return result.String()
+}
+
+func (self *ArgParser) GenerateUsage(flags int64) string {
+	var result bytes.Buffer
+
+	// TODO: Should only return [OPTIONS] if there are too many options
+	// TODO: to display on a single line
+	if flags == IsOption {
+		return "[OPTIONS]"
+	}
+
+	for _, rule := range self.rules {
+		if !rule.HasFlags(flags) {
+			continue
+		}
+		result.WriteString(rule.GenerateUsage() + " ")
 	}
 	return result.String()
 }

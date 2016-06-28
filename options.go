@@ -138,7 +138,7 @@ func (self *Options) FromChangeEvent(event *ChangeEvent) *Options {
 }
 
 func (self *Options) Del(key string) *Options {
-	delete(self.values, "key")
+	delete(self.values, key)
 	return self
 }
 

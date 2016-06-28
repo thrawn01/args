@@ -254,6 +254,22 @@ func (self *Rule) Validate() error {
 	return nil
 }
 
+func (self *Rule) GenerateUsage() string {
+	switch {
+	case self.Flags&IsOption != 0:
+		if self.HasFlags(IsRequired) {
+			return fmt.Sprintf("%s", self.Aliases[0])
+		}
+		return fmt.Sprintf("[%s]", self.Aliases[0])
+	case self.Flags&IsPositional != 0:
+		if self.HasFlags(IsRequired) {
+			return fmt.Sprintf("%s", self.Name)
+		}
+		return fmt.Sprintf("[%s]", self.Name)
+	}
+	return ""
+}
+
 func (self *Rule) GenerateHelp() (string, string) {
 	var parens []string
 	paren := ""
@@ -271,6 +287,9 @@ func (self *Rule) GenerateHelp() (string, string) {
 		}
 	}
 
+	if self.HasFlags(IsPositional) {
+		return ("  " + self.Name), self.RuleDesc
+	}
 	// TODO: This sort should happen when we validate rules
 	sort.Sort(sort.Reverse(sort.StringSlice(self.Aliases)))
 	return ("  " + strings.Join(self.Aliases, ", ")), (self.RuleDesc + " " + paren)
@@ -328,12 +347,16 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	}
 
 	//fmt.Printf("arg: %s value: %s\n", alias, args[*idx])
-	value, err := self.Cast(alias, args[*idx])
+	value, err := self.Cast(alias, self.UnEscape(args[*idx]))
 	if err != nil {
 		return true, err
 	}
 	self.Value = value
 	return true, nil
+}
+
+func (self *Rule) UnEscape(str string) string {
+	return strings.Replace(str, "\\", "", -1)
 }
 
 // Returns the appropriate required warning to display to the user

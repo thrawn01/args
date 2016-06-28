@@ -90,6 +90,7 @@ func main() {
 			fmt.Println(err.Error())
 			return
 		}
+		fmt.Printf("Change Event - %+v\n", event)
 		// This takes a ChangeEvent and updates the opts with the latest changes
 		parser.Apply(opts.FromChangeEvent(event))
 	})

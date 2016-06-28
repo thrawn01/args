@@ -30,7 +30,7 @@ func Add(parent *args.ArgParser, data interface{}) int {
 	opts, err := parent.ParseArgs(nil)
 	if err != nil {
 		fmt.Println(err.Error())
-		return 0
+		return 1
 	}
 
 	// Create our Client
@@ -43,7 +43,6 @@ func Add(parent *args.ArgParser, data interface{}) int {
 
 	// Create our context
 	key := fmt.Sprintf("/etcd-endpoints/nginx-endpoints/%s", opts.String("name"))
-	return 0
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
@@ -62,9 +61,7 @@ func Delete(parent *args.ArgParser, data interface{}) int {
 
 	opts, err := parent.ParseArgs(nil)
 	if err != nil {
-		if !args.AskedForHelp(err) {
-			fmt.Println(err.Error())
-		}
+		fmt.Println(err.Error())
 		return 1
 	}
 
