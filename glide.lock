@@ -1,5 +1,5 @@
-hash: a488a307ab1fd0860b94c9218245210094db3d03980f99869f4d6e661ca8736a
-updated: 2016-06-28T17:09:38.042439799-05:00
+hash: 12cd98ff23a2333c3147363289b7fb918849b51eaeec920d92b64f426242dcec
+updated: 2016-06-28T17:18:53.470168686-05:00
 imports:
 - name: github.com/cloudfoundry-incubator/candiedyaml
   version: 99c3df83b51532e3615f851d8c2dbb638f5313bf
@@ -36,9 +36,9 @@ imports:
 - name: github.com/julienschmidt/httprouter
   version: 8c199fb6259ffc1af525cc3ad52ee60ba8359669
 - name: github.com/onsi/ginkgo
-  version: 462326b1628e124b23f42e87a8f2750e3c4e2d24
+  version: 059cec02d342bab423425a99b191186a03255e9e
 - name: github.com/onsi/gomega
-  version: a78ae492d53aad5a7a232d0d0462c14c400e3ee7
+  version: a1094b2db2d4845621602c667bd4ccf09834544e
 - name: github.com/pborman/uuid
   version: a97ce2ca70fa5a848076093f05e639a89ca34d06
 - name: github.com/pkg/errors

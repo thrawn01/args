@@ -31,11 +31,17 @@ glide install
 make examples
 ```
 
-Run the tests
+Run all the tests
 ```
 make test
 ```
-**NOTE: tests require etcd v3.0.0 running**
+
+Skip the etcd tests
+```
+go test
+```
+
+**NOTE: some of the tests require etcd v3.0.0 server running**
 
 ```make test``` will attempt to start a docker container running etcd on the local machine,
 ensure you have docker installed before running the test target.
