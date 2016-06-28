@@ -234,6 +234,24 @@ func (self *ArgParser) HasHelpOption() bool {
 	return false
 }
 
+// Will parse the commandline, but also print help and exit if the user asked for --help
+func (self *ArgParser) ParseArgsSimple(args *[]string) *Options {
+	opt, err := self.ParseArgs(args)
+
+	// We could have a non critical error, in addition to the user asking for help
+	if opt != nil && opt.Bool("help") {
+		self.PrintHelp()
+		os.Exit(1)
+	}
+	// Print errors to stderr and include our help message
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		self.PrintHelp()
+		os.Exit(-1)
+	}
+	return opt
+}
+
 // Parses command line arguments using os.Args if 'args' is nil
 func (self *ArgParser) ParseArgs(args *[]string) (*Options, error) {
 	if args != nil {

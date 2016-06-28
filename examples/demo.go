@@ -85,12 +85,11 @@ func main() {
 	db.AddConfig("pass").Help("database password")
 
 	// Pass our own argument list, or nil to parse os.Args[]
-	opt, err := parser.ParseArgs(nil)
-	if err != nil {
-		fmt.Println(err.Error())
-		parser.PrintHelp()
-		os.Exit(-1)
-	}
+	opt := parser.ParseArgsSimple(nil)
+
+	// NOTE: ParseArgsSimple() is just a convenience, you can call
+	// parser.ParseArgs(nil) directly and handle the errors
+	// yourself if you have more complicated use case
 
 	// Demo default variables in a struct
 	fmt.Printf("Power        '%d'\n", conf.PowerLevel)
@@ -100,7 +99,8 @@ func main() {
 	fmt.Printf("TheAnswer    '%d'\n", conf.TheAnswer)
 	fmt.Println("")
 
-	// If user asked for --help or there were no options passed
+	// If user asked for --help or there were no options
+	// passed and none where required
 	if opt.NoArgs() || opt.Bool("help") {
 		parser.PrintHelp()
 		os.Exit(-1)
@@ -149,7 +149,7 @@ func main() {
 	`)
 
 	// Make configuration simple by reading arguments from an INI file
-	opt, err = parser.FromIni(iniFile)
+	opt, err := parser.FromIni(iniFile)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(-1)
