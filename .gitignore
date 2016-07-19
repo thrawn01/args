@@ -2,3 +2,4 @@
 *.iml
 bin/
 vendor/
+glide.lock
