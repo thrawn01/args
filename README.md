@@ -17,17 +17,17 @@ Args uses can use glide to ensure the proper dependencies are installed, but arg
 Fetch the source
 ```
 go get -d github.com/thrawn01/args
-```
-
-Running the tests will install glide retrieve the proper dependencies and build the examples
-```
 cd $GOPATH/src/github.com/thrawn01/args
-make
 ```
 
-Run all the tests
+Install glide and fetch the dependencies via glide
 ```
-make test
+make get-deps
+```
+
+Run make to build the example and run the tests
+```
+make
 ```
 
 ## Usage

@@ -11,10 +11,9 @@ all: test examples
 
 examples: bin/chicken-http-client bin/demo
 
-travis-ci:
+travis-ci: get-deps
 	go get -u github.com/mattn/goveralls
 	go get -u golang.org/x/tools/cmd/cover
-	#$(HOME)/gopath/bin/goveralls -service=travis-ci
 	goveralls -service=travis-ci
 
 glide:
