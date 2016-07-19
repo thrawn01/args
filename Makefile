@@ -17,6 +17,7 @@ travis-ci: get-deps
 	goveralls -service=travis-ci
 
 glide:
+	@if [ ! -e $(GOPATH)/bin ] ; then mkdir $(GOPATH)/bin ; fi
 	@which glide > /dev/null ; if [ $$? -eq 1 ] ; then curl https://glide.sh/get | sh ; fi
 
 get-deps: glide
