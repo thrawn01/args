@@ -326,7 +326,6 @@ Apply:
 
 	// If we specified a command, we probably do not want help even if we see -h on the commandline
 	if self.helpAdded && opts.Bool("help") && self.Command == nil {
-		self.PrintHelp()
 		return opts, &HelpError{}
 	}
 	return opts, err

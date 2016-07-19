@@ -1,76 +1,20 @@
-hash: 12cd98ff23a2333c3147363289b7fb918849b51eaeec920d92b64f426242dcec
-updated: 2016-06-28T17:18:53.470168686-05:00
+hash: 6da3213a16f0e1d7ca4fed6ac35fadd64650038624aa522e88c1762290d21482
+updated: 2016-07-19T14:45:04.820418783-05:00
 imports:
-- name: github.com/cloudfoundry-incubator/candiedyaml
-  version: 99c3df83b51532e3615f851d8c2dbb638f5313bf
-- name: github.com/coreos/etcd
-  version: ae6e8798128d08074777f93789a9a14d238bfa1b
-  subpackages:
-  - clientv3
-  - auth/authpb
-  - etcdserver/api/v3rpc/rpctypes
-  - etcdserver/etcdserverpb
-  - mvcc/mvccpb
-  - pkg/tlsutil
 - name: github.com/fatih/structs
-  version: bfcf7eedca5eca84631f95fe4b46d968e0a03500
-- name: github.com/gengo/grpc-gateway
-  version: 04d03d2c0176f9060cc3da4945a71abc759648bc
-  subpackages:
-  - runtime
-  - utilities
-  - runtime/internal
-- name: github.com/ghodss/yaml
-  version: aa0c862057666179de291b67d9f093d12b5a8473
+  version: be738c8546f55b34e60125afa50ed73a9a9c460e
 - name: github.com/go-ini/ini
-  version: 81d957713547172ed2e08bb075c6a0f2d1ecf6d9
-- name: github.com/gogo/protobuf
-  version: 2752d97bbd91927dd1c43296dbf8700e50e2708c
-  subpackages:
-  - proto
-- name: github.com/golang/protobuf
-  version: 78b168c14fc28c8c711844d210f7ab845083e3b1
-  subpackages:
-  - proto
-  - jsonpb
-- name: github.com/julienschmidt/httprouter
-  version: 8c199fb6259ffc1af525cc3ad52ee60ba8359669
-- name: github.com/onsi/ginkgo
-  version: 059cec02d342bab423425a99b191186a03255e9e
-- name: github.com/onsi/gomega
-  version: a1094b2db2d4845621602c667bd4ccf09834544e
-- name: github.com/pborman/uuid
-  version: a97ce2ca70fa5a848076093f05e639a89ca34d06
+  version: cf53f9204df4fbdd7ec4164b57fa6184ba168292
 - name: github.com/pkg/errors
   version: 01fa4104b9c248c8945d14d9f128454d5b28d595
 - name: github.com/spf13/cast
   version: 27b586b42e29bec072fe7379259cc719e1289da6
 - name: github.com/spf13/jwalterweatherman
   version: 33c24e77fb80341fe7130ee7c594256ff08ccc46
-- name: golang.org/x/net
-  version: 04557861f124410b768b1ba5bb3a91b705afbfc6
-  subpackages:
-  - context
-  - http2
-  - trace
-  - http2/hpack
-  - lex/httplex
-  - internal/timeseries
 - name: golang.org/x/sys
-  version: 62bee037599929a6e9146f29d10dd5208c43507d
+  version: a646d33e2ee3172a661fc09bca23bb4889a41bc8
   subpackages:
   - unix
-- name: google.golang.org/grpc
-  version: 5c7e717663448ccc1c9ff4d9ce75cdb1cca28121
-  subpackages:
-  - credentials
-  - grpclog
-  - metadata
-  - codes
-  - internal
-  - naming
-  - transport
-  - peer
 - name: gopkg.in/fsnotify.v1
-  version: 30411dbcefb7a1da7e84f75530ad3abe4011b4f8
+  version: a8a77c9133d2d6fd8334f3260d06f60e8d80a5fb
 testImports: []

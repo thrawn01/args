@@ -1,9 +1,8 @@
 package benchmark
 
 import (
-	"github.com/julienschmidt/httprouter"
-	"net/http"
 	"fmt"
+	"net/http"
 	"sync"
 )
 
@@ -16,31 +15,29 @@ func (self *Options) Get(key string) string {
 	return self.values[key]
 }
 
-
 type ArgParser interface {
 	SetOpts(values OptValues)
 	GetOpts() *Options
 }
 
 type Api struct {
-	Parser  ArgParser
+	Parser ArgParser
 }
 
 func (self *Api) NewServer() http.Handler {
-	router := httprouter.New()
-	router.GET("/", self.Index)
+	router := http.NewServeMux()
+	router.HandleFunc("/", self.Index)
 	return router
 }
 
-func (self *Api) Index(resp http.ResponseWriter, req *http.Request, params httprouter.Params) {
+func (self *Api) Index(resp http.ResponseWriter, req *http.Request) {
 	opts := self.Parser.GetOpts()
 	fmt.Fprintf(resp, "TestValue: %s", opts.Get("test-value"))
 }
 
-
 // No Thread Safety
 type ParserBench struct {
-	opts	*Options
+	opts *Options
 }
 
 // =================================================================
@@ -59,8 +56,8 @@ func (self *ParserBench) GetOpts() *Options {
 }
 
 type ParserBenchMutex struct {
-	opts	*Options
-	mutex	*sync.Mutex
+	opts  *Options
+	mutex *sync.Mutex
 }
 
 // =================================================================
@@ -86,8 +83,8 @@ func (self *ParserBenchMutex) GetOpts() *Options {
 
 // =================================================================
 type ParserBenchRWMutex struct {
-	opts	*Options
-	mutex	*sync.RWMutex
+	opts  *Options
+	mutex *sync.RWMutex
 }
 
 func NewParserBenchRWMutex(values OptValues) *ParserBenchRWMutex {
@@ -112,10 +109,10 @@ func (self *ParserBenchRWMutex) GetOpts() *Options {
 
 // =================================================================
 type ParserBenchChannel struct {
-	opts	*Options
-	get	chan *Options
-	set	chan *Options
-	done	chan bool
+	opts *Options
+	get  chan *Options
+	set  chan *Options
+	done chan bool
 }
 
 func NewParserBenchChannel(values OptValues) *ParserBenchChannel {
@@ -149,7 +146,7 @@ func (self *ParserBenchChannel) Close() {
 }
 
 func (self *ParserBenchChannel) SetOpts(values OptValues) {
-	self.set <-&Options{values}
+	self.set <- &Options{values}
 }
 
 func (self *ParserBenchChannel) GetOpts() *Options {

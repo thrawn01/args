@@ -128,15 +128,6 @@ func (self *Options) Group(group string) *Options {
 	return opts
 }
 
-func (self *Options) FromChangeEvent(event *ChangeEvent) *Options {
-	if event.Deleted {
-		self.Group(event.Group).Del(event.Key)
-	} else {
-		self.Group(event.Group).Set(event.Key, event.Value)
-	}
-	return self
-}
-
 func (self *Options) Del(key string) *Options {
 	delete(self.values, key)
 	return self
