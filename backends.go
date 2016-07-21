@@ -13,38 +13,27 @@ import (
 
 const MAX_BACKOFF_WAIT = 2 * time.Second
 
-type ChangeEvent interface {
-	Err() error
-	Key() string
-	Group() string
-	Value() []byte
-	Deleted() bool
-	Rule() *Rule
-	SetRule(*Rule)
-}
-
 // A ChangeEvent is a representation of an key=value update, delete or expire. Args attempts to match
 // a rule to the change and includes the matched rule in the ChangeEvent. If args is unable to match
 // a with this change, then ChangeEvent.Rule will be nil
-type Event struct {
-	Rule    *Rule
+type ChangeEvent struct {
 	Group   string
+	KeyName string
 	Key     string
 	Value   []byte
 	Deleted bool
-	Error   error
+	Err     error
+	Rule    *Rule
+}
+
+func (self *ChangeEvent) SetRule(rule *Rule) {
+	self.Group = rule.Group
+	self.Rule = rule
 }
 
 type Pair struct {
 	Key   string
 	Value []byte
-}
-
-func NewPair(key string, value []byte) *Pair {
-	return &Pair{
-		Key:   key,
-		Value: value,
-	}
 }
 
 type WatchCancelFunc func()
@@ -60,18 +49,21 @@ type Backend interface {
 	Set(ctx context.Context, key string, value []byte) error
 
 	// Watch monitors store for changes to key.
-	Watch(ctx context.Context, key string) <-chan ChangeEvent
+	Watch(ctx context.Context, key string) <-chan *ChangeEvent
 
 	// Return the root key used to store all other keys in the backend
 	GetRootKey() string
+
+	// Closes the connection to the backend and cancels all watches
+	Close()
 }
 
-func (self *ArgParser) FromStore(backend Backend) (*Options, error) {
+func (self *ArgParser) FromBackend(backend Backend) (*Options, error) {
 
 	// Build the rules keys
 	self.buildBackendKeys(backend.GetRootKey())
 
-	options, err := self.ParseStore(backend)
+	options, err := self.ParseBackend(backend)
 	if err != nil {
 		return options, err
 	}
@@ -79,7 +71,7 @@ func (self *ArgParser) FromStore(backend Backend) (*Options, error) {
 	return self.Apply(options)
 }
 
-func (self *ArgParser) ParseStore(backend Backend) (*Options, error) {
+func (self *ArgParser) ParseBackend(backend Backend) (*Options, error) {
 	values := self.NewOptions()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -87,9 +79,9 @@ func (self *ArgParser) ParseStore(backend Backend) (*Options, error) {
 	//
 	for _, rule := range self.rules {
 		if rule.HasFlags(IsConfigGroup) {
-			pairs, err := backend.List(ctx, rule.EtcdPath)
+			pairs, err := backend.List(ctx, rule.BackendKey)
 			if err != nil {
-				self.error("args.FromStore().List() fetching '%s' - '%s'", rule.EtcdPath, err.Error())
+				self.info("args.FromStore().List() fetching '%s' - '%s'", rule.BackendKey, err.Error())
 				continue
 			}
 			// Iterate through all the key=values for this group
@@ -98,9 +90,9 @@ func (self *ArgParser) ParseStore(backend Backend) (*Options, error) {
 			}
 			continue
 		}
-		pair, err := backend.Get(ctx, rule.EtcdPath)
+		pair, err := backend.Get(ctx, rule.BackendKey)
 		if err != nil {
-			self.error("args.ParseEtcd(): Failed to fetch key '%s' - '%s'", rule.EtcdPath, err.Error())
+			self.info("args.ParseEtcd(): Failed to fetch key '%s' - '%s'", rule.BackendKey, err.Error())
 			continue
 		}
 		values.Group(rule.Group).Set(rule.Name, string(pair.Value))
@@ -114,7 +106,7 @@ func (self *ArgParser) matchBackendRule(key string) *Rule {
 		if rule.HasFlags(IsConfigGroup) {
 			comparePath = path.Dir(key)
 		}
-		if comparePath == rule.EtcdPath {
+		if comparePath == rule.BackendKey {
 			return rule
 		}
 	}
@@ -127,11 +119,11 @@ func (self *ArgParser) buildBackendKeys(root string) {
 		// Do this so users are not surprised root isn't prefixed with "/"
 		root = "/" + strings.TrimPrefix(root, "/")
 		// Build the full etcd key path
-		rule.EtcdPath = rule.EtcdKeyPath(root)
+		rule.BackendKey = rule.BackendKeyPath(root)
 	}
 }
 
-func (self *ArgParser) Watch(backend Backend, callBack func(ChangeEvent, error)) WatchCancelFunc {
+func (self *ArgParser) Watch(backend Backend, callBack func(*ChangeEvent, error)) WatchCancelFunc {
 	var isRunning sync.WaitGroup
 	done := make(chan struct{})
 
@@ -140,7 +132,7 @@ func (self *ArgParser) Watch(backend Backend, callBack func(ChangeEvent, error))
 
 	isRunning.Add(1)
 	go func() {
-		var event ChangeEvent
+		var event *ChangeEvent
 		var ok bool
 		for {
 			// Always attempt to watch, until the user tells us to stop
@@ -154,12 +146,12 @@ func (self *ArgParser) Watch(backend Backend, callBack func(ChangeEvent, error))
 					if !ok {
 						goto Retry
 					}
-					if event.Err() {
-						callBack(nil, errors.Wrap(event.Err(), "ArgParser.Watch()"))
+					if event.Err != nil {
+						callBack(nil, errors.Wrap(event.Err, "ArgParser.Watch()"))
 						goto Retry
 					}
 
-					rule := self.matchBackendRule(event.Key())
+					rule := self.matchBackendRule(event.Key)
 					if rule != nil {
 						event.SetRule(rule)
 					}

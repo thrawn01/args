@@ -241,11 +241,11 @@ func (self *Options) Interface(key string) interface{} {
 	return nil
 }
 
-func (self *Options) FromChangeEvent(event ChangeEvent) *Options {
-	if event.Deleted() {
-		self.Group(event.Group()).Del(event.Key())
+func (self *Options) FromChangeEvent(event *ChangeEvent) *Options {
+	if event.Deleted {
+		self.Group(event.Group).Del(event.KeyName)
 	} else {
-		self.Group(event.Group()).Set(event.Key(), event.Value())
+		self.Group(event.Group).Set(event.KeyName, string(event.Value))
 	}
 	return self
 }

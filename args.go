@@ -56,12 +56,6 @@ func EnvPrefix(prefix string) ParseModifier {
 	}
 }
 
-func EtcdPath(path string) ParseModifier {
-	return func(parser *ArgParser) {
-		parser.EtcdRoot = path
-	}
-}
-
 func NoHelp() ParseModifier {
 	return func(parser *ArgParser) {
 		parser.addHelp = false
@@ -273,15 +267,4 @@ func (e *HelpError) Error() string {
 
 func (e *HelpError) IsHelpError() bool {
 	return true
-}
-
-// A ChangeEvent is a representation of an etcd key=value update, delete or expire. Args attempts to match
-// a rule to the etcd change and includes the matched rule in the ChangeEvent. If args is unable to match
-// a with this change, then ChangeEvent.Rule will be nil
-type ChangeEvent struct {
-	Rule    *Rule
-	Group   string
-	Key     string
-	Value   string
-	Deleted bool
 }
