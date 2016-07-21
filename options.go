@@ -241,6 +241,15 @@ func (self *Options) Interface(key string) interface{} {
 	return nil
 }
 
+func (self *Options) FromChangeEvent(event ChangeEvent) *Options {
+	if event.Deleted() {
+		self.Group(event.Group()).Del(event.Key())
+	} else {
+		self.Group(event.Group()).Set(event.Key(), event.Value())
+	}
+	return self
+}
+
 // TODO: Add these getters
 /*Float64(key string) : float64
 StringMap(key string) : map[string]interface{}

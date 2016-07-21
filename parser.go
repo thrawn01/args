@@ -96,6 +96,12 @@ func (self *ArgParser) GetLog() StdLogger {
 	return self.log
 }
 
+func (self *ArgParser) error(format string, args ...interface{}) {
+	if self.log != nil {
+		self.log.Printf(format, args...)
+	}
+}
+
 func (self *ArgParser) ValidateRules() error {
 	for idx, rule := range self.rules {
 		// Duplicate rule check
