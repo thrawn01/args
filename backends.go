@@ -92,7 +92,7 @@ func (self *ArgParser) ParseBackend(backend Backend) (*Options, error) {
 		}
 		pair, err := backend.Get(ctx, rule.BackendKey)
 		if err != nil {
-			self.info("args.ParseEtcd(): Failed to fetch key '%s' - '%s'", rule.BackendKey, err.Error())
+			self.info("args.ParseEtcd(): Failed to fetch key '%s' - %s", rule.BackendKey, err.Error())
 			continue
 		}
 		values.Group(rule.Group).Set(rule.Name, string(pair.Value))
@@ -125,6 +125,7 @@ func (self *ArgParser) buildBackendKeys(root string) {
 
 func (self *ArgParser) Watch(backend Backend, callBack func(*ChangeEvent, error)) WatchCancelFunc {
 	var isRunning sync.WaitGroup
+	var once sync.Once
 	done := make(chan struct{})
 
 	// Build the rules keys
@@ -139,7 +140,7 @@ func (self *ArgParser) Watch(backend Backend, callBack func(*ChangeEvent, error)
 			ctx, cancel := context.WithCancel(context.Background())
 
 			watchChan := backend.Watch(ctx, backend.GetRootKey())
-			isRunning.Done() // Notify we are watching
+			once.Do(func() { isRunning.Done() }) // Notify we are watching
 			for {
 				select {
 				case event, ok = <-watchChan:
@@ -168,8 +169,8 @@ func (self *ArgParser) Watch(backend Backend, callBack func(*ChangeEvent, error)
 		}
 	}()
 
-	// Wait until the goroutine is running before we return, this ensures any updates
-	// our application might make to etcd will be picked up by WatchEtcd()
+	// Wait until the go-routine is running before we return, this ensures any updates
+	// our application might need from the backend picked up by Watch()
 	isRunning.Wait()
 	return func() { close(done) }
 }

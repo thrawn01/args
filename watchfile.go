@@ -3,64 +3,66 @@ package args
 import (
 	"time"
 
+	"sync"
+
 	"gopkg.in/fsnotify.v1"
 )
 
-type FileWatcher struct {
-	fsNotify *fsnotify.Watcher
-	interval time.Duration
-	done     chan struct{}
-	callback func()
-}
-
-func WatchFile(path string, interval time.Duration, callBack func()) (*FileWatcher, error) {
-	fsWatcher, err := fsnotify.NewWatcher()
+func WatchFile(path string, interval time.Duration, callBack func()) (WatchCancelFunc, error) {
+	var isRunning sync.WaitGroup
+	fsWatch, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
 
-	fsWatcher.Add(path)
+	fsWatch.Add(path)
 
-	watcher := &FileWatcher{
-		fsWatcher,
-		interval,
-		make(chan struct{}, 1),
-		callBack,
-	}
-	go watcher.run()
-	return watcher, err
-}
-
-func (self *FileWatcher) run() {
 	// Check for write events at this interval
-	tick := time.Tick(self.interval)
+	tick := time.Tick(interval)
+	done := make(chan struct{}, 1)
+	once := sync.Once{}
 
-	var lastWriteEvent *fsnotify.Event
-	for {
-		select {
-		case event := <-self.fsNotify.Events:
-			// If it was a write event
-			if event.Op == fsnotify.Write {
-				lastWriteEvent = &event
+	isRunning.Add(1)
+	go func() {
+		var lastWriteEvent *fsnotify.Event
+		for {
+			once.Do(func() { isRunning.Done() }) // Notify we are watching
+			select {
+			case event := <-fsWatch.Events:
+				// If it was a write event
+				if event.Op&fsnotify.Write == fsnotify.Write {
+					lastWriteEvent = &event
+				}
+				// If we see a Remove event, This is probably ConfigMap updating the config symlink
+				if event.Op&fsnotify.Remove == fsnotify.Remove {
+					// Since the symlink was removed, we must
+					// re-register the file to be watched
+					fsWatch.Remove(event.Name)
+					fsWatch.Add(event.Name)
+					lastWriteEvent = &event
+				}
+			case <-tick:
+				// No events during this interval
+				if lastWriteEvent == nil {
+					continue
+				}
+				// Execute the callback
+				callBack()
+				// Reset the last event
+				lastWriteEvent = nil
+			case <-done:
+				close(done)
+				return
 			}
-		case <-tick:
-			// No events during this interval
-			if lastWriteEvent == nil {
-				continue
-			}
-			// Execute the callback
-			self.callback()
-			// Reset the last event
-			lastWriteEvent = nil
-		case <-self.done:
-			goto Close
 		}
-	}
-Close:
-	close(self.done)
-}
+	}()
 
-func (self *FileWatcher) Close() {
-	self.done <- struct{}{}
-	self.fsNotify.Close()
+	// Wait until the go-routine is running before we return, this ensures we
+	// pickup any file changes after we leave this function
+	isRunning.Wait()
+
+	return func() {
+		done <- struct{}{}
+		fsWatch.Close()
+	}, err
 }
