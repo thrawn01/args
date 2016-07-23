@@ -56,12 +56,6 @@ func EnvPrefix(prefix string) ParseModifier {
 	}
 }
 
-func EtcdPath(path string) ParseModifier {
-	return func(parser *ArgParser) {
-		parser.EtcdRoot = path
-	}
-}
-
 func NoHelp() ParseModifier {
 	return func(parser *ArgParser) {
 		parser.addHelp = false

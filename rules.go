@@ -192,8 +192,8 @@ func (self *RuleModifier) AddConfig(name string) *RuleModifier {
 	return self.parser.AddRule(name, newRuleModifier(&newRule, self.parser))
 }
 
-func (self *RuleModifier) EtcdKey(key string) *RuleModifier {
-	self.rule.EtcdKey = key
+func (self *RuleModifier) Key(key string) *RuleModifier {
+	self.rule.Key = key
 	return self
 }
 
@@ -233,8 +233,8 @@ type Rule struct {
 	StoreValue  StoreFunc
 	CommandFunc CommandFunc
 	Group       string
-	EtcdKey     string
-	EtcdPath    string
+	Key         string
+	BackendKey  string
 	NotGreedy   bool
 	Flags       int64
 }
@@ -442,19 +442,19 @@ func (self *Rule) GetEnvValue() (interface{}, error) {
 	return nil, nil
 }
 
-func (self *Rule) EtcdKeyPath(rootPath string) string {
+func (self *Rule) BackendKeyPath(rootPath string) string {
 	rootPath = strings.TrimPrefix(rootPath, "/")
-	if self.EtcdKey == "" {
-		self.EtcdKey = self.Name
+	if self.Key == "" {
+		self.Key = self.Name
 	}
 
 	if self.HasFlags(IsConfigGroup) {
 		return path.Join("/", rootPath, self.Group)
 	}
 	if self.Group == DefaultOptionGroup {
-		return path.Join("/", rootPath, "DEFAULT", self.EtcdKey)
+		return path.Join("/", rootPath, "DEFAULT", self.Key)
 	}
-	return path.Join("/", rootPath, self.Group, self.EtcdKey)
+	return path.Join("/", rootPath, self.Group, self.Key)
 }
 
 // ***********************************************

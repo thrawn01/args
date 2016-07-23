@@ -19,7 +19,6 @@ type ParseModifier func(*ArgParser)
 type ArgParser struct {
 	Command              *Rule
 	EnvPrefix            string
-	EtcdRoot             string
 	Description          string
 	Name                 string
 	WordWrap             int
@@ -94,6 +93,12 @@ func (self *ArgParser) SetLog(logger StdLogger) {
 
 func (self *ArgParser) GetLog() StdLogger {
 	return self.log
+}
+
+func (self *ArgParser) info(format string, args ...interface{}) {
+	if self.log != nil {
+		self.log.Printf(format, args...)
+	}
 }
 
 func (self *ArgParser) ValidateRules() error {
