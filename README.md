@@ -4,7 +4,35 @@
 **NOTE: This is alpha software, the api will continue to evolve**
 
 ## Introduction
-An argument parser built for distributed services with support for CLI clients and server hot config reloading
+A 12 factor app configuration and argument parser designed for
+ use in distributed services with support for CLI clients and live server
+ configuration reloading
+
+### Configuration Philosophy
+Configuration for modern cloud native applications is divided into two separate
+phases. The first phase is initialization, This is the minimum configuration
+the service needs to start up. At a minimum this may include configuration for:
+Service Interface, Port Number, and the source location of the second phase configuration.
+
+The second phase includes everything else the service needs to operate. Including:
+Monitoring, Logging, Databases, etc.... Everything in the First Phase should be mostly static
+items; things that can not change unless the service is restarted. Everything in
+the second phase can and should change at anytime during the operation of the service
+without the need for the service to restart.
+
+Since the first phase remains mostly static, Simple narrowly nested configuration
+ is suitable here. The Second phase should be saved for rich deeply nested configuration
+ typically loaded from a json, yaml, or a distributed key store.
+
+Args is designed to make shallowly nested first and second phase configuration easy
+ and flexible. It include capabilities to assist in synchronization of second phase
+ hot reloading. For items that require *deeply nested* configuration a json, yaml, or
+ distributed key store is almost always better suited after first phase has completed.
+
+## Key Store Backends
+Args supports additional backend configuration via any backend that implements the
+ ```Backend``` interface. Currently only etcd is supported and is provided by the
+  [args-backend](http://github.com/thrawn01/args-backends) repo.
 
 ## Installation
 ```
@@ -12,19 +40,18 @@ go get github.com/thrawn01/args
 ```
 
 ## Development Guide
-Args uses can use glide to ensure the proper dependencies are installed, but args should compile without it
+Args uses can use glide to ensure the proper dependencies are installed, but args
+should compile without it.
 
 Fetch the source
 ```
 go get -d github.com/thrawn01/args
 cd $GOPATH/src/github.com/thrawn01/args
 ```
-
 Install glide and fetch the dependencies via glide
 ```
 make get-deps
 ```
-
 Run make to build the example and run the tests
 ```
 make
