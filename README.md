@@ -140,12 +140,13 @@ The JSON-RPC handler will provide access to the config via http using JSON-RPC (
 parser := args.NewParser(args.Desc("Demo Service showcasing args JSON-RPC interface"))
 parser.AddConfig("simple").Help("Demo of simple config item")
 opt := parser.ParseArgsSimple(nil)
+
 // Simple Application that just displays our current config
 http.HandleFunc("/my-app", func(w http.ResponseWriter, r *http.Request) {
     conf := parser.GetOpts()
 
     payload, err := json.Marshal(map[string]string{
-        "some-config-item":         conf.String("some-config-item"),
+        "simple": conf.String("simple"),
     })
     w.Header().Set("Content-Type", "application/json")
     w.Write(payload)
