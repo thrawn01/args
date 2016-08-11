@@ -116,6 +116,19 @@ var _ = Describe("Options", func() {
 		})
 	})
 
+	Describe("InspectOpt()", func() {
+		It("Should return the option object requested", func() {
+			parser := args.NewParser()
+			parser.AddOption("--is-set").IsInt().Default("1")
+			parser.AddOption("--not-set")
+			opt, err := parser.ParseArgs(nil)
+			Expect(err).To(BeNil())
+			option := opt.InspectOpt("is-set")
+			Expect(option.Value.(int)).To(Equal(1))
+			Expect(option.Flags).To(Equal(int64(32)))
+		})
+	})
+
 	Describe("Required()", func() {
 		It("Should return nil if all values are provided", func() {
 			parser := args.NewParser()
