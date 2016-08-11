@@ -28,11 +28,11 @@ var _ = Describe("RuleModifier", func() {
 			options := parser.NewOptionsFromMap(args.DefaultOptionGroup,
 				map[string]map[string]*args.OptionValue{
 					args.DefaultOptionGroup: {
-						"power-level": &args.OptionValue{Value: 3, Seen: false},
+						"power-level": &args.OptionValue{Value: 3, Flags: 0},
 					},
 					"database": {
-						"user": &args.OptionValue{Value: "my-user", Seen: false},
-						"pass": &args.OptionValue{Value: "my-pass", Seen: false},
+						"user": &args.OptionValue{Value: "my-user", Flags: 0},
+						"pass": &args.OptionValue{Value: "my-pass", Flags: 0},
 					},
 				})
 			newOpt, _ := parser.Apply(options)

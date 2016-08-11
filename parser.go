@@ -308,7 +308,7 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 				// If we already found a command token on the commandline
 				if self.Command != nil {
 					// Ignore this match, it must be a sub command or a positional argument
-					rule.Seen = false
+					rule.ClearFlags(Seen)
 				}
 				self.Command = rule
 				// Remove the command argument so we don't process it again in our sub parser
@@ -358,10 +358,10 @@ func (self *ArgParser) Apply(values *Options) (*Options, error) {
 		if rule.HasFlags(IsConfigGroup) && values != nil {
 			for _, key := range values.Group(rule.Group).Keys() {
 				value := values.Group(rule.Group).Get(key)
-				results.Group(rule.Group).SetSeen(key, value, rule.Seen)
+				results.Group(rule.Group).SetFlags(key, value, rule.Flags)
 			}
 		} else {
-			results.Group(rule.Group).SetSeen(rule.Name, value, rule.Seen)
+			results.Group(rule.Group).SetFlags(rule.Name, value, rule.Flags)
 		}
 	}
 

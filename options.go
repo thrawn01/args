@@ -17,7 +17,7 @@ type Options struct {
 
 type OptionValue struct {
 	Value interface{}
-	Seen  bool // Argument was seen on the commandline
+	Flags int64
 }
 
 func (self *ArgParser) NewOptions() *Options {
@@ -56,7 +56,7 @@ func (self *ArgParser) NewOptionsFromMap(group string, groups map[string]map[str
 	for groupName, values := range groups {
 		grp := options.Group(groupName)
 		for key, opt := range values {
-			grp.SetSeen(key, opt.Value, opt.Seen)
+			grp.SetFlags(key, opt.Value, opt.Flags)
 		}
 	}
 	return options
@@ -133,21 +133,21 @@ func (self *Options) Del(key string) *Options {
 	return self
 }
 
-// Just like Set() but also record if the key was seen on the commandline
-func (self *Options) SetSeen(key string, value interface{}, seen bool) *Options {
-	self.values[key] = &OptionValue{value, seen}
+// Just like Set() but also record the matching rule flags
+func (self *Options) SetFlags(key string, value interface{}, flags int64) *Options {
+	self.values[key] = &OptionValue{value, flags}
 	return self
 }
 
 // Set an option with a key and value
 func (self *Options) Set(key string, value interface{}) *Options {
-	return self.SetSeen(key, value, false)
+	return self.SetFlags(key, value, 0)
 }
 
 // Return true if any of the values in this Option object were seen on the command line
 func (self *Options) ValuesSeen() bool {
 	for _, opt := range self.values {
-		if opt.Seen == true {
+		if opt.Flags&Seen != 0 {
 			return true
 		}
 	}
@@ -207,7 +207,7 @@ func (self *Options) StringSlice(key string) []string {
 
 func (self *Options) IsSet(key string) bool {
 	if opt, ok := self.values[key]; ok {
-		return opt.Value != nil
+		return !(opt.Flags&NoValue != 0)
 	}
 	return false
 }

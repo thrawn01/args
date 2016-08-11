@@ -216,7 +216,7 @@ var _ = Describe("ArgParser", func() {
 			options := parser.NewOptionsFromMap(args.DefaultOptionGroup,
 				map[string]map[string]*args.OptionValue{
 					args.DefaultOptionGroup: {
-						"power-level": &args.OptionValue{Value: 3, Seen: false},
+						"power-level": &args.OptionValue{Value: 3, Flags: 0},
 					},
 				})
 			newOpt, _ := parser.Apply(options)

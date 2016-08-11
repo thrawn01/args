@@ -214,6 +214,7 @@ const (
 	IsRequired
 	IsOption
 	NoValue
+	Seen
 )
 
 type Rule struct {
@@ -223,7 +224,6 @@ type Rule struct {
 	RuleDesc    string
 	VarName     string
 	Value       interface{}
-	Seen        bool
 	Default     *string
 	Aliases     []string
 	EnvVars     []string
@@ -319,7 +319,7 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 
 	if self.HasFlags(IsPositional) {
 		// If we are a positional and we have already been seen, and not greedy
-		if self.Seen && self.NotGreedy {
+		if self.HasFlags(Seen) && self.NotGreedy {
 			// Do not match this argument
 			return false, nil
 		}
@@ -332,7 +332,7 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 			return false, nil
 		}
 	}
-	self.Seen = true
+	self.SetFlags(Seen)
 
 	// If user defined an action
 	if self.Action != nil {
@@ -382,7 +382,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	}
 
 	// If Rule Matched Argument on command line
-	if self.Seen {
+	if self.HasFlags(Seen) {
 		return self.Value, nil
 	}
 
