@@ -16,14 +16,14 @@ var _ = Describe("Options", func() {
 		opts = parser.NewOptionsFromMap(args.DefaultOptionGroup,
 			map[string]map[string]*args.OptionValue{
 				args.DefaultOptionGroup: {
-					"int":    &args.OptionValue{Value: 1, Seen: false},
-					"bool":   &args.OptionValue{Value: true, Seen: false},
-					"string": &args.OptionValue{Value: "one", Seen: false},
+					"int":    &args.OptionValue{Value: 1, Flags: 0},
+					"bool":   &args.OptionValue{Value: true, Flags: 0},
+					"string": &args.OptionValue{Value: "one", Flags: 0},
 				},
 				"endpoints": {
-					"endpoint1": &args.OptionValue{Value: "host1", Seen: false},
-					"endpoint2": &args.OptionValue{Value: "host2", Seen: false},
-					"endpoint3": &args.OptionValue{Value: "host3", Seen: false},
+					"endpoint1": &args.OptionValue{Value: "host1", Flags: 0},
+					"endpoint2": &args.OptionValue{Value: "host2", Flags: 0},
+					"endpoint3": &args.OptionValue{Value: "host3", Flags: 0},
 				},
 			})
 
@@ -100,6 +100,32 @@ var _ = Describe("Options", func() {
 		})
 		It("Should return an empty map if the group doesn't exist", func() {
 			Expect(opts.Group("no-group").ToMap()).To(Equal(map[string]interface{}{}))
+		})
+	})
+
+	Describe("IsSet()", func() {
+		It("Should return true if the value is not a cast default", func() {
+			parser := args.NewParser()
+			parser.AddOption("--is-set").IsInt().Default("1")
+			parser.AddOption("--not-set")
+			opt, err := parser.ParseArgs(nil)
+			Expect(err).To(BeNil())
+			Expect(opt.IsSet("is-set")).To(Equal(true))
+			Expect(opt.IsSet("not-set")).To(Equal(false))
+
+		})
+	})
+
+	Describe("Required()", func() {
+		It("Should return true if all values are provided", func() {
+			parser := args.NewParser()
+			parser.AddOption("--is-set").IsInt().Default("1")
+			parser.AddOption("--is-provided")
+			parser.AddOption("--not-set")
+			opt, err := parser.ParseArgs(&[]string{"--is-provided", "foo"})
+			Expect(err).To(BeNil())
+			Expect(opt.Required([]string{"is-set", "is-provided"})).To(Equal(true))
+			Expect(opt.Required([]string{"is-set", "is-provided", "not-set"})).To(Equal(false))
 		})
 	})
 })
