@@ -405,6 +405,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	if values != nil {
 		group := values.Group(self.Group)
 		if group.HasKey(self.Name) {
+			self.ClearFlags(NoValue)
 			return self.Cast(self.Name, group.Get(self.Name))
 		}
 	}

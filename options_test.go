@@ -117,15 +117,21 @@ var _ = Describe("Options", func() {
 	})
 
 	Describe("Required()", func() {
-		It("Should return true if all values are provided", func() {
+		It("Should return nil if all values are provided", func() {
 			parser := args.NewParser()
 			parser.AddOption("--is-set").IsInt().Default("1")
 			parser.AddOption("--is-provided")
 			parser.AddOption("--not-set")
 			opt, err := parser.ParseArgs(&[]string{"--is-provided", "foo"})
 			Expect(err).To(BeNil())
-			Expect(opt.Required([]string{"is-set", "is-provided"})).To(Equal(true))
-			Expect(opt.Required([]string{"is-set", "is-provided", "not-set"})).To(Equal(false))
+
+			// All options required have values
+			Expect(opt.Required([]string{"is-set", "is-provided"})).To(BeNil())
+
+			// Option 'not-set' is missing is not provided
+			err = opt.Required([]string{"is-set", "is-provided", "not-set"})
+			Expect(err).To(Not(BeNil()))
+			Expect(err.Error()).To(Equal("not-set"))
 		})
 	})
 })
