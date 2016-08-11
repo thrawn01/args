@@ -1,5 +1,11 @@
-.PHONY: test examples all get-deps glide
+.PHONY: test examples all get-deps
 .DEFAULT_GOAL := all
+
+# GO
+GOPATH := $(shell go env | grep GOPATH | sed 's/GOPATH="\(.*\)"/\1/')
+GLIDE := $(GOPATH)/bin/glide
+PATH := $(GOPATH)/bin:$(PATH)
+export $(PATH)
 
 bin/chicken-http-client: examples/chicken-http-client.go
 	go build -o bin/chicken-http-client examples/chicken-http-client.go
@@ -16,12 +22,11 @@ travis-ci: get-deps
 	go get -u golang.org/x/tools/cmd/cover
 	goveralls -service=travis-ci
 
-glide:
-	@if [ ! -e $(GOPATH)/bin ] ; then mkdir $(GOPATH)/bin ; fi
-	@which glide > /dev/null ; if [ $$? -eq 1 ] ; then curl https://glide.sh/get | sh ; fi
+$(GLIDE):
+	go get -u github.com/Masterminds/glide
 
-get-deps: glide
-	glide install
+get-deps: $(GLIDE)
+	$(GLIDE) install
 
 clean:
 	rm bin/*
