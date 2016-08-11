@@ -94,18 +94,35 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should report IsSet properly", func() {
 			parser := args.NewParser()
-			parser.AddConfig("one")
-			parser.AddConfig("two")
+			parser.AddOption("--one")
+			parser.AddOption("--two")
+			parser.AddConfig("three")
+			parser.AddOption("four")
+			parser.AddConfig("five")
 
 			// 'two' is missing from the command line
 			cmdLine := []string{"--one", "this is one"}
 			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(opt.String("one")).To(Equal("this is one"))
+			Expect(opt.IsSet("one")).To(Equal(true))
 			Expect(opt.IsSet("two")).To(Equal(false))
+			Expect(opt.IsSet("three")).To(Equal(false))
+			Expect(opt.IsSet("four")).To(Equal(false))
+			Expect(opt.IsSet("five")).To(Equal(false))
 
-			input := []byte("two=this is two value")
+			input := []byte("two=this is two value\nthree=yes")
 			opt, err = parser.FromIni(input)
 			Expect(err).To(BeNil())
 			Expect(opt.IsSet("two")).To(Equal(true))
+			Expect(opt.IsSet("one")).To(Equal(true))
+			Expect(opt.IsSet("three")).To(Equal(true))
+			Expect(opt.IsSet("four")).To(Equal(false))
+			Expect(opt.IsSet("five")).To(Equal(false))
+
+			err = opt.Required([]string{"two", "one", "three"})
+			Expect(err).To(BeNil())
+			err = opt.Required([]string{"two", "one", "four"})
+			Expect(err).To(Not(BeNil()))
 		})
 	})
 	Describe("ArgParser.AddConfigGroup()", func() {
