@@ -92,6 +92,21 @@ var _ = Describe("ArgParser", func() {
 			Expect(opts.Bool("debug")).To(Equal(true))
 			Expect(opts.Group("database").Bool("debug")).To(Equal(false))
 		})
+		It("Should report IsSet properly", func() {
+			parser := args.NewParser()
+			parser.AddConfig("one")
+			parser.AddConfig("two")
+
+			// 'two' is missing from the command line
+			cmdLine := []string{"--one", "this is one"}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(opt.IsSet("two")).To(Equal(false))
+
+			input := []byte("two=this is two value")
+			opt, err = parser.FromIni(input)
+			Expect(err).To(BeNil())
+			Expect(opt.IsSet("two")).To(Equal(true))
+		})
 	})
 	Describe("ArgParser.AddConfigGroup()", func() {
 		It("Should Parser an adhoc group from the ini file", func() {
