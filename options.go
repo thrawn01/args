@@ -71,7 +71,7 @@ func (left *Options) Compare(right *Options) *Options {
 	}*/
 }
 
-func (self *Options) ThreadSafe() *Options {
+func (self *Options) GetOpts() *Options {
 	return self.parser.GetOpts()
 }
 
@@ -232,6 +232,13 @@ func (self *Options) HasKey(key string) bool {
 func (self *Options) Get(key string) interface{} {
 	if opt, ok := self.values[key]; ok {
 		return opt.Value
+	}
+	return nil
+}
+
+func (self *Options) InspectOpt(key string) *OptionValue {
+	if opt, ok := self.values[key]; ok {
+		return opt
 	}
 	return nil
 }

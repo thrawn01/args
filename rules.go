@@ -252,7 +252,8 @@ func (self *Rule) SetFlags(flag int64) {
 }
 
 func (self *Rule) ClearFlags(flag int64) {
-	self.Flags = (self.Flags ^ flag)
+	mask := (self.Flags ^ flag)
+	self.Flags &= mask
 }
 
 func (self *Rule) Validate() error {

@@ -8,14 +8,16 @@ import (
 	"gopkg.in/fsnotify.v1"
 )
 
-func WatchFile(path string, interval time.Duration, callBack func()) (WatchCancelFunc, error) {
+func WatchFile(path string, interval time.Duration, callBack func(error)) (WatchCancelFunc, error) {
 	var isRunning sync.WaitGroup
 	fsWatch, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
 
-	fsWatch.Add(path)
+	if err := fsWatch.Add(path); err != nil {
+		return nil, err
+	}
 
 	// Check for write events at this interval
 	tick := time.Tick(interval)
@@ -25,33 +27,51 @@ func WatchFile(path string, interval time.Duration, callBack func()) (WatchCance
 	isRunning.Add(1)
 	go func() {
 		var lastWriteEvent *fsnotify.Event
+		var checkFile *fsnotify.Event
 		for {
 			once.Do(func() { isRunning.Done() }) // Notify we are watching
 			select {
 			case event := <-fsWatch.Events:
+				//fmt.Printf("Event %s\n", event.String())
 				// If it was a write event
 				if event.Op&fsnotify.Write == fsnotify.Write {
 					lastWriteEvent = &event
 				}
+				// VIM apparently renames a file before writing
+				if event.Op&fsnotify.Rename == fsnotify.Rename {
+					checkFile = &event
+				}
 				// If we see a Remove event, This is probably ConfigMap updating the config symlink
 				if event.Op&fsnotify.Remove == fsnotify.Remove {
-					// Since the symlink was removed, we must
-					// re-register the file to be watched
-					fsWatch.Remove(event.Name)
-					fsWatch.Add(event.Name)
-					lastWriteEvent = &event
+					checkFile = &event
 				}
 			case <-tick:
+				// If the file was renamed or removed; maybe it re-appears after our duration?
+				if checkFile != nil {
+					// Since the file was removed, we must
+					// re-register the file to be watched
+					fsWatch.Remove(checkFile.Name)
+					if err := fsWatch.Add(checkFile.Name); err != nil {
+						// Nothing left to watch
+						callBack(err)
+						close(done)
+						return
+					}
+					lastWriteEvent = checkFile
+					checkFile = nil
+					continue
+				}
+
 				// No events during this interval
 				if lastWriteEvent == nil {
 					continue
 				}
 				// Execute the callback
-				callBack()
+				callBack(nil)
 				// Reset the last event
 				lastWriteEvent = nil
+
 			case <-done:
-				close(done)
 				return
 			}
 		}
@@ -62,7 +82,7 @@ func WatchFile(path string, interval time.Duration, callBack func()) (WatchCance
 	isRunning.Wait()
 
 	return func() {
-		done <- struct{}{}
+		close(done)
 		fsWatch.Close()
 	}, err
 }

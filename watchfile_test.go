@@ -82,7 +82,7 @@ var _ = Describe("ArgParser.WatchFile()", func() {
 		Expect(opt.Int("version")).To(Equal(1))
 
 		done := make(chan struct{})
-		cancelWatch, err := args.WatchFile(iniFile.Name(), time.Second, func() {
+		cancelWatch, err := args.WatchFile(iniFile.Name(), time.Second, func(err error) {
 			content, err := loadFile(iniFile.Name())
 			if err != nil {
 				Fail(err.Error())
