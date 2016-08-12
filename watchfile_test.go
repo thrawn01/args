@@ -1,6 +1,7 @@
 package args_test
 
 import (
+	"fmt"
 	"time"
 
 	"io/ioutil"
@@ -13,14 +14,6 @@ import (
 	"github.com/thrawn01/args"
 )
 
-func loadFile(fileName string) ([]byte, error) {
-	content, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to read '%s'", fileName)
-	}
-	return content, nil
-}
-
 func saveFile(fileName string, content []byte) error {
 	err := ioutil.WriteFile(fileName, content, os.ModePerm)
 	if err != nil {
@@ -29,7 +22,7 @@ func saveFile(fileName string, content []byte) error {
 	return nil
 }
 
-var _ = Describe("ArgParser.WatchFile()", func() {
+var _ = Describe("args.WatchFile()", func() {
 	var iniFile *os.File
 	var log *TestLogger
 	iniVersion1 := []byte(`
@@ -45,7 +38,7 @@ var _ = Describe("ArgParser.WatchFile()", func() {
 		log = NewTestLogger()
 	})
 
-	It("Should call Watch() to watch for new values", func() {
+	It("Should reload a config file when watched file is modified", func() {
 		parser := args.NewParser()
 		parser.SetLog(log)
 
@@ -70,7 +63,7 @@ var _ = Describe("ArgParser.WatchFile()", func() {
 		}
 
 		// Load the INI file
-		content, err := loadFile(iniFile.Name())
+		content, err := args.LoadFile(iniFile.Name())
 		if err != nil {
 			Fail(err.Error())
 		}
@@ -83,11 +76,7 @@ var _ = Describe("ArgParser.WatchFile()", func() {
 
 		done := make(chan struct{})
 		cancelWatch, err := args.WatchFile(iniFile.Name(), time.Second, func(err error) {
-			content, err := loadFile(iniFile.Name())
-			if err != nil {
-				Fail(err.Error())
-			}
-			parser.FromIni(content)
+			parser.FromIniFile(iniFile.Name())
 			// Tell the test to continue, Change event was handled
 			close(done)
 		})
@@ -108,5 +97,72 @@ var _ = Describe("ArgParser.WatchFile()", func() {
 		Expect(log.GetEntry()).To(Equal(""))
 		Expect(opts.String("value")).To(Equal("new-value"))
 		Expect(opts.Int("version")).To(Equal(2))
+	})
+
+	It("Should signal a modification if the file is deleted and re-created", func() {
+		testFile, err := ioutil.TempFile("/tmp", "args-test")
+		if err != nil {
+			Fail(err.Error())
+		}
+		testFile.Close()
+
+		var watchErr error
+		done := make(chan struct{})
+		cancelWatch, err := args.WatchFile(testFile.Name(), time.Second, func(err error) {
+			if err != nil {
+				fmt.Printf("Watch Error %s\n", err.Error())
+			}
+			// Tell the test to continue, Change event was handled
+			close(done)
+		})
+		if err != nil {
+			Fail(err.Error())
+		}
+
+		// Quickly Remove the file and replace it
+		os.Remove(testFile.Name())
+		testFile, err = os.OpenFile(testFile.Name(), os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
+		testFile.Close()
+		defer os.Remove(testFile.Name())
+
+		// Wait until the new file was loaded
+		<-done
+		Expect(watchErr).To(BeNil())
+
+		// Stop the watch
+		cancelWatch()
+	})
+
+	// Apparently VIM does this to files on OSX
+	It("Should signal a modification if the file is renamed and renamed back", func() {
+		testFile, err := ioutil.TempFile("/tmp", "args-test")
+		if err != nil {
+			Fail(err.Error())
+		}
+		testFile.Close()
+
+		var watchErr error
+		done := make(chan struct{})
+		cancelWatch, err := args.WatchFile(testFile.Name(), time.Second, func(err error) {
+			if err != nil {
+				fmt.Printf("Watch Error %s\n", err.Error())
+			}
+			// Tell the test to continue, Change event was handled
+			close(done)
+		})
+		if err != nil {
+			Fail(err.Error())
+		}
+
+		// Quickly Remove the file and replace it
+		os.Rename(testFile.Name(), testFile.Name()+"-new")
+		os.Rename(testFile.Name()+"-new", testFile.Name())
+		defer os.Remove(testFile.Name())
+
+		// Wait until the new file was loaded
+		<-done
+		Expect(watchErr).To(BeNil())
+		// Stop the watch
+		cancelWatch()
 	})
 })
