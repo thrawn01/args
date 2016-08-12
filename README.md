@@ -1,5 +1,6 @@
 [![Coverage Status](https://img.shields.io/coveralls/thrawn01/args.svg)](https://coveralls.io/github/thrawn01/args)
 [![Build Status](https://img.shields.io/travis/thrawn01/args/master.svg)](https://travis-ci.org/thrawn01/args)
+[![Code Climate](https://codeclimate.com/github/thrawn01/args/badges/gpa.svg)](https://codeclimate.com/github/thrawn01/args)
 
 **NOTE: This is alpha software, the api will continue to evolve until the 1.0 release**
 
