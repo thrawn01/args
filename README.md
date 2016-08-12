@@ -223,6 +223,38 @@ func createVolume(subParser *args.ArgParser, data interface{}) int {
 }
 ```
 
+## Watch Config with hot reload
+Args can reload your config when modifications are made to a watched config file. **This works well
+with Kubernetes ConfigMap**
+```go
+    parser := args.NewParser()
+    parser.AddOption("--config").Alias("-c").Help("Read options from a config file")
+    opt := parser.ParseArgsSimple(nil)
+    configFile := opt.String("config")
+    // Initial load of our config file
+    opt, err = parser.FromIniFile(configFile)
+
+    // check our config file for changes every second
+    cancelWatch, err := args.WatchFile(configFile, time.Second, func(err error) {
+        if err != nil {
+            fmt.Printf("Error Watching %s - %s", configFile, err.Error())
+            return
+        }
+
+        fmt.Println("Config file changed, Reloading...")
+        opt, err = parser.FromIniFile(configFile)
+        if err != nil {
+            fmt.Printf("Failed to load config - %s\n", err.Error())
+            return
+        }
+    })
+    if err != nil {
+        fmt.Printf("Failed to watch '%s' -  %s", configFile, err.Error())
+    }
+    // Shut down the watcher when done
+    defer cancelWatch()
+```
+
 ## Demo Code Examples
 See more code examples in the ```examples/``` directory
 
@@ -472,8 +504,8 @@ Options:
 * Support different types of optional prefixes (--, -, ++, +, etc..)
 * Support for Config only options
 * Support for Groups
-* Support for Etcd v3 (See: https://github.com/thrawn01/args-etcd)
-* Support for Watching Etcd v3 for changes and hot reload (See: https://github.com/thrawn01/args-etcd)
+* Support for Etcd v3 (See: https://github.com/thrawn01/args-backends)
+* Support for Watching Etcd v3 for changes and hot reload (See: https://github.com/thrawn01/args-backends)
 * Support Positional Arguments
 * Support for adhoc configuration groups using AddConfigGroups()
 * Generate Help Message
@@ -482,7 +514,8 @@ Options:
 * Automatically adds a --help message if none defined
 * Support for escaping positionals (IE: --help and \\-\\-help are different)
 * Automatically generates help for SubCommands
-
+* Tests for args.WatchFile()
+* Support for Kubernetes ConfigMap file watching
 
 ## TODO
 * Custom Help and Usage
@@ -492,12 +525,9 @@ Options:
 * Support float type '--float=3.14'
 * Support '-arg=value'
 * Support Parent Parsing
-* Support for ConfigMap
 * Support Greedy Positional Arguments ```[<files>….]```
 * Write better intro document
 * Write godoc
-* Test args.FileWatcher()
-* Example for k8s configMap
 * Ability to include Config() options in help message
 * if AddOption() is called with a name that doesn’t begin with a prefix, apply some default rules to match - or — prefix
 * Add support for updating etcd values from the Option{} object. (shouldn't be hard)

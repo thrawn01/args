@@ -1,6 +1,11 @@
 package args
 
-import "github.com/go-ini/ini"
+import (
+	"fmt"
+
+	"github.com/go-ini/ini"
+	"github.com/pkg/errors"
+)
 
 // Parse the INI file and the Apply() the values to the parser
 func (self *ArgParser) FromIni(input []byte) (*Options, error) {
@@ -10,6 +15,14 @@ func (self *ArgParser) FromIni(input []byte) (*Options, error) {
 	}
 	// Apply the ini file values to the commandline and environment variables
 	return self.Apply(options)
+}
+
+func (self *ArgParser) FromIniFile(fileName string) (*Options, error) {
+	content, err := LoadFile(fileName)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("'%s'", fileName))
+	}
+	return self.FromIni(content)
 }
 
 // Parse the INI file and return the raw parsed options
