@@ -417,9 +417,12 @@ func (self *ArgParser) GenerateHelp() string {
 	result.WriteString(fmt.Sprintf("Usage: %s %s %s\n", self.Name,
 		self.GenerateUsage(IsOption),
 		self.GenerateUsage(IsPositional)))
-	result.WriteString("\n")
-	result.WriteString(WordWrap(self.Description, 0, 80))
-	result.WriteString("\n")
+
+	if self.Description != "" {
+		result.WriteString("\n")
+		result.WriteString(WordWrap(self.Description, 0, 80))
+		result.WriteString("\n")
+	}
 
 	commands := self.GenerateHelpSection(IsCommand)
 	if commands != "" {
