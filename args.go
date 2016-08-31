@@ -7,6 +7,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"text/scanner"
+
+	"k8s.io/kubernetes/pkg/util/json"
 )
 
 const (
@@ -142,7 +145,7 @@ func WordWrap(msg string, indent int, wordWrap int) string {
 	return strings.Join(lines, seperator)
 }
 
-func castString(name string, value interface{}) (interface{}, error) {
+func castString(name string, dest interface{}, value interface{}) (interface{}, error) {
 	// If value is nil, return the type default
 	if value == nil {
 		return "", nil
@@ -155,7 +158,7 @@ func castString(name string, value interface{}) (interface{}, error) {
 	return value, nil
 }
 
-func castInt(name string, value interface{}) (interface{}, error) {
+func castInt(name string, dest interface{}, value interface{}) (interface{}, error) {
 	// If value is nil, return the type default
 	if value == nil {
 		return 0, nil
@@ -196,7 +199,7 @@ func castInt(name string, value interface{}) (interface{}, error) {
 	return int(intValue), nil
 }
 
-func castBool(name string, value interface{}) (interface{}, error) {
+func castBool(name string, dest interface{}, value interface{}) (interface{}, error) {
 	// If value is nil, return the type default
 	if value == nil {
 		return false, nil
@@ -219,34 +222,162 @@ func castBool(name string, value interface{}) (interface{}, error) {
 	return bool(boolValue), nil
 }
 
-func castStringSlice(name string, value interface{}) (interface{}, error) {
-	// If value is nil, return the type default
-	if value == nil {
-		return []string{}, nil
+func castStringSlice(name string, dest interface{}, value interface{}) (interface{}, error) {
+	// If our destination is nil, init a new slice
+	if dest == nil {
+		dest = make([]string, 0)
 	}
 
+	// If value is nil, return the type default
+	if value == nil {
+		return dest, nil
+	}
+
+	// value could already be a slice
 	kind := reflect.TypeOf(value).Kind()
 	if kind == reflect.Slice {
 		sliceKind := reflect.TypeOf(value).Elem().Kind()
 		// Is already a []string
 		if sliceKind == reflect.String {
-			return value, nil
+			return append(dest.([]string), value.([]string)...), nil
 		}
-		return []string{}, errors.New(fmt.Sprintf("Invalid slice type for '%s' - '%s'  not a String", name, value))
+		return dest, errors.New(fmt.Sprintf("Invalid slice type for '%s' - '%s'  not a String",
+			name, value))
 	}
 
+	// or it could be a string
 	if kind != reflect.String {
-		return []string{}, errors.New(fmt.Sprintf("Invalid slice type for '%s' - '%s' is not a []string or parsable comma delimited string", name, value))
+		return dest, errors.New(fmt.Sprintf("Invalid slice type for '%s' - '%s' is not a "+
+			"[]string or parsable comma delimited string", name, value))
 	}
+
+	// Assume the value must be a parsable string
 	strValue := value.(string)
 
 	// If no comma is found, then assume this is a single value
 	if strings.Index(strValue, ",") == -1 {
-		return []string{strValue}, nil
+		return append(dest.([]string), strValue), nil
 	}
 
 	// Split the values separated by comma's
-	return strings.Split(strValue, ","), nil
+	return append(dest.([]string), strings.Split(strValue, ",")...), nil
+}
+
+func mergeStringMap(src, dest map[string]string) map[string]string {
+	for key, value := range src {
+		dest[key] = value
+	}
+	return dest
+}
+
+func isMapString(value interface{}) (bool, error) {
+	// value could already be a map
+	kind := reflect.TypeOf(value).Kind()
+	if kind == reflect.Map {
+		kind := reflect.TypeOf(value).Elem().Kind()
+		// Is already a []string
+		if kind == reflect.String {
+			return true, nil
+		}
+		return false, errors.New(fmt.Sprintf("is %s expected map[string]string",
+			reflect.TypeOf(value)))
+	}
+	return false, nil
+}
+
+func castStringMap(name string, dest interface{}, value interface{}) (interface{}, error) {
+	// If our destination is nil, init a new slice
+	if dest == nil {
+		dest = make(map[string]string, 0)
+	}
+
+	// Might already be a map
+	ok, err := isMapString(value)
+	if err != nil {
+		return dest, errors.New(fmt.Sprintf("Invalid map type for '%s' - %s", name, err))
+	}
+	if ok {
+		return mergeStringMap(dest.(map[string]string), value.(map[string]string)), nil
+	}
+
+	// or it could be a string
+	if reflect.TypeOf(value).Kind() != reflect.String {
+		return dest, errors.New(fmt.Sprintf("Invalid map type for '%s' - '%s' is not a "+
+			"map[string]string or parsable key=value string", name, value))
+	}
+
+	// Assume the value is a parsable string
+	strValue := value.(string)
+
+	// Parse the string
+	result, err := StringToMap(strValue)
+	if err != nil {
+		return dest, errors.New(fmt.Sprintf("Invalid map type for '%s' - %s", name, err))
+	}
+
+	return mergeStringMap(dest.(map[string]string), result), nil
+}
+
+func JSONToMap(value string) (map[string]string, error) {
+	result := make(map[string]string)
+	err := json.Unmarshal([]byte(value), result)
+	if err != nil {
+		return result, errors.New(fmt.Sprintf("JSON map decoding for '%s' failed with '%s'; "+
+			`JSON map values should be in form '{"key":"value", "foo":"bar"}'`, value, err))
+	}
+	return result, nil
+}
+
+func StringToMap(value string) (map[string]string, error) {
+	var tokenizer scanner.Scanner
+	tokenizer.Init(strings.NewReader(value))
+	tokenizer.Error = func(*scanner.Scanner, string) {}
+
+	result := make(map[string]string)
+	next := func() string {
+		tokenizer.Scan()
+		return tokenizer.TokenText()
+	}
+
+	var lvalue, rvalue, expression string
+	for {
+		lvalue = next()
+		if lvalue == "" {
+			return result, errors.New(fmt.Sprintf("Expected key at pos '%d' but found none; "+
+				"map values should be 'key=value' separated by commas", tokenizer.Pos().Offset))
+		}
+		if lvalue == "{" {
+			// Assume this is JSON format and attempt to un-marshal
+			return JSONToMap(value)
+		}
+
+		expression = next()
+		if expression != ":" && expression != "=" {
+			return result, errors.New(fmt.Sprintf("Expected '=' after '%s' but found '%s'; "+
+				"map values should be 'key=value' separated by commas", lvalue, expression))
+		}
+		rvalue = next()
+		if rvalue == "" {
+			return result, errors.New(fmt.Sprintf("Expected value after '%s' but found none; "+
+				"map values should be 'key=value' separated by commas", expression))
+		}
+		// TODO: Handle quoted strings and escaped double quotes
+		result[lvalue] = rvalue
+
+		// Are there anymore tokens?
+		delimiter := next()
+		if delimiter == "" {
+			break
+		}
+
+		// Should be a comma next
+		if delimiter != "," {
+			return result, errors.New(fmt.Sprintf("Expected ',' after '%s' but found '%s'; "+
+				"map values should be 'key=value' separated by commas", rvalue, delimiter))
+		}
+	}
+
+	return result, nil
 }
 
 // Returns true if the error was because help message was printed

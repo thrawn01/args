@@ -85,6 +85,11 @@ func (self *RuleModifier) IsStringSlice() *RuleModifier {
 	return self
 }
 
+func (self *RuleModifier) IsStringMap() *RuleModifier {
+	self.rule.Cast = castStringMap
+	return self
+}
+
 // TODO: Make this less horribad, and use more reflection to make the interface simpler
 // It should also take more than just []string but also []int... etc...
 func (self *RuleModifier) StoreStringSlice(dest *[]string) *RuleModifier {
@@ -408,13 +413,13 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 		group := values.Group(self.Group)
 		if group.HasKey(self.Name) {
 			self.ClearFlags(NoValue)
-			return self.Cast(self.Name, group.Get(self.Name))
+			return self.Cast(self.Name, self.Value, group.Get(self.Name))
 		}
 	}
 
 	// Apply default if available
 	if self.Default != nil {
-		return self.Cast(self.Name, *self.Default)
+		return self.Cast(self.Name, self.Value, *self.Default)
 	}
 
 	// TODO: Move this logic from here, This method should be all about getting the value
@@ -426,7 +431,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	self.SetFlags(NoValue)
 
 	// Return the default value for our type choice
-	value, _ = self.Cast(self.Name, nil)
+	value, _ = self.Cast(self.Name, self.Value, nil)
 	return value, nil
 }
 
@@ -439,7 +444,7 @@ func (self *Rule) GetEnvValue() (interface{}, error) {
 		varName := self.EnvPrefix + varName
 		//if value, ok := os.LookupEnv(varName); ok {
 		if value := os.Getenv(varName); value != "" {
-			return self.Cast(varName, value)
+			return self.Cast(varName, self.Value, value)
 		}
 	}
 	return nil, nil

@@ -13,19 +13,43 @@ var _ = Describe("Options", func() {
 		log = NewTestLogger()
 		parser := args.NewParser()
 		parser.SetLog(log)
-		opts = parser.NewOptionsFromMap(args.DefaultOptionGroup,
-			map[string]map[string]*args.OptionValue{
-				args.DefaultOptionGroup: {
-					"int":    &args.OptionValue{Value: 1, Flags: 0},
-					"bool":   &args.OptionValue{Value: true, Flags: 0},
-					"string": &args.OptionValue{Value: "one", Flags: 0},
+
+		opts := parser.NewOptionsFromMap(
+			map[string]interface{}{
+				"int":    1,
+				"bool":   true,
+				"string": "one",
+				"endpoints": map[string]interface{}{
+					"endpoint1": "host1",
+					"endpoint2": "host2",
+					"endpoint3": "host3",
 				},
-				"endpoints": {
-					"endpoint1": &args.OptionValue{Value: "host1", Flags: 0},
-					"endpoint2": &args.OptionValue{Value: "host2", Flags: 0},
-					"endpoint3": &args.OptionValue{Value: "host3", Flags: 0},
-				},
-			})
+			},
+		)
+
+		opts.String("string")                       // == "one"
+		opts.Group("endpoints")                     // == *args.Options
+		opts.Group("endpoints").String("endpoint1") // == "host1"
+		opts.Group("endpoints").ToMap()             // {"endpoint1": "host1", ...}
+		opts.StringMap("endpoints")                 // {"endpoint1": "host1", ...}
+		opts.KeySlice("endpoints")                  // [ "endpoint1", "endpoint2", ]
+		opts.StringSlice("endpoints")               // [ "host1", "host2", "host3" ]
+
+		// Leaves the door open for IntSlice(), IntMap(), etc....
+
+		/*opts = parser.NewOptionsFromMap(args.DefaultOptionGroup,
+		map[string]map[string]*args.OptionValue{
+			args.DefaultOptionGroup: {
+				"int":    &args.OptionValue{Value: 1, Flags: 0},
+				"bool":   &args.OptionValue{Value: true, Flags: 0},
+				"string": &args.OptionValue{Value: "one", Flags: 0},
+			},
+			"endpoints": {
+				"endpoint1": &args.OptionValue{Value: "host1", Flags: 0},
+				"endpoint2": &args.OptionValue{Value: "host2", Flags: 0},
+				"endpoint3": &args.OptionValue{Value: "host3", Flags: 0},
+			},
+		})*/
 
 	})
 	Describe("log", func() {
@@ -124,8 +148,8 @@ var _ = Describe("Options", func() {
 			opt, err := parser.ParseArgs(nil)
 			Expect(err).To(BeNil())
 			option := opt.InspectOpt("is-set")
-			Expect(option.Value.(int)).To(Equal(1))
-			Expect(option.Flags).To(Equal(int64(32)))
+			Expect(option.GetValue().(int)).To(Equal(1))
+			Expect(option.GetRule().Flags).To(Equal(int64(32)))
 		})
 	})
 

@@ -149,7 +149,7 @@ func main() {
 	`)
 
 	// Make configuration simple by reading arguments from an INI file
-	opt, err := parser.FromIni(iniFile)
+	opt, err := parser.FromINI(iniFile)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(-1)

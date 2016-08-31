@@ -68,7 +68,7 @@ var _ = Describe("args.WatchFile()", func() {
 			Fail(err.Error())
 		}
 		// Parse the ini file
-		opt, err = parser.FromIni(content)
+		opt, err = parser.FromINI(content)
 		Expect(err).To(BeNil())
 		Expect(log.GetEntry()).To(Equal(""))
 		Expect(opt.String("value")).To(Equal("my-value"))
@@ -76,7 +76,7 @@ var _ = Describe("args.WatchFile()", func() {
 
 		done := make(chan struct{})
 		cancelWatch, err := args.WatchFile(iniFile.Name(), time.Second, func(err error) {
-			parser.FromIniFile(iniFile.Name())
+			parser.FromINIFile(iniFile.Name())
 			// Tell the test to continue, Change event was handled
 			close(done)
 		})

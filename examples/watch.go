@@ -57,7 +57,7 @@ func main() {
 	if appConf.Bool("complex-example") {
 		// Complex Example
 		cancelWatch, err := args.WatchFile(configFile, time.Second, func() {
-			rawValues, err := parser.ParseIni(configFile)
+			rawValues, err := parser.ParseINI(configFile)
 			if err != nil {
 				fmt.Printf("Failed to update config - %s\n", err.Error())
 				return
@@ -90,7 +90,7 @@ func main() {
 			// You can safely ignore the returned Options{} object here.
 			// the next call to ThreadSafe() from within the handler will
 			// pick up the newly parsed config.
-			appConf, err = parser.FromIni(configFile)
+			appConf, err = parser.FromINI(configFile)
 			if err != nil {
 				fmt.Printf("Failed to update config - %s\n", err.Error())
 				return

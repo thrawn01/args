@@ -213,11 +213,9 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.Int("power-level")).To(Equal(0))
 
 			// But Apply() a config file
-			options := parser.NewOptionsFromMap(args.DefaultOptionGroup,
-				map[string]map[string]*args.OptionValue{
-					args.DefaultOptionGroup: {
-						"power-level": &args.OptionValue{Value: 3, Flags: 0},
-					},
+			options := parser.NewOptionsFromMap(
+				map[string]interface{}{
+					"power-level": 3,
 				})
 			newOpt, _ := parser.Apply(options)
 			// The old config still has the original non config applied version

@@ -3,105 +3,127 @@ package args
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"errors"
+
+	"reflect"
 
 	"github.com/spf13/cast"
 )
 
-type Options struct {
-	group  string
-	log    StdLogger
-	parser *ArgParser
-	values map[string]*OptionValue
-	groups map[string]*Options
+type Value interface {
+	ToString(...int) string
+	GetValue() interface{}
+	GetRule() *Rule
+	Seen() bool
 }
 
-type OptionValue struct {
+type Options struct {
+	log    StdLogger
+	parser *ArgParser
+	values map[string]Value
+}
+
+type RawValue struct {
 	Value interface{}
-	Flags int64
+	Rule  *Rule
+}
+
+func (self *RawValue) ToString(indent ...int) string {
+	return fmt.Sprintf("%v", self.Value)
+}
+
+func (self *RawValue) GetValue() interface{} {
+	return self.Value
+}
+
+func (self *RawValue) GetRule() *Rule {
+	return self.Rule
+}
+
+func (self *RawValue) Seen() bool {
+	if self.Rule.Flags&Seen != 0 {
+		return true
+	}
+	return false
 }
 
 func (self *ArgParser) NewOptions() *Options {
-	return self.NewOptionsWithGroup(DefaultOptionGroup)
-}
-
-func (self *ArgParser) NewOptionsWithGroup(group string) *Options {
-	groups := make(map[string]*Options)
-	new := &Options{
-		group,
-		self.log,
-		self,
-		make(map[string]*OptionValue),
-		groups,
+	return &Options{
+		values: make(map[string]Value),
+		log:    self.log,
+		parser: self,
 	}
-	// Add the new Options{} to the group of options
-	groups[group] = new
-	return new
 }
 
-func (self *ArgParser) NewOptionsWithGroups(group string, groups map[string]*Options) *Options {
-	new := &Options{
-		group,
-		self.log,
-		self,
-		make(map[string]*OptionValue),
-		groups,
-	}
-	// Add the new Options{} to the group of options
-	groups[group] = new
-	return new
-}
-
-func (self *ArgParser) NewOptionsFromMap(group string, groups map[string]map[string]*OptionValue) *Options {
-	options := self.NewOptionsWithGroup(group)
-	for groupName, values := range groups {
-		grp := options.Group(groupName)
-		for key, opt := range values {
-			grp.SetFlags(key, opt.Value, opt.Flags)
+//func (self *ArgParser) NewOptionsFromMap(group string, groups map[string]map[string]*OptionValue) *Options {
+func (self *ArgParser) NewOptionsFromMap(values map[string]interface{}) *Options {
+	options := self.NewOptions()
+	for key, value := range values {
+		// If the value is a map of interfaces
+		obj, ok := value.(map[string]interface{})
+		if ok {
+			// Convert them to options
+			options.Set(key, self.NewOptionsFromMap(obj))
+		} else {
+			// Else set the value
+			options.Set(key, value)
 		}
 	}
 	return options
-}
-
-func (left *Options) Compare(right *Options) *Options {
-	panic("Options.Compare() not implemented")
-	/*for _, group := range self.groups {
-
-	}*/
 }
 
 func (self *Options) GetOpts() *Options {
 	return self.parser.GetOpts()
 }
 
-func (self *Options) ValuesToString() string {
+func (self *Options) GetValue() interface{} {
+	return self
+}
+
+func (self *Options) GetRule() *Rule {
+	return nil
+}
+
+func (self *Options) ToString(indent ...int) string {
 	var buffer bytes.Buffer
-	groupName := self.group
-	if groupName == "" {
-		groupName = "\"\""
-	}
-	buffer.WriteString(fmt.Sprintf("%s:\n", groupName))
+	pad := strings.Repeat(" ", indent[0])
+
 	for key, value := range self.values {
-		buffer.WriteString(fmt.Sprintf("   %s=%s\n", key, value.Value))
+		buffer.WriteString(fmt.Sprintf("%s%s=%v\n", pad, key, value.ToString()))
 	}
 	return buffer.String()
+}
+
+func (self *Options) Group(key string) *Options {
+	group, ok := self.values[key]
+	// If group doesn't exist; always create it
+	if !ok {
+		group = self.parser.NewOptions()
+		self.values[key] = group
+	}
+	// If user called Group() on this value, it *should* be an *Option
+	options, ok := group.GetValue().(*Options)
+	if !ok {
+		self.log.Printf("Attempted to call Group(%s) on non *Option type %s",
+			key, reflect.TypeOf(options))
+	}
+	return options
 }
 
 func (self *Options) ToMap() map[string]interface{} {
 	result := make(map[string]interface{})
 	for key, value := range self.values {
-		result[key] = value.Value
+		// If the value is an *Option
+		options, ok := value.(*Options)
+		if ok {
+			result[key] = options.ToMap()
+		} else {
+			result[key] = value
+		}
 	}
 	return result
-}
-
-func (self *Options) GroupsToString() string {
-	var buffer bytes.Buffer
-	for _, group := range self.groups {
-		buffer.WriteString(group.ValuesToString())
-	}
-	return buffer.String()
 }
 
 func (self *Options) Keys() []string {
@@ -112,44 +134,26 @@ func (self *Options) Keys() []string {
 	return keys
 }
 
-func (self *Options) Group(group string) *Options {
-	// If they asked for the default group, and I'm the default group return myself
-	if group == DefaultOptionGroup {
-		return self
-	}
-	opts, ok := self.groups[group]
-	if !ok {
-		// TODO: Validate group name has valid characters or at least
-		// doesn't have ':' in the name which would conflict with Compare()
-
-		// If group doesn't exist; create it
-		new := self.parser.NewOptionsWithGroups(group, self.groups)
-		self.groups[group] = new
-		return new
-	}
-	return opts
-}
-
 func (self *Options) Del(key string) *Options {
 	delete(self.values, key)
 	return self
 }
 
 // Just like Set() but also record the matching rule flags
-func (self *Options) SetFlags(key string, value interface{}, flags int64) *Options {
-	self.values[key] = &OptionValue{value, flags}
+func (self *Options) SetWithRule(key string, value interface{}, rule *Rule) *Options {
+	self.values[key] = &RawValue{value, rule}
 	return self
 }
 
 // Set an option with a key and value
 func (self *Options) Set(key string, value interface{}) *Options {
-	return self.SetFlags(key, value, 0)
+	return self.SetWithRule(key, value, nil)
 }
 
 // Return true if any of the values in this Option object were seen on the command line
-func (self *Options) ValuesSeen() bool {
+func (self *Options) Seen() bool {
 	for _, opt := range self.values {
-		if opt.Flags&Seen != 0 {
+		if opt.Seen() {
 			return true
 		}
 	}
@@ -157,22 +161,16 @@ func (self *Options) ValuesSeen() bool {
 }
 
 /*
-	Return true if no arguments where seen on the command line
+	Return true if none of the options where seen on the command line
 
 	opts, _ := parser.ParseArgs(nil)
 	if opts.NoArgs() {
 		fmt.Printf("No arguments provided")
-		parser.PrintHelp()
 		os.Exit(-1)
 	}
 */
 func (self *Options) NoArgs() bool {
-	for _, group := range self.groups {
-		if group.ValuesSeen() {
-			return false
-		}
-	}
-	return !self.ValuesSeen()
+	return self.Seen()
 }
 
 func (self *Options) Int(key string) int {
@@ -207,9 +205,17 @@ func (self *Options) StringSlice(key string) []string {
 	return value
 }
 
+func (self *Options) StringMap(key string) map[string]interface{} {
+	return self.Group(key).ToMap()
+}
+
+func (self *Options) KeySlice(key string) []string {
+	return self.Group(key).Keys()
+}
+
 func (self *Options) IsSet(key string) bool {
 	if opt, ok := self.values[key]; ok {
-		return !(opt.Flags&NoValue != 0)
+		return !(opt.GetRule().Flags&NoValue != 0)
 	}
 	return false
 }
@@ -231,12 +237,12 @@ func (self *Options) HasKey(key string) bool {
 
 func (self *Options) Get(key string) interface{} {
 	if opt, ok := self.values[key]; ok {
-		return opt.Value
+		return opt.GetValue()
 	}
 	return nil
 }
 
-func (self *Options) InspectOpt(key string) *OptionValue {
+func (self *Options) InspectOpt(key string) Value {
 	if opt, ok := self.values[key]; ok {
 		return opt
 	}
@@ -245,7 +251,7 @@ func (self *Options) InspectOpt(key string) *OptionValue {
 
 func (self *Options) Interface(key string) interface{} {
 	if opt, ok := self.values[key]; ok {
-		return opt.Value
+		return opt.GetValue()
 	}
 	return nil
 }
