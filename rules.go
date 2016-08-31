@@ -90,7 +90,7 @@ func (self *RuleModifier) IsStringSlice() *RuleModifier {
 func (self *RuleModifier) StoreStringSlice(dest *[]string) *RuleModifier {
 	self.rule.Cast = castStringSlice
 	self.rule.StoreValue = func(src interface{}) {
-		// First clear the currenty slice if any
+		// First clear the current slice if any
 		*dest = nil
 		// This should never happen if we validate the types
 		srcType := reflect.TypeOf(src)
@@ -201,7 +201,7 @@ func (self *RuleModifier) Key(key string) *RuleModifier {
 // Rule Object
 // ***********************************************
 
-type CastFunc func(string, interface{}) (interface{}, error)
+type CastFunc func(string, interface{}, interface{}) (interface{}, error)
 type ActionFunc func(*Rule, string, []string, *int) error
 type StoreFunc func(interface{})
 type CommandFunc func(*ArgParser, interface{}) int
@@ -352,8 +352,9 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 		}
 	}
 
+	// If we get here, this argument is associated with either an option value or a positional
 	//fmt.Printf("arg: %s value: %s\n", alias, args[*idx])
-	value, err := self.Cast(name, self.UnEscape(args[*idx]))
+	value, err := self.Cast(name, self.Value, self.UnEscape(args[*idx]))
 	if err != nil {
 		return true, err
 	}
@@ -382,12 +383,12 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 		self.Value = self.Count
 	}
 
-	// If Rule Matched Argument on command line
+	// If rule matched argument on command line
 	if self.HasFlags(Seen) {
 		return self.Value, nil
 	}
 
-	// If Rule Matched Environment variable
+	// If rule matched environment variable
 	value, err := self.GetEnvValue()
 	if err != nil {
 		return nil, err
