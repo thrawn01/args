@@ -279,7 +279,7 @@ func isMapString(value interface{}) (bool, error) {
 		if kind == reflect.String {
 			return true, nil
 		}
-		return false, errors.New(fmt.Sprintf("is %s expected map[string]string",
+		return false, errors.New(fmt.Sprintf("is ]%s expected map[string]string",
 			reflect.TypeOf(value)))
 	}
 	return false, nil
@@ -352,7 +352,7 @@ func StringToMap(value string) (map[string]string, error) {
 		}
 
 		expression = next()
-		if expression != ":" && expression != "=" {
+		if expression != "=" {
 			return result, errors.New(fmt.Sprintf("Expected '=' after '%s' but found '%s'; "+
 				"map values should be 'key=value' separated by commas", lvalue, expression))
 		}

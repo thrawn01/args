@@ -102,6 +102,113 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("option '--power-level' is required"))
 		})
+		It("Should allow slices in a comma delimited string", func() {
+			parser := args.NewParser()
+			parser.AddOption("--list").IsStringSlice().Default("foo,bar,bit")
+
+			// Test Default Value
+			opt, err := parser.ParseArgs(nil)
+			Expect(err).To(BeNil())
+			Expect(opt.StringSlice("list")).To(Equal([]string{"foo", "bar", "bit"}))
+
+			// Provided on the command line
+			cmdLine := []string{"--list", "belt,car,table"}
+			opt, err = parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.StringSlice("list")).To(Equal([]string{"belt", "car", "table"}))
+		})
+		It("Should allow slices in a comma delimited string saved to a variable", func() {
+			parser := args.NewParser()
+			var list []string
+			parser.AddOption("--list").StoreStringSlice(&list).Default("foo,bar,bit")
+
+			cmdLine := []string{"--list", "belt,car,table"}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.StringSlice("list")).To(Equal([]string{"belt", "car", "table"}))
+			Expect(list).To(Equal([]string{"belt", "car", "table"}))
+		})
+		It("Should allow multiple iterations of the same argument to create a slice", func() {
+			parser := args.NewParser()
+			parser.AddOption("--list").IsStringSlice()
+
+			cmdLine := []string{"--list", "bee", "--list", "cat", "--list", "dad"}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.StringSlice("list")).To(Equal([]string{"bee", "cat", "dad"}))
+		})
+		It("Should allow multiple iterations of the same argument to create a slice - with var", func() {
+			parser := args.NewParser()
+			var list []string
+			parser.AddOption("--list").StoreStringSlice(&list)
+
+			cmdLine := []string{"--list", "bee", "--list", "cat", "--list", "dad"}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.StringSlice("list")).To(Equal([]string{"bee", "cat", "dad"}))
+			Expect(list).To(Equal([]string{"bee", "cat", "dad"}))
+		})
+		It("Should allow string map with '=' expression in a comma delimited string", func() {
+			parser := args.NewParser()
+			parser.AddOption("--map").IsStringMap().Default("foo=bar,bar=foo")
+
+			// Test Default Value
+			opt, err := parser.ParseArgs(nil)
+			Expect(err).To(BeNil())
+			Expect(opt.StringMap("map")).To(Equal(map[string]string{"foo": "bar", "bar": "foo"}))
+
+			// Provided on the command line
+			cmdLine := []string{"--map", "belt=car,table=cloth"}
+			opt, err = parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.StringSlice("map")).To(Equal(map[string]string{"belt": "car", "table": "cloth"}))
+		})
+		It("Should allow string map with JSON string", func() {
+			parser := args.NewParser()
+			parser.AddOption("--map").IsStringMap().Default(`{"foo":"bar","bar":"foo"}`)
+
+			// Test Default Value
+			opt, err := parser.ParseArgs(nil)
+			Expect(err).To(BeNil())
+			Expect(opt.StringMap("map")).To(Equal(map[string]string{"foo": "bar", "bar": "foo"}))
+
+			// Provided on the command line
+			cmdLine := []string{"--map", `{"belt":"car","table":"cloth"`}
+			opt, err = parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.StringSlice("map")).To(Equal(map[string]string{"belt": "car", "table": "cloth"}))
+		})
+		It("Should allow multiple iterations of the same argument to create a map", func() {
+			parser := args.NewParser()
+			parser.AddOption("--map").IsStringMap()
+
+			cmdLine := []string{"--map", "blue=bell", "--map", "cat=dog", "--map", "dad=boy"}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.StringSlice("map")).To(Equal(map[string]string{
+				"blue": "bell",
+				"cat":  "dog",
+				"dad":  "boy",
+			}))
+		})
+		It("Should allow multiple iterations of the same argument to create a map with JSON", func() {
+			parser := args.NewParser()
+			parser.AddOption("--map").IsStringMap()
+
+			cmdLine := []string{
+				"--map", `{"blue":"bell}"`,
+				"--map", `{"cat":"dog}"`,
+				"--map", `{"dad":"boy"}`,
+			}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.StringSlice("map")).To(Equal(map[string]string{
+				"blue": "bell",
+				"cat":  "dog",
+				"dad":  "boy",
+			}))
+		})
+		// TODO: Add a StoreStringMap() tests
 	})
 
 	Describe("ArgParser.AddPositional()", func() {

@@ -14,7 +14,7 @@ var _ = Describe("Options", func() {
 		parser := args.NewParser()
 		parser.SetLog(log)
 
-		opts := parser.NewOptionsFromMap(
+		opts = parser.NewOptionsFromMap(
 			map[string]interface{}{
 				"int":    1,
 				"bool":   true,
@@ -24,16 +24,22 @@ var _ = Describe("Options", func() {
 					"endpoint2": "host2",
 					"endpoint3": "host3",
 				},
+				"deeply": map[string]interface{}{
+					"nested": map[string]interface{}{
+						"thing": "foo",
+					},
+					"foo": "bar",
+				},
 			},
 		)
 
-		opts.String("string")                       // == "one"
+		/*opts.String("string")                       // == "one"
 		opts.Group("endpoints")                     // == *args.Options
 		opts.Group("endpoints").String("endpoint1") // == "host1"
 		opts.Group("endpoints").ToMap()             // {"endpoint1": "host1", ...}
 		opts.StringMap("endpoints")                 // {"endpoint1": "host1", ...}
 		opts.KeySlice("endpoints")                  // [ "endpoint1", "endpoint2", ]
-		opts.StringSlice("endpoints")               // [ "host1", "host2", "host3" ]
+		opts.StringSlice("endpoints")               // [ "host1", "host2", "host3" ]*/
 
 		// Leaves the door open for IntSlice(), IntMap(), etc....
 
@@ -171,4 +177,27 @@ var _ = Describe("Options", func() {
 			Expect(err.Error()).To(Equal("not-set"))
 		})
 	})
+
+	Describe("ToString()", func() {
+		It("Should return a string representation of the options", func() {
+			output := opts.ToString()
+			Expect(output).To(Equal(`{
+  'bool' = true
+  'deeply' = {
+    'foo' = bar
+    'nested' = {
+      'thing' = foo
+    }
+  }
+  'endpoints' = {
+    'endpoint1' = host1
+    'endpoint2' = host2
+    'endpoint3' = host3
+  }
+  'int' = 1
+  'string' = one
+}`))
+		})
+	})
+
 })

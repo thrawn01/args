@@ -3,6 +3,7 @@ package args
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 
 	"errors"
@@ -57,7 +58,6 @@ func (self *ArgParser) NewOptions() *Options {
 	}
 }
 
-//func (self *ArgParser) NewOptionsFromMap(group string, groups map[string]map[string]*OptionValue) *Options {
 func (self *ArgParser) NewOptionsFromMap(values map[string]interface{}) *Options {
 	options := self.NewOptions()
 	for key, value := range values {
@@ -65,7 +65,7 @@ func (self *ArgParser) NewOptionsFromMap(values map[string]interface{}) *Options
 		obj, ok := value.(map[string]interface{})
 		if ok {
 			// Convert them to options
-			options.Set(key, self.NewOptionsFromMap(obj))
+			options.SetWithOptions(key, self.NewOptionsFromMap(obj))
 		} else {
 			// Else set the value
 			options.Set(key, value)
@@ -86,17 +86,36 @@ func (self *Options) GetRule() *Rule {
 	return nil
 }
 
-func (self *Options) ToString(indent ...int) string {
+func (self *Options) ToString(indented ...int) string {
 	var buffer bytes.Buffer
-	pad := strings.Repeat(" ", indent[0])
-
-	for key, value := range self.values {
-		buffer.WriteString(fmt.Sprintf("%s%s=%v\n", pad, key, value.ToString()))
+	indent := 2
+	if len(indented) != 0 {
+		indent = indented[0]
 	}
+
+	buffer.WriteString("{\n")
+	pad := strings.Repeat(" ", indent)
+
+	// Sort the values so testing is consistent
+	var keys []string
+	for key := range self.values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		buffer.WriteString(fmt.Sprintf("%s'%s' = %s\n", pad, key, self.values[key].ToString(indent+2)))
+	}
+	buffer.WriteString(pad[2:] + "}")
 	return buffer.String()
 }
 
 func (self *Options) Group(key string) *Options {
+	// "" is not a valid group
+	if key == "" {
+		return self
+	}
+
 	group, ok := self.values[key]
 	// If group doesn't exist; always create it
 	if !ok {
@@ -120,7 +139,7 @@ func (self *Options) ToMap() map[string]interface{} {
 		if ok {
 			result[key] = options.ToMap()
 		} else {
-			result[key] = value
+			result[key] = value.GetValue()
 		}
 	}
 	return result
@@ -136,6 +155,11 @@ func (self *Options) Keys() []string {
 
 func (self *Options) Del(key string) *Options {
 	delete(self.values, key)
+	return self
+}
+
+func (self *Options) SetWithOptions(key string, value *Options) *Options {
+	self.values[key] = value
 	return self
 }
 
@@ -170,7 +194,7 @@ func (self *Options) Seen() bool {
 	}
 */
 func (self *Options) NoArgs() bool {
-	return self.Seen()
+	return !self.Seen()
 }
 
 func (self *Options) Int(key string) int {
