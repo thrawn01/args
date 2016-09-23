@@ -276,10 +276,7 @@ func isMapString(value interface{}) (bool, error) {
 	if kind == reflect.Map {
 		kind := reflect.TypeOf(value).Elem().Kind()
 		// Is already a []string
-		if kind == reflect.String || kind == reflect.Interface{
-			return true, nil
-		}
-		if  {
+		if kind == reflect.String {
 			return true, nil
 		}
 		return false, errors.New(fmt.Sprintf("is ]%s expected map[string]string",
@@ -288,16 +285,16 @@ func isMapString(value interface{}) (bool, error) {
 	return false, nil
 }
 
-func castStringMap(name string, dest interface{}, value interface{}) (map[string]interface{}, error) {
+func castStringMap(name string, dest interface{}, value interface{}) (interface{}, error) {
 	// If our destination is nil, init a new slice
 	if dest == nil {
-		dest = make(map[string]interface{}, 0)
+		dest = make(map[string]string, 0)
 	}
 
 	// Might already be a map
 	ok, err := isMapString(value)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Invalid map type for '%s' - %s", name, err))
+		return dest, errors.New(fmt.Sprintf("Invalid map type for '%s' - %s", name, err))
 	}
 	if ok {
 		return mergeStringMap(dest.(map[string]string), value.(map[string]string)), nil
@@ -305,17 +302,16 @@ func castStringMap(name string, dest interface{}, value interface{}) (map[string
 
 	// or it could be a string
 	if reflect.TypeOf(value).Kind() != reflect.String {
-		return nil, errors.New(fmt.Sprintf("Invalid map type for '%s' - '%s' is not a "+
+		return dest, errors.New(fmt.Sprintf("Invalid map type for '%s' - '%s' is not a "+
 			"map[string]string or parsable key=value string", name, value))
 	}
 
 	// Assume the value is a parsable string
 	strValue := value.(string)
-
 	// Parse the string
 	result, err := StringToMap(strValue)
 	if err != nil {
-		return dest.(map[string]string), errors.New(fmt.Sprintf("Invalid map type for '%s' - %s", name, err))
+		return dest, errors.New(fmt.Sprintf("Invalid map type for '%s' - %s", name, err))
 	}
 
 	return mergeStringMap(dest.(map[string]string), result), nil
@@ -323,7 +319,7 @@ func castStringMap(name string, dest interface{}, value interface{}) (map[string
 
 func JSONToMap(value string) (map[string]string, error) {
 	result := make(map[string]string)
-	err := json.Unmarshal([]byte(value), result)
+	err := json.Unmarshal([]byte(value), &result)
 	if err != nil {
 		return result, errors.New(fmt.Sprintf("JSON map decoding for '%s' failed with '%s'; "+
 			`JSON map values should be in form '{"key":"value", "foo":"bar"}'`, value, err))

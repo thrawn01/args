@@ -111,31 +111,48 @@ func (self *Options) ToString(indented ...int) string {
 }
 
 func (self *Options) Group(key string) *Options {
-	fmt.Printf("Group(%s)\n", key)
 	// "" is not a valid group
 	if key == "" {
 		return self
 	}
 
 	group, ok := self.values[key]
-	fmt.Printf("Group - group %v\n", group)
 	// If group doesn't exist; always create it
 	if !ok {
 		group = self.parser.NewOptions()
 		self.values[key] = group
 	}
-	// If user called Group() on this value, it *should* be an *Option
-	options, ok := group.GetValue().(*Options)
-	if !ok {
-		self.log.Printf("Attempted to call Group(%s) on non *Option type %s",
-			key, reflect.TypeOf(group.GetValue()))
-		fmt.Printf("Attempted to call Group(%s) on non *Option type %s\n",
+	// If user called Group() on this value, it *should* be an
+	// *Option, map[string]string or map[string]interface{}
+	options := self.ToOption(group.GetValue())
+	if options == nil {
+		self.log.Printf("Attempted to call Group(%s) on non *Option or map[string]interface type %s",
 			key, reflect.TypeOf(group.GetValue()))
 		// Do this so we don't panic if we can't cast this group
 		options = self.parser.NewOptions()
 	}
-	fmt.Printf("Group Return %v\n", options)
 	return options
+}
+
+// Given an interface of map[string]string or map[string]string
+// or *Option return an *Options with the same content.
+// return nil if un-successful
+func (self *Options) ToOption(from interface{}) *Options {
+	if options, ok := from.(*Options); ok {
+		return options
+	}
+	if stringMap, ok := from.(map[string]string); ok {
+		result := make(map[string]interface{})
+		for key, value := range stringMap {
+			result[key] = value
+		}
+		return self.parser.NewOptionsFromMap(result)
+	}
+
+	if interfaceMap, ok := from.(map[string]interface{}); ok {
+		return self.parser.NewOptionsFromMap(interfaceMap)
+	}
+	return nil
 }
 
 func (self *Options) ToMap() map[string]interface{} {
@@ -236,8 +253,14 @@ func (self *Options) StringSlice(key string) []string {
 	return value
 }
 
-func (self *Options) StringMap(key string) map[string]interface{} {
-	return self.Group(key).ToMap()
+func (self *Options) StringMap(key string) map[string]string {
+	group := self.Group(key)
+
+	result := make(map[string]string)
+	for _, key := range group.Keys() {
+		result[key] = group.String(key)
+	}
+	return result
 }
 
 func (self *Options) KeySlice(key string) []string {
@@ -298,7 +321,5 @@ func (self *Options) FromChangeEvent(event *ChangeEvent) *Options {
 
 // TODO: Add these getters
 /*Float64(key string) : float64
-StringMap(key string) : map[string]interface{}
-StringMapString(key string) : map[string]string
 Time(key string) : time.Time
 Duration(key string) : time.Duration*/

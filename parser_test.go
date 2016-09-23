@@ -163,28 +163,46 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt).To(Not(BeNil()))
 
 			Expect(err).To(BeNil())
-			Expect(opt.StringMap("map")).To(Equal(map[string]interface{}{"foo": "bar", "bar": "foo"}))
+			Expect(opt.StringMap("map")).To(Equal(map[string]string{"foo": "bar", "bar": "foo"}))
 
 			// Provided on the command line
 			cmdLine := []string{"--map", "belt=car,table=cloth"}
 			opt, err = parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
-			Expect(opt.StringMap("map")).To(Equal(map[string]interface{}{"belt": "car", "table": "cloth"}))
+			Expect(opt.StringMap("map")).To(Equal(map[string]string{"belt": "car", "table": "cloth"}))
+		})
+		It("Should store string map into a struct", func() {
+			parser := args.NewParser()
+			var destMap map[string]string
+			parser.AddOption("--map").StoreStringMap(&destMap).Default("foo=bar,bar=foo")
+
+			// Test Default Value
+			opt, err := parser.ParseArgs(nil)
+			Expect(opt).To(Not(BeNil()))
+
+			Expect(err).To(BeNil())
+			Expect(destMap).To(Equal(map[string]string{"foo": "bar", "bar": "foo"}))
+
+			// Provided on the command line
+			cmdLine := []string{"--map", "belt=car,table=cloth"}
+			opt, err = parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(destMap).To(Equal(map[string]string{"belt": "car", "table": "cloth"}))
 		})
 		It("Should allow string map with JSON string", func() {
 			parser := args.NewParser()
-			parser.AddOption("--map").IsStringMap().Default(`{"foo":"bar","bar":"foo"}`)
+			parser.AddOption("--map").IsStringMap().Default(`{"foo":"bar", "bar":"foo"}`)
 
 			// Test Default Value
 			opt, err := parser.ParseArgs(nil)
 			Expect(err).To(BeNil())
-			Expect(opt.StringMap("map")).To(Equal(map[string]interface{}{"foo": "bar", "bar": "foo"}))
+			Expect(opt.StringMap("map")).To(Equal(map[string]string{"foo": "bar", "bar": "foo"}))
 
 			// Provided on the command line
-			cmdLine := []string{"--map", `{"belt":"car","table":"cloth"`}
+			cmdLine := []string{"--map", `{"belt":"car","table":"cloth"}`}
 			opt, err = parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
-			Expect(opt.StringSlice("map")).To(Equal(map[string]string{"belt": "car", "table": "cloth"}))
+			Expect(opt.StringMap("map")).To(Equal(map[string]string{"belt": "car", "table": "cloth"}))
 		})
 		It("Should allow multiple iterations of the same argument to create a map", func() {
 			parser := args.NewParser()
@@ -193,7 +211,7 @@ var _ = Describe("ArgParser", func() {
 			cmdLine := []string{"--map", "blue=bell", "--map", "cat=dog", "--map", "dad=boy"}
 			opt, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
-			Expect(opt.StringSlice("map")).To(Equal(map[string]string{
+			Expect(opt.StringMap("map")).To(Equal(map[string]string{
 				"blue": "bell",
 				"cat":  "dog",
 				"dad":  "boy",
@@ -204,19 +222,18 @@ var _ = Describe("ArgParser", func() {
 			parser.AddOption("--map").IsStringMap()
 
 			cmdLine := []string{
-				"--map", `{"blue":"bell}"`,
-				"--map", `{"cat":"dog}"`,
+				"--map", `{"blue":"bell"}`,
+				"--map", `{"cat":"dog"}`,
 				"--map", `{"dad":"boy"}`,
 			}
 			opt, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
-			Expect(opt.StringSlice("map")).To(Equal(map[string]string{
+			Expect(opt.StringMap("map")).To(Equal(map[string]string{
 				"blue": "bell",
 				"cat":  "dog",
 				"dad":  "boy",
 			}))
 		})
-		// TODO: Add a StoreStringMap() tests
 	})
 
 	Describe("ArgParser.AddPositional()", func() {
