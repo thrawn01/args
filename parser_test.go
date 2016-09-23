@@ -9,6 +9,12 @@ import (
 )
 
 var _ = Describe("ArgParser", func() {
+	var log *TestLogger
+
+	BeforeEach(func() {
+		log = NewTestLogger()
+	})
+
 	Describe("ArgParser.ParseArgs(nil)", func() {
 		It("Should return error if AddOption() was never called", func() {
 			parser := args.NewParser(args.NoHelp())
@@ -154,14 +160,16 @@ var _ = Describe("ArgParser", func() {
 
 			// Test Default Value
 			opt, err := parser.ParseArgs(nil)
+			Expect(opt).To(Not(BeNil()))
+
 			Expect(err).To(BeNil())
-			Expect(opt.StringMap("map")).To(Equal(map[string]string{"foo": "bar", "bar": "foo"}))
+			Expect(opt.StringMap("map")).To(Equal(map[string]interface{}{"foo": "bar", "bar": "foo"}))
 
 			// Provided on the command line
 			cmdLine := []string{"--map", "belt=car,table=cloth"}
 			opt, err = parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
-			Expect(opt.StringSlice("map")).To(Equal(map[string]string{"belt": "car", "table": "cloth"}))
+			Expect(opt.StringMap("map")).To(Equal(map[string]interface{}{"belt": "car", "table": "cloth"}))
 		})
 		It("Should allow string map with JSON string", func() {
 			parser := args.NewParser()
@@ -170,7 +178,7 @@ var _ = Describe("ArgParser", func() {
 			// Test Default Value
 			opt, err := parser.ParseArgs(nil)
 			Expect(err).To(BeNil())
-			Expect(opt.StringMap("map")).To(Equal(map[string]string{"foo": "bar", "bar": "foo"}))
+			Expect(opt.StringMap("map")).To(Equal(map[string]interface{}{"foo": "bar", "bar": "foo"}))
 
 			// Provided on the command line
 			cmdLine := []string{"--map", `{"belt":"car","table":"cloth"`}

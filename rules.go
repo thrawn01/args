@@ -86,7 +86,13 @@ func (self *RuleModifier) IsStringSlice() *RuleModifier {
 }
 
 func (self *RuleModifier) IsStringMap() *RuleModifier {
-	self.rule.Cast = castStringMap
+	self.rule.Cast = func(name string, dest, value interface{}) (interface{}, error) {
+		result, err := castStringMap(name, dest, value)
+		if err != nil {
+			return nil, err
+		}
+		return self.parser.NewOptionsFromMap(result), nil
+	}
 	return self
 }
 
@@ -384,6 +390,7 @@ func (self *Rule) RequiredMessage() string {
 }
 
 func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
+	fmt.Printf("ComputedValue - %s\n", self.Name)
 	if self.Count != 0 {
 		self.Value = self.Count
 	}
@@ -419,6 +426,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 
 	// Apply default if available
 	if self.Default != nil {
+		fmt.Printf("Apply Default\n")
 		return self.Cast(self.Name, self.Value, *self.Default)
 	}
 

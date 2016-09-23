@@ -359,6 +359,7 @@ func (self *ArgParser) Apply(values *Options) (*Options, error) {
 	}
 
 	self.SetOpts(results)
+	fmt.Printf("results: %+v\n", results)
 	return self.GetOpts(), self.err
 }
 

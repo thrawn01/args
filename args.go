@@ -276,7 +276,10 @@ func isMapString(value interface{}) (bool, error) {
 	if kind == reflect.Map {
 		kind := reflect.TypeOf(value).Elem().Kind()
 		// Is already a []string
-		if kind == reflect.String {
+		if kind == reflect.String || kind == reflect.Interface{
+			return true, nil
+		}
+		if  {
 			return true, nil
 		}
 		return false, errors.New(fmt.Sprintf("is ]%s expected map[string]string",
@@ -285,16 +288,16 @@ func isMapString(value interface{}) (bool, error) {
 	return false, nil
 }
 
-func castStringMap(name string, dest interface{}, value interface{}) (interface{}, error) {
+func castStringMap(name string, dest interface{}, value interface{}) (map[string]interface{}, error) {
 	// If our destination is nil, init a new slice
 	if dest == nil {
-		dest = make(map[string]string, 0)
+		dest = make(map[string]interface{}, 0)
 	}
 
 	// Might already be a map
 	ok, err := isMapString(value)
 	if err != nil {
-		return dest, errors.New(fmt.Sprintf("Invalid map type for '%s' - %s", name, err))
+		return nil, errors.New(fmt.Sprintf("Invalid map type for '%s' - %s", name, err))
 	}
 	if ok {
 		return mergeStringMap(dest.(map[string]string), value.(map[string]string)), nil
@@ -302,7 +305,7 @@ func castStringMap(name string, dest interface{}, value interface{}) (interface{
 
 	// or it could be a string
 	if reflect.TypeOf(value).Kind() != reflect.String {
-		return dest, errors.New(fmt.Sprintf("Invalid map type for '%s' - '%s' is not a "+
+		return nil, errors.New(fmt.Sprintf("Invalid map type for '%s' - '%s' is not a "+
 			"map[string]string or parsable key=value string", name, value))
 	}
 
@@ -312,7 +315,7 @@ func castStringMap(name string, dest interface{}, value interface{}) (interface{
 	// Parse the string
 	result, err := StringToMap(strValue)
 	if err != nil {
-		return dest, errors.New(fmt.Sprintf("Invalid map type for '%s' - %s", name, err))
+		return dest.(map[string]string), errors.New(fmt.Sprintf("Invalid map type for '%s' - %s", name, err))
 	}
 
 	return mergeStringMap(dest.(map[string]string), result), nil

@@ -111,12 +111,14 @@ func (self *Options) ToString(indented ...int) string {
 }
 
 func (self *Options) Group(key string) *Options {
+	fmt.Printf("Group(%s)\n", key)
 	// "" is not a valid group
 	if key == "" {
 		return self
 	}
 
 	group, ok := self.values[key]
+	fmt.Printf("Group - group %v\n", group)
 	// If group doesn't exist; always create it
 	if !ok {
 		group = self.parser.NewOptions()
@@ -126,8 +128,13 @@ func (self *Options) Group(key string) *Options {
 	options, ok := group.GetValue().(*Options)
 	if !ok {
 		self.log.Printf("Attempted to call Group(%s) on non *Option type %s",
-			key, reflect.TypeOf(options))
+			key, reflect.TypeOf(group.GetValue()))
+		fmt.Printf("Attempted to call Group(%s) on non *Option type %s\n",
+			key, reflect.TypeOf(group.GetValue()))
+		// Do this so we don't panic if we can't cast this group
+		options = self.parser.NewOptions()
 	}
+	fmt.Printf("Group Return %v\n", options)
 	return options
 }
 
