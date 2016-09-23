@@ -1,6 +1,7 @@
 package args
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -8,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"text/scanner"
-
-	"k8s.io/kubernetes/pkg/util/json"
 )
 
 const (

@@ -32,31 +32,6 @@ var _ = Describe("Options", func() {
 				},
 			},
 		)
-
-		/*opts.String("string")                       // == "one"
-		opts.Group("endpoints")                     // == *args.Options
-		opts.Group("endpoints").String("endpoint1") // == "host1"
-		opts.Group("endpoints").ToMap()             // {"endpoint1": "host1", ...}
-		opts.StringMap("endpoints")                 // {"endpoint1": "host1", ...}
-		opts.KeySlice("endpoints")                  // [ "endpoint1", "endpoint2", ]
-		opts.StringSlice("endpoints")               // [ "host1", "host2", "host3" ]*/
-
-		// Leaves the door open for IntSlice(), IntMap(), etc....
-
-		/*opts = parser.NewOptionsFromMap(args.DefaultOptionGroup,
-		map[string]map[string]*args.OptionValue{
-			args.DefaultOptionGroup: {
-				"int":    &args.OptionValue{Value: 1, Flags: 0},
-				"bool":   &args.OptionValue{Value: true, Flags: 0},
-				"string": &args.OptionValue{Value: "one", Flags: 0},
-			},
-			"endpoints": {
-				"endpoint1": &args.OptionValue{Value: "host1", Flags: 0},
-				"endpoint2": &args.OptionValue{Value: "host2", Flags: 0},
-				"endpoint3": &args.OptionValue{Value: "host3", Flags: 0},
-			},
-		})*/
-
 	})
 	Describe("log", func() {
 		It("Should log to StdLogger when cast fails", func() {
