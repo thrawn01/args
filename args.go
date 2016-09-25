@@ -95,7 +95,7 @@ func DedentTrim(input string, cutset string) string {
 }
 
 func WordWrap(msg string, indent int, wordWrap int) string {
-	// Remove any previous formating
+	// Remove any previous formatting
 	regex, _ := regexp.Compile(" {2,}|\n|\t")
 	msg = regex.ReplaceAllString(msg, "")
 
@@ -269,19 +269,16 @@ func mergeStringMap(src, dest map[string]string) map[string]string {
 	return dest
 }
 
-func isMapString(value interface{}) (bool, error) {
-	// value could already be a map
+func isMapString(value interface{}) bool {
 	kind := reflect.TypeOf(value).Kind()
 	if kind == reflect.Map {
 		kind := reflect.TypeOf(value).Elem().Kind()
-		// Is already a []string
+		// Is already a string
 		if kind == reflect.String {
-			return true, nil
+			return true
 		}
-		return false, errors.New(fmt.Sprintf("is ]%s expected map[string]string",
-			reflect.TypeOf(value)))
 	}
-	return false, nil
+	return false
 }
 
 func castStringMap(name string, dest interface{}, value interface{}) (interface{}, error) {
@@ -290,19 +287,15 @@ func castStringMap(name string, dest interface{}, value interface{}) (interface{
 		dest = make(map[string]string, 0)
 	}
 
-	// Might already be a map
-	ok, err := isMapString(value)
-	if err != nil {
-		return dest, errors.New(fmt.Sprintf("Invalid map type for '%s' - %s", name, err))
-	}
-	if ok {
+	// could already be a map[string]string
+	if isMapString(value) {
 		return mergeStringMap(dest.(map[string]string), value.(map[string]string)), nil
 	}
 
-	// or it could be a string
+	// value should be a string
 	if reflect.TypeOf(value).Kind() != reflect.String {
 		return dest, errors.New(fmt.Sprintf("Invalid map type for '%s' - '%s' is not a "+
-			"map[string]string or parsable key=value string", name, value))
+			"map[string]string or parsable key=value string", name, reflect.TypeOf(value)))
 	}
 
 	// Assume the value is a parsable string

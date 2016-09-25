@@ -112,14 +112,8 @@ func (self *RuleModifier) StoreStringSlice(dest *[]string) *RuleModifier {
 func (self *RuleModifier) StoreStringMap(dest *map[string]string) *RuleModifier {
 	self.rule.Cast = castStringMap
 	self.rule.StoreValue = func(src interface{}) {
-		// First clear the current map if any
+		// clear the current before assignment
 		*dest = nil
-		// This should never happen if we validate the types
-		srcType := reflect.TypeOf(src)
-		if srcType.Kind() != reflect.Map {
-			self.parser.GetLog().Printf("Attempted to store '%s' which is not a map[string]string",
-				srcType.Kind())
-		}
 		*dest = src.(map[string]string)
 	}
 	return self
@@ -165,11 +159,6 @@ func (self *RuleModifier) Env(varName string) *RuleModifier {
 	return self
 }
 
-func (self *RuleModifier) VarName(varName string) *RuleModifier {
-	self.rule.VarName = varName
-	return self
-}
-
 func (self *RuleModifier) Help(message string) *RuleModifier {
 	self.rule.RuleDesc = message
 	return self
@@ -189,20 +178,12 @@ func (self *RuleModifier) AddConfigGroup(group string) *RuleModifier {
 	return self.parser.AddRule(group, newRuleModifier(&newRule, self.parser))
 }
 
-func (self *RuleModifier) Opt(name string) *RuleModifier {
-	return self.AddOption(name)
-}
-
 func (self *RuleModifier) AddOption(name string) *RuleModifier {
 	var newRule Rule
 	newRule = *self.rule
 	newRule.SetFlags(IsOption)
 	// Make a new RuleModifier using self as the template
 	return self.parser.AddRule(name, newRuleModifier(&newRule, self.parser))
-}
-
-func (self *RuleModifier) Cfg(name string) *RuleModifier {
-	return self.AddConfig(name)
 }
 
 func (self *RuleModifier) AddConfig(name string) *RuleModifier {
@@ -243,7 +224,6 @@ type Rule struct {
 	Order       int
 	Name        string
 	RuleDesc    string
-	VarName     string
 	Value       interface{}
 	Default     *string
 	Aliases     []string
@@ -310,7 +290,7 @@ func (self *Rule) GenerateHelp() (string, string) {
 			parens = append(parens, fmt.Sprintf("Env=%s", envs))
 		}
 		if len(parens) != 0 {
-			paren = fmt.Sprintf("(%s)", strings.Join(parens, " "))
+			paren = fmt.Sprintf(" (%s)", strings.Join(parens, " "))
 		}
 	}
 
@@ -319,7 +299,7 @@ func (self *Rule) GenerateHelp() (string, string) {
 	}
 	// TODO: This sort should happen when we validate rules
 	sort.Sort(sort.Reverse(sort.StringSlice(self.Aliases)))
-	return ("  " + strings.Join(self.Aliases, ", ")), (self.RuleDesc + " " + paren)
+	return ("  " + strings.Join(self.Aliases, ", ")), (self.RuleDesc + paren)
 }
 
 func (self *Rule) MatchesAlias(args []string, idx *int) (bool, string) {

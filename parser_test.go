@@ -108,6 +108,8 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("option '--power-level' is required"))
 		})
+	})
+	Describe("ArgParser.IsStringSlice()", func() {
 		It("Should allow slices in a comma delimited string", func() {
 			parser := args.NewParser()
 			parser.AddOption("--list").IsStringSlice().Default("foo,bar,bit")
@@ -153,6 +155,31 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"bee", "cat", "dad"}))
 			Expect(list).To(Equal([]string{"bee", "cat", "dad"}))
+		})
+	})
+	Describe("ArgParser.IsStringMap()", func() {
+		It("Should handle slice apply from alternate sources", func() {
+			parser := args.NewParser()
+			parser.AddOption("--list").IsStringSlice()
+
+			options := parser.NewOptionsFromMap(
+				map[string]interface{}{
+					"list": []string{"bee", "cat", "dad"},
+				})
+			opt, err := parser.Apply(options)
+			Expect(err).To(BeNil())
+			Expect(opt.StringSlice("list")).To(Equal([]string{"bee", "cat", "dad"}))
+		})
+		It("Should error if apply on map is invalid type", func() {
+			parser := args.NewParser()
+			parser.AddOption("--list").IsStringSlice()
+
+			options := parser.NewOptionsFromMap(
+				map[string]interface{}{
+					"list": 1,
+				})
+			_, err := parser.Apply(options)
+			Expect(err).To(Not(BeNil()))
 		})
 		It("Should allow string map with '=' expression in a comma delimited string", func() {
 			parser := args.NewParser()
@@ -217,6 +244,57 @@ var _ = Describe("ArgParser", func() {
 				"dad":  "boy",
 			}))
 		})
+		It("Should handle map apply from alternate sources", func() {
+			parser := args.NewParser()
+			parser.AddOption("--map").IsStringMap()
+
+			options := parser.NewOptionsFromMap(
+				map[string]interface{}{
+					"map": map[string]string{"key": "value"},
+				})
+			opt, err := parser.Apply(options)
+			Expect(err).To(BeNil())
+			Expect(opt.StringMap("map")).To(Equal(map[string]string{
+				"key": "value",
+			}))
+		})
+		It("Should error if apply on map is invalid type", func() {
+			parser := args.NewParser()
+			parser.AddOption("--map").IsStringMap()
+
+			options := parser.NewOptionsFromMap(
+				map[string]interface{}{
+					"map": 1,
+				})
+			_, err := parser.Apply(options)
+			Expect(err).To(Not(BeNil()))
+		})
+		It("Should fail with incomplete key=values", func() {
+			parser := args.NewParser()
+			parser.AddOption("--map").IsStringMap()
+
+			cmdLine := []string{"--map", "belt"}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(Not(BeNil()))
+
+			cmdLine = []string{"--map", "belt="}
+			opt, err = parser.ParseArgs(&cmdLine)
+			Expect(err).To(Not(BeNil()))
+
+			cmdLine = []string{"--map", "belt=blue;"}
+			opt, err = parser.ParseArgs(&cmdLine)
+			Expect(err).To(Not(BeNil()))
+
+			cmdLine = []string{"--map", "belt=blue;,"}
+			opt, err = parser.ParseArgs(&cmdLine)
+			Expect(err).To(Not(BeNil()))
+
+			cmdLine = []string{"--map", "belt=car,table=cloth"}
+			opt, err = parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.StringMap("map")).To(Equal(map[string]string{"belt": "car", "table": "cloth"}))
+		})
+
 		It("Should allow multiple iterations of the same argument to create a map with JSON", func() {
 			parser := args.NewParser()
 			parser.AddOption("--map").IsStringMap()
@@ -234,6 +312,7 @@ var _ = Describe("ArgParser", func() {
 				"dad":  "boy",
 			}))
 		})
+
 	})
 
 	Describe("ArgParser.AddPositional()", func() {
@@ -388,27 +467,27 @@ var _ = Describe("ArgParser", func() {
 				Help(`Lorem ipsum dolor sit amet, consectetur
 			mollit anim id est laborum.`)
 			msg := parser.GenerateHelpSection(args.IsOption)
-			Expect(msg).To(Equal("  -p, --power-level   Specify our power level " +
+			Expect(msg).To(Equal("  -p, --power-level   Specify our power level" +
 				"\n  -c, --cat-level     Lorem ipsum dolor sit amet, consecteturmollit anim id est" +
-				"\n                      laborum. \n"))
+				"\n                      laborum.\n"))
 		})
 	})
 	Describe("ArgParser.GenerateHelp()", func() {
 		It("Should generate help messages given a set of rules", func() {
-			parser := args.NewParser(args.Name("dragon-ball"), args.WrapLen(80))
+			parser := args.NewParser(args.EnvPrefix("APP_"), args.Desc("Small Description"),
+				args.Name("dragon-ball"), args.WrapLen(80))
+			parser.AddOption("--environ").Default("1").Alias("-e").Env("ENV").Help("Default thing")
+			parser.AddOption("--default").Default("0").Alias("-d").Help("Default thing")
 			parser.AddOption("--power-level").Alias("-p").Help("Specify our power level")
 			parser.AddOption("--cat-level").Alias("-c").Help(`Lorem ipsum dolor sit amet, consectetur
 				adipiscing elit, sed do eiusmod tempor incididunt ut labore et
 				mollit anim id est laborum.`)
-			//msg := parser.GenerateHelp()
-			/*Expect(msg).To(Equal("Usage:\n" +
-			" dragon-ball [OPTIONS]\n" +
-			"\n" +
-			"Options:\n" +
-			"  -p, --power-level   Specify our power level\n" +
-			"  -c, --cat-level     Lorem ipsum dolor sit amet, consecteturadipiscing elit, se\n" +
-			"                     d do eiusmod tempor incididunt ut labore etmollit anim id\n" +
-			"                      est laborum."))*/
+			msg := parser.GenerateHelp()
+			Expect(msg).To(ContainSubstring("Usage: dragon-ball [OPTIONS]"))
+			Expect(msg).To(ContainSubstring("-e, --environ       Default thing (Default=1 Env=ENV)"))
+			Expect(msg).To(ContainSubstring("-d, --default       Default thing (Default=0)"))
+			Expect(msg).To(ContainSubstring("-p, --power-level   Specify our power level"))
+			Expect(msg).To(ContainSubstring("Small Description"))
 		})
 	})
 	Describe("ArgParser.AddCommand()", func() {

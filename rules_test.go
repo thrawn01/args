@@ -395,5 +395,4 @@ var _ = Describe("Rule", func() {
 			Expect(rule.HasFlags(args.Seen)).To(Equal(false))
 		})
 	})
-
 })
