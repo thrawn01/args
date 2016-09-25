@@ -7,15 +7,18 @@ GLIDE := $(GOPATH)/bin/glide
 PATH := $(GOPATH)/bin:$(PATH)
 export $(PATH)
 
-bin/chicken-http-client: examples/chicken-http-client.go
-	go build -o bin/chicken-http-client examples/chicken-http-client.go
+bin/chicken-cli: examples/chicken-cli/checkin-cli.go
+	go build -o bin/chicken-cli examples/chicken-cli/checkin-cli.go
 
-bin/demo: examples/demo.go
-	go build -o bin/demo examples/demo.go
+bin/demo: examples/demo/demo.go
+	go build -o bin/demo examples/demo/demo.go
+
+bin/watch: examples/watch/watch.go
+	go build -o bin/watch examples/watch/watch.go
+
+examples: bin/chicken-cli bin/demo bin/watch
 
 all: test examples
-
-examples: bin/chicken-http-client bin/demo
 
 travis-ci: get-deps
 	go get -u github.com/mattn/goveralls
