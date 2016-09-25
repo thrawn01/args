@@ -115,7 +115,7 @@ func (self *ArgParser) ValidateRules() error {
 		}
 		// Ensure user didn't set a bad default value
 		if rule.Cast != nil && rule.Default != nil {
-			_, err := rule.Cast(rule.Name, *rule.Default)
+			_, err := rule.Cast(rule.Name, nil, *rule.Default)
 			if err != nil {
 				return errors.Wrap(err, "Bad default value")
 			}
@@ -132,18 +132,10 @@ func (self *ArgParser) AddConfigGroup(group string) *RuleModifier {
 	return NewRuleModifier(self).AddConfigGroup(group)
 }
 
-func (self *ArgParser) Opt(name string) *RuleModifier {
-	return self.AddOption(name)
-}
-
 func (self *ArgParser) AddOption(name string) *RuleModifier {
 	rule := newRule()
 	rule.SetFlags(IsOption)
 	return self.AddRule(name, newRuleModifier(rule, self))
-}
-
-func (self *ArgParser) Cfg(name string) *RuleModifier {
-	return self.AddConfig(name)
 }
 
 func (self *ArgParser) AddConfig(name string) *RuleModifier {
@@ -297,29 +289,30 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 		}
 		// Match our arguments with rules expected
 		//fmt.Printf("====== Attempting to match: %d:%s - ", self.idx, self.args[self.idx])
-		rule, err := self.match(self.rules)
+		rule, err := self.matchRules(self.rules)
 		if err != nil {
 			return nil, err
 		}
-		if rule != nil {
-			//fmt.Printf("Found rule - %+v\n", rule)
-			// If we matched a command
-			if rule.HasFlags(IsCommand) {
-				// If we already found a command token on the commandline
-				if self.Command != nil {
-					// Ignore this match, it must be a sub command or a positional argument
-					rule.ClearFlags(Seen)
-				}
-				self.Command = rule
-				// Remove the command argument so we don't process it again in our sub parser
-				self.args = append(self.args[:self.idx], self.args[self.idx+1:]...)
-				self.idx--
-				// If user asked us to stop parsing arguments after finding a command
-				// This might be useful if the user wants arguments found before the command
-				// to apply only to the parent processor
-				if self.StopParsingOnCommand {
-					goto Apply
-				}
+		if rule == nil {
+			continue
+		}
+		//fmt.Printf("Found rule - %+v\n", rule)
+		// If we matched a command
+		if rule.HasFlags(IsCommand) {
+			// If we already found a command token on the commandline
+			if self.Command != nil {
+				// Ignore this match, it must be a sub command or a positional argument
+				rule.ClearFlags(Seen)
+			}
+			self.Command = rule
+			// Remove the command argument so we don't process it again in our sub parser
+			self.args = append(self.args[:self.idx], self.args[self.idx+1:]...)
+			self.idx--
+			// If user asked us to stop parsing arguments after finding a command
+			// This might be useful if the user wants arguments found before the command
+			// to apply only to the parent processor
+			if self.StopParsingOnCommand {
+				goto Apply
 			}
 		}
 	}
@@ -358,10 +351,10 @@ func (self *ArgParser) Apply(values *Options) (*Options, error) {
 		if rule.HasFlags(IsConfigGroup) && values != nil {
 			for _, key := range values.Group(rule.Group).Keys() {
 				value := values.Group(rule.Group).Get(key)
-				results.Group(rule.Group).SetFlags(key, value, rule.Flags)
+				results.Group(rule.Group).SetWithRule(key, value, rule)
 			}
 		} else {
-			results.Group(rule.Group).SetFlags(rule.Name, value, rule.Flags)
+			results.Group(rule.Group).SetWithRule(rule.Name, value, rule)
 		}
 	}
 
@@ -383,18 +376,15 @@ func (self *ArgParser) GetOpts() *Options {
 	return self.options
 }
 
-func (self *ArgParser) match(rules Rules) (*Rule, error) {
+func (self *ArgParser) matchRules(rules Rules) (*Rule, error) {
 	// Find a Rule that matches this argument
 	for _, rule := range rules {
 		matched, err := rule.Match(self.args, &self.idx)
-		if err != nil {
-			// This Rule did match our argument but had an error
-			return rule, err
+		// If no rule was matched
+		if !matched {
+			continue
 		}
-		if matched {
-			//fmt.Printf("Matched '%s' with '%s'\n", rule.Name, rule.Value)
-			return rule, nil
-		}
+		return rule, err
 	}
 	// No Rules matched our arguments and there was no error
 	return nil, nil
@@ -457,7 +447,7 @@ func (self *ArgParser) GenerateUsage(flags int64) string {
 		if !rule.HasFlags(flags) {
 			continue
 		}
-		result.WriteString(rule.GenerateUsage() + " ")
+		result.WriteString(rule.GenerateUsage())
 	}
 	return result.String()
 }

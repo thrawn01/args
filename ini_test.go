@@ -18,7 +18,7 @@ var _ = Describe("ArgParser", func() {
 			parser := args.NewParser()
 			parser.AddOption("--one").IsString()
 			input := []byte("one=this is one value\ntwo=this is two value\n")
-			opt, err := parser.FromIni(input)
+			opt, err := parser.FromINI(input)
 			Expect(err).To(BeNil())
 			Expect(opt.String("one")).To(Equal("this is one value"))
 		})
@@ -31,7 +31,7 @@ var _ = Describe("ArgParser", func() {
 			cmdLine := []string{"--three", "this is three value"}
 			opt, err := parser.ParseArgs(&cmdLine)
 			input := []byte("one=this is one value\ntwo=this is two value\n")
-			opt, err = parser.FromIni(input)
+			opt, err = parser.FromINI(input)
 			Expect(err).To(BeNil())
 			Expect(opt.String("one")).To(Equal("this is one value"))
 			Expect(opt.String("three")).To(Equal("this is three value"))
@@ -45,7 +45,7 @@ var _ = Describe("ArgParser", func() {
 			cmdLine := []string{"--three", "this is three value", "--one", "this is from the cmd line"}
 			opt, err := parser.ParseArgs(&cmdLine)
 			input := []byte("one=this is one value\ntwo=this is two value\n")
-			opt, err = parser.FromIni(input)
+			opt, err = parser.FromINI(input)
 			Expect(err).To(BeNil())
 			Expect(opt.String("one")).To(Equal("this is from the cmd line"))
 			Expect(opt.String("three")).To(Equal("this is three value"))
@@ -62,7 +62,7 @@ var _ = Describe("ArgParser", func() {
 			Expect(list).To(Equal([]string{"foo", "bar", "bit"}))
 
 			input := []byte("list=six,five,four\n")
-			opt, err = parser.FromIni(input)
+			opt, err = parser.FromINI(input)
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"six", "five", "four"}))
 			Expect(list).To(Equal([]string{"six", "five", "four"}))
@@ -71,7 +71,7 @@ var _ = Describe("ArgParser", func() {
 			parser := args.NewParser()
 			parser.AddConfig("one").Required()
 			input := []byte("two=this is one value\nthree=this is two value\n")
-			_, err := parser.FromIni(input)
+			_, err := parser.FromINI(input)
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("config 'one' is required"))
 		})
@@ -87,7 +87,7 @@ var _ = Describe("ArgParser", func() {
 				[database]
 				debug=false
 			`)
-			opts, err = parser.FromIni(iniFile)
+			opts, err = parser.FromINI(iniFile)
 			Expect(err).To(BeNil())
 			Expect(opts.Bool("debug")).To(Equal(true))
 			Expect(opts.Group("database").Bool("debug")).To(Equal(false))
@@ -111,7 +111,7 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.IsSet("five")).To(Equal(false))
 
 			input := []byte("two=this is two value\nthree=yes")
-			opt, err = parser.FromIni(input)
+			opt, err = parser.FromINI(input)
 			Expect(err).To(BeNil())
 			Expect(opt.IsSet("two")).To(Equal(true))
 			Expect(opt.IsSet("one")).To(Equal(true))
@@ -146,7 +146,7 @@ var _ = Describe("ArgParser", func() {
 				fruit-snacks=100 Cals
 				m&ms=400 Cals
 			`)
-			opts, err := parser.FromIni(iniFile)
+			opts, err := parser.FromINI(iniFile)
 			Expect(err).To(BeNil())
 			Expect(opts.Group("candy-bars").ToMap()).To(Equal(map[string]interface{}{
 				"snickers":     "300 Cals",

@@ -85,12 +85,17 @@ func (self *RuleModifier) IsStringSlice() *RuleModifier {
 	return self
 }
 
+func (self *RuleModifier) IsStringMap() *RuleModifier {
+	self.rule.Cast = castStringMap
+	return self
+}
+
 // TODO: Make this less horribad, and use more reflection to make the interface simpler
 // It should also take more than just []string but also []int... etc...
 func (self *RuleModifier) StoreStringSlice(dest *[]string) *RuleModifier {
 	self.rule.Cast = castStringSlice
 	self.rule.StoreValue = func(src interface{}) {
-		// First clear the currenty slice if any
+		// First clear the current slice if any
 		*dest = nil
 		// This should never happen if we validate the types
 		srcType := reflect.TypeOf(src)
@@ -100,6 +105,16 @@ func (self *RuleModifier) StoreStringSlice(dest *[]string) *RuleModifier {
 		for _, value := range src.([]string) {
 			*dest = append(*dest, value)
 		}
+	}
+	return self
+}
+
+func (self *RuleModifier) StoreStringMap(dest *map[string]string) *RuleModifier {
+	self.rule.Cast = castStringMap
+	self.rule.StoreValue = func(src interface{}) {
+		// clear the current before assignment
+		*dest = nil
+		*dest = src.(map[string]string)
 	}
 	return self
 }
@@ -144,11 +159,6 @@ func (self *RuleModifier) Env(varName string) *RuleModifier {
 	return self
 }
 
-func (self *RuleModifier) VarName(varName string) *RuleModifier {
-	self.rule.VarName = varName
-	return self
-}
-
 func (self *RuleModifier) Help(message string) *RuleModifier {
 	self.rule.RuleDesc = message
 	return self
@@ -168,20 +178,12 @@ func (self *RuleModifier) AddConfigGroup(group string) *RuleModifier {
 	return self.parser.AddRule(group, newRuleModifier(&newRule, self.parser))
 }
 
-func (self *RuleModifier) Opt(name string) *RuleModifier {
-	return self.AddOption(name)
-}
-
 func (self *RuleModifier) AddOption(name string) *RuleModifier {
 	var newRule Rule
 	newRule = *self.rule
 	newRule.SetFlags(IsOption)
 	// Make a new RuleModifier using self as the template
 	return self.parser.AddRule(name, newRuleModifier(&newRule, self.parser))
-}
-
-func (self *RuleModifier) Cfg(name string) *RuleModifier {
-	return self.AddConfig(name)
 }
 
 func (self *RuleModifier) AddConfig(name string) *RuleModifier {
@@ -201,7 +203,7 @@ func (self *RuleModifier) Key(key string) *RuleModifier {
 // Rule Object
 // ***********************************************
 
-type CastFunc func(string, interface{}) (interface{}, error)
+type CastFunc func(string, interface{}, interface{}) (interface{}, error)
 type ActionFunc func(*Rule, string, []string, *int) error
 type StoreFunc func(interface{})
 type CommandFunc func(*ArgParser, interface{}) int
@@ -222,7 +224,6 @@ type Rule struct {
 	Order       int
 	Name        string
 	RuleDesc    string
-	VarName     string
 	Value       interface{}
 	Default     *string
 	Aliases     []string
@@ -289,7 +290,7 @@ func (self *Rule) GenerateHelp() (string, string) {
 			parens = append(parens, fmt.Sprintf("Env=%s", envs))
 		}
 		if len(parens) != 0 {
-			paren = fmt.Sprintf("(%s)", strings.Join(parens, " "))
+			paren = fmt.Sprintf(" (%s)", strings.Join(parens, " "))
 		}
 	}
 
@@ -298,7 +299,7 @@ func (self *Rule) GenerateHelp() (string, string) {
 	}
 	// TODO: This sort should happen when we validate rules
 	sort.Sort(sort.Reverse(sort.StringSlice(self.Aliases)))
-	return ("  " + strings.Join(self.Aliases, ", ")), (self.RuleDesc + " " + paren)
+	return ("  " + strings.Join(self.Aliases, ", ")), (self.RuleDesc + paren)
 }
 
 func (self *Rule) MatchesAlias(args []string, idx *int) (bool, string) {
@@ -352,8 +353,9 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 		}
 	}
 
+	// If we get here, this argument is associated with either an option value or a positional
 	//fmt.Printf("arg: %s value: %s\n", alias, args[*idx])
-	value, err := self.Cast(name, self.UnEscape(args[*idx]))
+	value, err := self.Cast(name, self.Value, self.UnEscape(args[*idx]))
 	if err != nil {
 		return true, err
 	}
@@ -382,12 +384,12 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 		self.Value = self.Count
 	}
 
-	// If Rule Matched Argument on command line
+	// If rule matched argument on command line
 	if self.HasFlags(Seen) {
 		return self.Value, nil
 	}
 
-	// If Rule Matched Environment variable
+	// If rule matched environment variable
 	value, err := self.GetEnvValue()
 	if err != nil {
 		return nil, err
@@ -407,13 +409,13 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 		group := values.Group(self.Group)
 		if group.HasKey(self.Name) {
 			self.ClearFlags(NoValue)
-			return self.Cast(self.Name, group.Get(self.Name))
+			return self.Cast(self.Name, self.Value, group.Get(self.Name))
 		}
 	}
 
 	// Apply default if available
 	if self.Default != nil {
-		return self.Cast(self.Name, *self.Default)
+		return self.Cast(self.Name, self.Value, *self.Default)
 	}
 
 	// TODO: Move this logic from here, This method should be all about getting the value
@@ -425,7 +427,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	self.SetFlags(NoValue)
 
 	// Return the default value for our type choice
-	value, _ = self.Cast(self.Name, nil)
+	value, _ = self.Cast(self.Name, self.Value, nil)
 	return value, nil
 }
 
@@ -438,7 +440,7 @@ func (self *Rule) GetEnvValue() (interface{}, error) {
 		varName := self.EnvPrefix + varName
 		//if value, ok := os.LookupEnv(varName); ok {
 		if value := os.Getenv(varName); value != "" {
-			return self.Cast(varName, value)
+			return self.Cast(varName, self.Value, value)
 		}
 	}
 	return nil, nil

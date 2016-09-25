@@ -25,14 +25,12 @@ var _ = Describe("RuleModifier", func() {
 			Expect(opt.Int("power-level")).To(Equal(0))
 
 			// But Apply() a config file
-			options := parser.NewOptionsFromMap(args.DefaultOptionGroup,
-				map[string]map[string]*args.OptionValue{
-					args.DefaultOptionGroup: {
-						"power-level": &args.OptionValue{Value: 3, Flags: 0},
-					},
-					"database": {
-						"user": &args.OptionValue{Value: "my-user", Flags: 0},
-						"pass": &args.OptionValue{Value: "my-pass", Flags: 0},
+			options := parser.NewOptionsFromMap(
+				map[string]interface{}{
+					"power-level": 3,
+					"database": map[string]interface{}{
+						"user": "my-user",
+						"pass": "my-pass",
 					},
 				})
 			newOpt, _ := parser.Apply(options)
@@ -83,7 +81,7 @@ var _ = Describe("RuleModifier", func() {
 			parser := args.NewParser()
 			parser.AddOption("--power-level").IsInt()
 			parser.AddConfigGroup("endpoints").Help("List of http endpoints")
-			opt, err := parser.FromIni(iniFile)
+			opt, err := parser.FromINI(iniFile)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(20000))
 			Expect(opt.Group("endpoints").ToMap()).To(Equal(map[string]interface{}{
@@ -397,5 +395,4 @@ var _ = Describe("Rule", func() {
 			Expect(rule.HasFlags(args.Seen)).To(Equal(false))
 		})
 	})
-
 })

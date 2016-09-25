@@ -13,20 +13,25 @@ var _ = Describe("Options", func() {
 		log = NewTestLogger()
 		parser := args.NewParser()
 		parser.SetLog(log)
-		opts = parser.NewOptionsFromMap(args.DefaultOptionGroup,
-			map[string]map[string]*args.OptionValue{
-				args.DefaultOptionGroup: {
-					"int":    &args.OptionValue{Value: 1, Flags: 0},
-					"bool":   &args.OptionValue{Value: true, Flags: 0},
-					"string": &args.OptionValue{Value: "one", Flags: 0},
-				},
-				"endpoints": {
-					"endpoint1": &args.OptionValue{Value: "host1", Flags: 0},
-					"endpoint2": &args.OptionValue{Value: "host2", Flags: 0},
-					"endpoint3": &args.OptionValue{Value: "host3", Flags: 0},
-				},
-			})
 
+		opts = parser.NewOptionsFromMap(
+			map[string]interface{}{
+				"int":    1,
+				"bool":   true,
+				"string": "one",
+				"endpoints": map[string]interface{}{
+					"endpoint1": "host1",
+					"endpoint2": "host2",
+					"endpoint3": "host3",
+				},
+				"deeply": map[string]interface{}{
+					"nested": map[string]interface{}{
+						"thing": "foo",
+					},
+					"foo": "bar",
+				},
+			},
+		)
 	})
 	Describe("log", func() {
 		It("Should log to StdLogger when cast fails", func() {
@@ -124,8 +129,8 @@ var _ = Describe("Options", func() {
 			opt, err := parser.ParseArgs(nil)
 			Expect(err).To(BeNil())
 			option := opt.InspectOpt("is-set")
-			Expect(option.Value.(int)).To(Equal(1))
-			Expect(option.Flags).To(Equal(int64(32)))
+			Expect(option.GetValue().(int)).To(Equal(1))
+			Expect(option.GetRule().Flags).To(Equal(int64(32)))
 		})
 	})
 
@@ -147,4 +152,27 @@ var _ = Describe("Options", func() {
 			Expect(err.Error()).To(Equal("not-set"))
 		})
 	})
+
+	Describe("ToString()", func() {
+		It("Should return a string representation of the options", func() {
+			output := opts.ToString()
+			Expect(output).To(Equal(`{
+  'bool' = true
+  'deeply' = {
+    'foo' = bar
+    'nested' = {
+      'thing' = foo
+    }
+  }
+  'endpoints' = {
+    'endpoint1' = host1
+    'endpoint2' = host2
+    'endpoint3' = host3
+  }
+  'int' = 1
+  'string' = one
+}`))
+		})
+	})
+
 })

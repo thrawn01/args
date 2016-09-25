@@ -149,7 +149,7 @@ func main() {
 	`)
 
 	// Make configuration simple by reading arguments from an INI file
-	opt, err := parser.FromIni(iniFile)
+	opts, err := parser.FromINI(iniFile)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(-1)
@@ -166,6 +166,37 @@ func main() {
 	fmt.Printf("INI Message    '%s'\n", conf.Message)
 	fmt.Printf("INI Slice      '%s'\n", conf.StringSlice)
 	fmt.Printf("INI Verbose    '%d'\n", conf.Verbose)
-	fmt.Printf("INI Debug      '%t'\n", opt.Bool("debug"))
+	fmt.Printf("INI Debug      '%t'\n", opts.Bool("debug"))
 	fmt.Println("")
+
+	// Create an Options object from a map
+	opts = parser.NewOptionsFromMap(
+		map[string]interface{}{
+			"int":    1,
+			"bool":   true,
+			"string": "one",
+			"endpoints": map[string]interface{}{
+				"endpoint1": "host1",
+				"endpoint2": "host2",
+				"endpoint3": "host3",
+			},
+			"deeply": map[string]interface{}{
+				"nested": map[string]interface{}{
+					"thing": "foo",
+				},
+				"foo": "bar",
+			},
+		},
+	)
+
+	// Small demo of how Group() works with options
+	opts.String("string")                       // == "one"
+	opts.Group("endpoints")                     // == *args.Options
+	opts.Group("endpoints").String("endpoint1") // == "host1"
+	opts.Group("endpoints").ToMap()             // map[string]interface{} {"endpoint1": "host1", ...}
+	opts.StringMap("endpoints")                 // map[string]string {"endpoint1": "host1", ...}
+	opts.KeySlice("endpoints")                  // [ "endpoint1", "endpoint2", ]
+	opts.StringSlice("endpoints")               // [ "host1", "host2", "host3" ]
+
+	// Leaves the door open for IntSlice(), IntMap(), etc....
 }
