@@ -21,7 +21,7 @@ type CommandFunc func(*ArgParser, interface{}) int
 
 const (
 	IsCommand int64 = 1 << iota
-	IsPositional
+	IsArgument
 	IsConfig
 	IsConfigGroup
 	IsRequired
@@ -39,6 +39,7 @@ type Rule struct {
 	Default     *string
 	Aliases     []string
 	EnvVars     []string
+	Choices     []string
 	EnvPrefix   string
 	Cast        CastFunc
 	Action      ActionFunc
@@ -79,7 +80,7 @@ func (self *Rule) GenerateUsage() string {
 			return fmt.Sprintf("%s", self.Aliases[0])
 		}
 		return fmt.Sprintf("[%s]", self.Aliases[0])
-	case self.Flags&IsPositional != 0:
+	case self.Flags&IsArgument != 0:
 		if self.HasFlags(IsRequired) {
 			return fmt.Sprintf("%s", self.Name)
 		}
@@ -105,7 +106,7 @@ func (self *Rule) GenerateHelp() (string, string) {
 		}
 	}
 
-	if self.HasFlags(IsPositional) {
+	if self.HasFlags(IsArgument) {
 		return ("  " + self.Name), self.RuleDesc
 	}
 	// TODO: This sort should happen when we validate rules
@@ -130,7 +131,7 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 		return false, nil
 	}
 
-	if self.HasFlags(IsPositional) {
+	if self.HasFlags(IsArgument) {
 		// If we are a positional and we have already been seen, and not greedy
 		if self.HasFlags(Seen) && self.NotGreedy {
 			// Do not match this argument
@@ -156,7 +157,7 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 		return true, nil
 	}
 
-	if !self.HasFlags(IsPositional) {
+	if !self.HasFlags(IsArgument) {
 		// If no actions are specified assume a value follows this argument and should be converted
 		*idx++
 		if len(args) <= *idx {
@@ -181,8 +182,8 @@ func (self *Rule) UnEscape(str string) string {
 // Returns the appropriate required warning to display to the user
 func (self *Rule) RequiredMessage() string {
 	switch {
-	case self.Flags&IsPositional != 0:
-		return fmt.Sprintf("positional '%s' is required", self.Name)
+	case self.Flags&IsArgument != 0:
+		return fmt.Sprintf("argument '%s' is required", self.Name)
 	case self.Flags&IsConfig != 0:
 		return fmt.Sprintf("config '%s' is required", self.Name)
 	default:

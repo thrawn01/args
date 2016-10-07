@@ -315,39 +315,58 @@ var _ = Describe("ArgParser", func() {
 
 	})
 
+	// Here until we complete deprecation of AddPositional()
 	Describe("ArgParser.AddPositional()", func() {
 		cmdLine := []string{"one", "two", "three", "four"}
-
-		It("Should create positional rule first", func() {
+		It("Should create argument rule first", func() {
 			parser := args.NewParser()
 			parser.AddPositional("first").IsString()
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("first"))
 			Expect(rule.Order).To(Equal(1))
 		})
-		It("Should match first position 'one'", func() {
+		It("Should match first argument 'one'", func() {
 			parser := args.NewParser()
-			parser.AddPositional("first").IsString()
+			parser.AddArgument("first").IsString()
 			opt, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("first")).To(Equal("one"))
 		})
-		It("Should match first positionals in order of declaration", func() {
+	})
+
+	Describe("ArgParser.AddArgument()", func() {
+		cmdLine := []string{"one", "two", "three", "four"}
+
+		It("Should create argument rule first", func() {
 			parser := args.NewParser()
-			parser.AddPositional("first").IsString()
-			parser.AddPositional("second").IsString()
-			parser.AddPositional("third").IsString()
+			parser.AddArgument("first").IsString()
+			rule := parser.GetRules()[0]
+			Expect(rule.Name).To(Equal("first"))
+			Expect(rule.Order).To(Equal(1))
+		})
+		It("Should match first argument 'one'", func() {
+			parser := args.NewParser()
+			parser.AddArgument("first").IsString()
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.String("first")).To(Equal("one"))
+		})
+		It("Should match first argument in order of declaration", func() {
+			parser := args.NewParser()
+			parser.AddArgument("first").IsString()
+			parser.AddArgument("second").IsString()
+			parser.AddArgument("third").IsString()
 			opt, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("first")).To(Equal("one"))
 			Expect(opt.String("second")).To(Equal("two"))
 			Expect(opt.String("third")).To(Equal("three"))
 		})
-		It("Should handle no positionals if declared", func() {
+		It("Should handle no arguments if declared", func() {
 			parser := args.NewParser()
-			parser.AddPositional("first").IsString()
-			parser.AddPositional("second").IsString()
-			parser.AddPositional("third").IsString()
+			parser.AddArgument("first").IsString()
+			parser.AddArgument("second").IsString()
+			parser.AddArgument("third").IsString()
 
 			cmdLine := []string{"one", "two"}
 			opt, err := parser.ParseArgs(&cmdLine)
@@ -356,12 +375,12 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.String("second")).To(Equal("two"))
 			Expect(opt.String("third")).To(Equal(""))
 		})
-		It("Should mixing optionals and positionals", func() {
+		It("Should mixing optionals and arguments", func() {
 			parser := args.NewParser()
 			parser.AddOption("--verbose").IsTrue()
 			parser.AddOption("--first").IsString()
-			parser.AddPositional("second").IsString()
-			parser.AddPositional("third").IsString()
+			parser.AddArgument("second").IsString()
+			parser.AddArgument("third").IsString()
 
 			cmdLine := []string{"--first", "one", "two", "--verbose"}
 			opt, err := parser.ParseArgs(&cmdLine)
@@ -371,10 +390,10 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.String("third")).To(Equal(""))
 			Expect(opt.Bool("verbose")).To(Equal(true))
 		})
-		It("Should raise an error if an optional and a positional share the same name", func() {
+		It("Should raise an error if an optional and an argument share the same name", func() {
 			parser := args.NewParser()
 			parser.AddOption("--first").IsString()
-			parser.AddPositional("first").IsString()
+			parser.AddArgument("first").IsString()
 
 			cmdLine := []string{"--first", "one", "one"}
 			_, err := parser.ParseArgs(&cmdLine)
@@ -390,20 +409,20 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("Duplicate option 'debug' defined"))
 		})
-		It("Should raise an error if a positional is required but not provided", func() {
+		It("Should raise an error if a argument is required but not provided", func() {
 			parser := args.NewParser()
-			parser.AddPositional("first").Required()
-			parser.AddPositional("second").Required()
+			parser.AddArgument("first").Required()
+			parser.AddArgument("second").Required()
 
 			cmdLine := []string{"one"}
 			_, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(Not(BeNil()))
-			Expect(err.Error()).To(Equal("positional 'second' is required"))
+			Expect(err.Error()).To(Equal("argument 'second' is required"))
 		})
-		It("Should respect escaped sequences in positionals", func() {
+		It("Should respect escaped sequences in arguments", func() {
 			parser := args.NewParser()
 			parser.AddOption("--me").IsTrue()
-			parser.AddPositional("first").Required()
+			parser.AddArgument("first").Required()
 
 			cmdLine := []string{"\\-\\-me"}
 			opts, err := parser.ParseArgs(&cmdLine)
@@ -504,7 +523,7 @@ var _ = Describe("ArgParser", func() {
 			Expect(retCode).To(Equal(0))
 			Expect(called).To(Equal(true))
 		})
-		It("Should not confuse a command with a following positional", func() {
+		It("Should not confuse a command with a following argument", func() {
 			parser := args.NewParser()
 			called := 0
 			parser.AddCommand("set", func(parent *args.ArgParser, data interface{}) int {
@@ -517,12 +536,12 @@ var _ = Describe("ArgParser", func() {
 			Expect(retCode).To(Equal(0))
 			Expect(called).To(Equal(1))
 		})
-		It("Should provide a sub parser with that will not confuse a following positional", func() {
+		It("Should provide a sub parser with that will not confuse a following argument", func() {
 			parser := args.NewParser()
 			called := 0
 			parser.AddCommand("set", func(parent *args.ArgParser, data interface{}) int {
-				parent.AddPositional("first").Required()
-				parent.AddPositional("second").Required()
+				parent.AddArgument("first").Required()
+				parent.AddArgument("second").Required()
 				opts, err := parent.ParseArgs(nil)
 				Expect(err).To(BeNil())
 				Expect(opts.String("first")).To(Equal("foo"))
@@ -543,7 +562,7 @@ var _ = Describe("ArgParser", func() {
 			called := 0
 			parser.AddCommand("volume", func(parent *args.ArgParser, data interface{}) int {
 				parent.AddCommand("create", func(subParent *args.ArgParser, data interface{}) int {
-					subParent.AddPositional("volume-name").Required()
+					subParent.AddArgument("volume-name").Required()
 					opts, err := subParent.ParseArgs(nil)
 					Expect(err).To(BeNil())
 					Expect(opts.String("volume-name")).To(Equal("my-new-volume"))
@@ -570,7 +589,7 @@ var _ = Describe("ArgParser", func() {
 
 			called := 0
 			parser.AddCommand("set", func(parent *args.ArgParser, data interface{}) int {
-				parent.AddPositional("first").Required()
+				parent.AddArgument("first").Required()
 				_, err := parent.ParseArgs(nil)
 				Expect(err).To(Not(BeNil()))
 				Expect(err.Error()).To(Equal(""))
@@ -584,6 +603,32 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(BeNil())
 			Expect(retCode).To(Equal(0))
 			Expect(called).To(Equal(1))
+		})
+	})
+	Describe("ArgParser.GetArgs()", func() {
+		It("Should return all un-matched arguments and options", func() {
+			parser := args.NewParser()
+			parser.AddArgument("image")
+			parser.AddOption("-output").Alias("-o").Required()
+			parser.AddOption("-runtime").Default("docker")
+
+			cmdLine := []string{"golang:1.6", "build", "-o",
+				"amd64-my-prog", "-installsuffix", "static", "./..."}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.String("output")).To(Equal("amd64-my-prog"))
+			Expect(opt.String("image")).To(Equal("golang:1.6"))
+			Expect(parser.GetArgs()).To(Equal([]string{"build", "-installsuffix", "static", "./..."}))
+		})
+		It("Should return all empty if all arguments and options matched", func() {
+			parser := args.NewParser()
+			parser.AddOption("--list").IsStringSlice()
+
+			cmdLine := []string{"--list", "bee", "--list", "cat", "--list", "dad"}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.StringSlice("list")).To(Equal([]string{"bee", "cat", "dad"}))
+			Expect(parser.GetArgs()).To(Equal([]string{}))
 		})
 	})
 })

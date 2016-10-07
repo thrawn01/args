@@ -122,6 +122,13 @@ func (self *RuleModifier) Required() *RuleModifier {
 	return self
 }
 
+// Value of this option can only be one of the provided choices; Required() is implied
+func (self *RuleModifier) Choices(choices []string) *RuleModifier {
+	self.rule.SetFlags(IsRequired)
+	self.rule.Choices = choices
+	return self
+}
+
 func (self *RuleModifier) StoreStr(dest *string) *RuleModifier {
 	return self.StoreString(dest)
 }

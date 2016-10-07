@@ -44,21 +44,21 @@ func main() {
 	parser.AddOption("--slice").Alias("-s").StoreStringSlice(&conf.StringSlice).Env("LIST").
 		Default("one,two,three").Help("list of messages")
 
-	// Count the number of times an argument is seen
+	// Count the number of times an option is seen
 	parser.AddOption("--verbose").Alias("-v").Count().StoreInt(&conf.Verbose).Help("be verbose")
 
-	// Set bool to true if the argument is present on the command line
+	// Set bool to true if the option is present on the command line
 	parser.AddOption("--debug").Alias("-d").IsTrue().Help("turn on Debug")
 
 	// Specify the type of the arg with IsInt(), IsString(), IsBool() or IsTrue()
 	parser.AddOption("--help").Alias("-h").IsTrue().Help("show this help message")
 
-	// Add Required positional arguments
-	parser.AddPositional("the-question").Required().
+	// Add Required arguments
+	parser.AddArgument("the-question").Required().
 		StoreStr(&conf.TheQuestion).Help("Before you have an answer")
 
-	// Add Optional positional arguments
-	parser.AddPositional("the-answer").IsInt().Default("42").
+	// Add Optional arguments
+	parser.AddArgument("the-answer").IsInt().Default("42").
 		StoreInt(&conf.TheAnswer).Help("It must be 42")
 
 	// 'Conf' options are not set via the command line but can be set

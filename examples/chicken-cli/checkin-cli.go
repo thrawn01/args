@@ -82,7 +82,7 @@ func main() {
 }
 
 func createChickens(subParser *args.ArgParser, data interface{}) int {
-	subParser.AddPositional("name").Required().Help("The name of the chicken to create")
+	subParser.AddArgument("name").Required().Help("The name of the chicken to create")
 	opts, err := subParser.ParseArgs(nil)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -135,7 +135,7 @@ func listChickens(subParser *args.ArgParser, data interface{}) int {
 }
 
 func deleteChickens(subParser *args.ArgParser, data interface{}) int {
-	subParser.AddPositional("name").Required().Help("The name of the chicken to delete")
+	subParser.AddArgument("name").Required().Help("The name of the chicken to delete")
 	opts, err := subParser.ParseArgs(nil)
 	if err != nil {
 		fmt.Println(err.Error())

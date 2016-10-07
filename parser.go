@@ -8,6 +8,8 @@ import (
 	"sort"
 	"sync"
 
+	"strings"
+
 	"github.com/fatih/structs"
 	"github.com/pkg/errors"
 )
@@ -144,11 +146,16 @@ func (self *ArgParser) AddConfig(name string) *RuleModifier {
 	return self.AddRule(name, newRuleModifier(rule, self))
 }
 
+// Deprecated use AddArgument instead
 func (self *ArgParser) AddPositional(name string) *RuleModifier {
+	return self.AddArgument(name)
+}
+
+func (self *ArgParser) AddArgument(name string) *RuleModifier {
 	rule := newRule()
 	self.posCount++
 	rule.Order = self.posCount
-	rule.SetFlags(IsPositional)
+	rule.SetFlags(IsArgument)
 	rule.NotGreedy = true
 	return self.AddRule(name, newRuleModifier(rule, self))
 }
@@ -252,10 +259,10 @@ func (self *ArgParser) ParseArgsSimple(args *[]string) *Options {
 // Parses command line arguments using os.Args if 'args' is nil
 func (self *ArgParser) ParseArgs(args *[]string) (*Options, error) {
 	if args != nil {
-		self.args = *args
+		self.args = copyStringSlice(*args)
 	} else if args == nil && !self.IsSubParser {
 		// If args is nil and we are not a subparser
-		self.args = os.Args[1:]
+		self.args = copyStringSlice(os.Args[1:])
 	}
 
 	if self.addHelp && !self.HasHelpOption() {
@@ -263,10 +270,10 @@ func (self *ArgParser) ParseArgs(args *[]string) (*Options, error) {
 		self.AddOption("--help").Alias("-h").IsTrue().Help("Display this help message and exit")
 		self.helpAdded = true
 	}
-	return self.parseUntil(self.args, "--")
+	return self.parseUntil("--")
 }
 
-func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, error) {
+func (self *ArgParser) parseUntil(terminator string) (*Options, error) {
 	self.idx = 0
 
 	// Sanity Check
@@ -284,11 +291,15 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 
 	// Process command line arguments until we find our terminator
 	for ; self.idx < len(self.args); self.idx++ {
+
 		if self.args[self.idx] == terminator {
 			goto Apply
 		}
 		// Match our arguments with rules expected
 		//fmt.Printf("====== Attempting to match: %d:%s - ", self.idx, self.args[self.idx])
+
+		// Some options have arguments, this is the idx of the option if it matches
+		startIdx := self.idx
 		rule, err := self.matchRules(self.rules)
 		if err != nil {
 			return nil, err
@@ -297,6 +308,13 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 			continue
 		}
 		//fmt.Printf("Found rule - %+v\n", rule)
+
+		// Remove the argument so a sub processor won't process it again, this avoids confusing behavior
+		// for sub parsers. IE: [prog -o option sub-command -o option] the first -o will not
+		// be confused with the second -o since we remove it from args here
+		self.args = append(self.args[:startIdx], self.args[self.idx+1:]...)
+		self.idx += startIdx - (self.idx + 1)
+
 		// If we matched a command
 		if rule.HasFlags(IsCommand) {
 			// If we already found a command token on the commandline
@@ -305,9 +323,6 @@ func (self *ArgParser) parseUntil(args []string, terminator string) (*Options, e
 				rule.ClearFlags(Seen)
 			}
 			self.Command = rule
-			// Remove the command argument so we don't process it again in our sub parser
-			self.args = append(self.args[:self.idx], self.args[self.idx+1:]...)
-			self.idx--
 			// If user asked us to stop parsing arguments after finding a command
 			// This might be useful if the user wants arguments found before the command
 			// to apply only to the parent processor
@@ -355,6 +370,16 @@ func (self *ArgParser) Apply(values *Options) (*Options, error) {
 			}
 		} else {
 			results.Group(rule.Group).SetWithRule(rule.Name, value, rule)
+
+			// Choices check
+			if rule.Choices != nil {
+				strValue := results.Group(rule.Group).String(rule.Name)
+				if !containsString(strValue, rule.Choices) {
+					err := errors.Errorf("'%s' is an invalid argument for '%s' choose from (%s)",
+						strValue, rule.Name, strings.Join(rule.Choices, ", "))
+					return results, err
+				}
+			}
 		}
 	}
 
@@ -374,6 +399,12 @@ func (self *ArgParser) GetOpts() *Options {
 		self.mutex.Unlock()
 	}()
 	return self.options
+}
+
+// Return the un-parsed portion of the argument array. These are arguments that where not
+// matched by any AddOption() or AddArgument() rules defined by the user.
+func (self *ArgParser) GetArgs() []string {
+	return copyStringSlice(self.args)
 }
 
 func (self *ArgParser) matchRules(rules Rules) (*Rule, error) {
@@ -402,11 +433,11 @@ func (self *ArgParser) PrintHelp() {
 
 func (self *ArgParser) GenerateHelp() string {
 	var result bytes.Buffer
-	// TODO: Improve this once we have positional arguments
+	// TODO: Improve this once we have arguments
 	// Super generic usage message
 	result.WriteString(fmt.Sprintf("Usage: %s %s %s\n", self.Name,
 		self.GenerateUsage(IsOption),
-		self.GenerateUsage(IsPositional)))
+		self.GenerateUsage(IsArgument)))
 
 	if self.Description != "" {
 		result.WriteString("\n")
@@ -420,10 +451,10 @@ func (self *ArgParser) GenerateHelp() string {
 		result.WriteString(commands)
 	}
 
-	positional := self.GenerateHelpSection(IsPositional)
-	if positional != "" {
-		result.WriteString("\nPositionals:\n")
-		result.WriteString(positional)
+	argument := self.GenerateHelpSection(IsArgument)
+	if argument != "" {
+		result.WriteString("\nArguments:\n")
+		result.WriteString(argument)
 	}
 
 	options := self.GenerateHelpSection(IsOption)
