@@ -207,7 +207,7 @@ func show(subParser *args.ArgParser, data interface{}) int {
 }
 
 func createVolume(subParser *args.ArgParser, data interface{}) int {
-    subParser.AddPositional("name").Required().Help("The name of the volume to create")
+    subParser.AddArgument("name").Required().Help("The name of the volume to create")
     opts, err := subParser.ParseArgs(nil)
     if err != nil {
         fmt.Println(err.Error())
@@ -306,21 +306,21 @@ func main() {
     parser.AddOption("--slice").Alias("-s").StoreStringSlice(&conf.StringSlice).Env("LIST").
         Default("one,two,three").Help("list of messages")
 
-    // Count the number of times an argument is seen
+    // Count the number of times an option is seen
     parser.AddOption("--verbose").Alias("-v").Count().StoreInt(&conf.Verbose).Help("be verbose")
 
-    // Set bool to true if the argument is present on the command line
+    // Set bool to true if the option is present on the command line
     parser.AddOption("--debug").Alias("-d").IsTrue().Help("turn on Debug")
 
     // Specify the type of the arg with IsInt(), IsString(), IsBool() or IsTrue()
     parser.AddOption("--help").Alias("-h").IsTrue().Help("show this help message")
 
-    // Add Required positional arguments
-    parser.AddPositional("the-question").Required().
+    // Add Required argument
+    parser.AddArgument("the-question").Required().
         StoreStr(&conf.TheQuestion).Help("Before you have an answer")
 
-    // Add Optional positional arguments
-    parser.AddPositional("the-answer").IsInt().Default("42").
+    // Add Optional arguments
+    parser.AddArgument("the-answer").IsInt().Default("42").
         StoreInt(&conf.TheAnswer).Help("It must be 42")
 
     // 'Conf' options are not set via the command line but can be set
@@ -480,7 +480,7 @@ Usage: demo [OPTIONS] the-question [the-answer]
 
 This is a demo app to showcase some features of args
 
-Positionals:
+Arguments:
   the-question   Before you have an answer
   the-answer     It must be 42
 
@@ -513,7 +513,7 @@ Options:
 * Support SubCommands
 * Support Nested SubCommands
 * Automatically adds a --help message if none defined
-* Support for escaping positionals (IE: --help and \\-\\-help are different)
+* Support for escaping arguments (IE: --help and \\-\\-help are different)
 * Automatically generates help for SubCommands
 * Tests for args.WatchFile()
 * Support for Kubernetes ConfigMap file watching
@@ -526,7 +526,7 @@ Options:
 * Support float type '--float=3.14'
 * Support '-arg=value'
 * Support Parent Parsing
-* Support Greedy Positional Arguments ```[<files>….]```
+* Support Greedy Arguments ```[<files>….]```
 * Write better intro document
 * Write godoc
 * Ability to include Config() options in help message

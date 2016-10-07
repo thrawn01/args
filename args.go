@@ -309,6 +309,23 @@ func castStringMap(name string, dest interface{}, value interface{}) (interface{
 	return mergeStringMap(dest.(map[string]string), result), nil
 }
 
+func containsString(needle string, haystack []string) bool {
+	for _, item := range haystack {
+		if item == needle {
+			return true
+		}
+	}
+	return false
+}
+
+func copyStringSlice(src []string) (dest []string) {
+	dest = make([]string, len(src))
+	for idx, value := range src {
+		dest[idx] = value
+	}
+	return
+}
+
 func JSONToMap(value string) (map[string]string, error) {
 	result := make(map[string]string)
 	err := json.Unmarshal([]byte(value), &result)

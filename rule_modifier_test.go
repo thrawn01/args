@@ -325,6 +325,53 @@ var _ = Describe("RuleModifier", func() {
 			Expect(err.Error()).To(ContainSubstring("Bad default value"))
 		})
 	})
+	Describe("RuleModifier.Choices()", func() {
+		It("Should err if not provided", func() {
+			parser := args.NewParser()
+			parser.AddOption("--choices").Choices([]string{"one", "two", "three"})
+
+			_, err := parser.ParseArgs(nil)
+			Expect(err).To(Not(BeNil()))
+			Expect(err.Error()).To(Equal("option '--choices' is required"))
+		})
+		It("Should allow valid choices", func() {
+			parser := args.NewParser()
+			parser.AddOption("--choices").Choices([]string{"one", "two", "three"})
+
+			cmdLine := []string{"--choices", "one"}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.String("choices")).To(Equal("one"))
+		})
+		It("Should err if not valid choice", func() {
+			parser := args.NewParser()
+			parser.AddOption("--choices").Choices([]string{"one", "two", "three"})
+
+			cmdLine := []string{"--choices", "five"}
+			_, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(Not(BeNil()))
+			Expect(err.Error()).To(Equal("'five' is an invalid argument for 'choices' " +
+				"choose from (one, two, three)"))
+		})
+		It("Should work with default value", func() {
+			parser := args.NewParser()
+			parser.AddOption("--choices").Default("two").Choices([]string{"one", "two", "three"})
+
+			opt, err := parser.ParseArgs(nil)
+			Expect(err).To(BeNil())
+			Expect(opt.String("choices")).To(Equal("two"))
+		})
+		It("Should work with non string values", func() {
+			parser := args.NewParser()
+			parser.AddOption("--choices").IsInt().Choices([]string{"1", "2", "3"})
+
+			cmdLine := []string{"--choices", "5"}
+			_, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(Not(BeNil()))
+			Expect(err.Error()).To(Equal("'5' is an invalid argument for 'choices' " +
+				"choose from (1, 2, 3)"))
+		})
+	})
 	Describe("RuleModifier.Env()", func() {
 		AfterEach(func() {
 			os.Unsetenv("POWER_LEVEL")
