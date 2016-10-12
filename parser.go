@@ -38,6 +38,7 @@ type ArgParser struct {
 	posCount             int
 	attempts             int
 	log                  StdLogger
+	flags                int64
 }
 
 // Creates a new instance of the argument parser
@@ -75,6 +76,7 @@ func (self *ArgParser) SubParser() *ArgParser {
 	parser.helpAdded = self.helpAdded
 	parser.addHelp = self.addHelp
 	parser.options = self.options
+	parser.flags = self.flags
 
 	// Remove all Commands from our rules
 	for i := len(parser.rules) - 1; i >= 0; i-- {
@@ -95,6 +97,10 @@ func (self *ArgParser) SetLog(logger StdLogger) {
 
 func (self *ArgParser) GetLog() StdLogger {
 	return self.log
+}
+
+func (self *ArgParser) SetDesc(desc string) {
+	self.Description = desc
 }
 
 func (self *ArgParser) info(format string, args ...interface{}) {
@@ -441,7 +447,11 @@ func (self *ArgParser) GenerateHelp() string {
 
 	if self.Description != "" {
 		result.WriteString("\n")
-		result.WriteString(WordWrap(self.Description, 0, 80))
+		if HasFlags(self.flags, IsFormated) {
+			result.WriteString(self.Description)
+		} else {
+			result.WriteString(WordWrap(self.Description, 0, 80))
+		}
 		result.WriteString("\n")
 	}
 

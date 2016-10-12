@@ -26,6 +26,7 @@ const (
 	IsConfigGroup
 	IsRequired
 	IsOption
+	IsFormated
 	NoValue
 	Seen
 )
@@ -102,7 +103,7 @@ func (self *Rule) GenerateHelp() (string, string) {
 			parens = append(parens, fmt.Sprintf("Env=%s", envs))
 		}
 		if len(parens) != 0 {
-			paren = fmt.Sprintf(" (%s)", strings.Join(parens, " "))
+			paren = fmt.Sprintf(" (%s)", strings.Join(parens, ", "))
 		}
 	}
 
@@ -249,7 +250,6 @@ func (self *Rule) GetEnvValue() (interface{}, error) {
 	}
 
 	for _, varName := range self.EnvVars {
-		varName := self.EnvPrefix + varName
 		//if value, ok := os.LookupEnv(varName); ok {
 		if value := os.Getenv(varName); value != "" {
 			return self.Cast(varName, self.Value, value)

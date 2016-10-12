@@ -274,6 +274,13 @@ func (self *Options) IsSet(key string) bool {
 	return false
 }
 
+func (self *Options) IsSeen(key string) bool {
+	if opt, ok := self.values[key]; ok {
+		return (opt.GetRule().Flags&Seen != 0)
+	}
+	return false
+}
+
 // Returns true only if all of the keys given have values set
 func (self *Options) Required(keys []string) error {
 	for _, key := range keys {

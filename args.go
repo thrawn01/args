@@ -40,8 +40,12 @@ func Name(name string) ParseModifier {
 	}
 }
 
-func Desc(desc string) ParseModifier {
+func Desc(desc string, flags ...int64) ParseModifier {
 	return func(parser *ArgParser) {
+		// Set any flags if provided
+		for _, flag := range flags {
+			SetFlags(&parser.flags, flag)
+		}
 		parser.Description = desc
 	}
 }
