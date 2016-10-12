@@ -5,9 +5,6 @@ import (
 
 	"sync"
 
-	"io/ioutil"
-
-	"github.com/pkg/errors"
 	"gopkg.in/fsnotify.v1"
 )
 
@@ -87,12 +84,4 @@ func WatchFile(path string, interval time.Duration, callBack func(error)) (Watch
 		close(done)
 		fsWatch.Close()
 	}, err
-}
-
-func LoadFile(fileName string) ([]byte, error) {
-	content, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to read '%s'", fileName)
-	}
-	return content, nil
 }

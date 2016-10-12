@@ -121,6 +121,22 @@ var _ = Describe("Options", func() {
 		})
 	})
 
+	Describe("IsSeen()", func() {
+		It("Should return true if the option was seen on the commandline", func() {
+			cmdLine := []string{"--is-seen"}
+			parser := args.NewParser()
+			parser.AddOption("--is-set").IsInt().Default("1")
+			parser.AddOption("--is-seen").IsTrue()
+			parser.AddOption("--not-set")
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.IsSeen("is-set")).To(Equal(false))
+			Expect(opt.IsSeen("not-set")).To(Equal(false))
+			Expect(opt.IsSeen("is-seen")).To(Equal(true))
+
+		})
+	})
+
 	Describe("InspectOpt()", func() {
 		It("Should return the option object requested", func() {
 			parser := args.NewParser()

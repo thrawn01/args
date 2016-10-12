@@ -503,10 +503,23 @@ var _ = Describe("ArgParser", func() {
 				mollit anim id est laborum.`)
 			msg := parser.GenerateHelp()
 			Expect(msg).To(ContainSubstring("Usage: dragon-ball [OPTIONS]"))
-			Expect(msg).To(ContainSubstring("-e, --environ       Default thing (Default=1 Env=ENV)"))
+			Expect(msg).To(ContainSubstring("-e, --environ       Default thing (Default=1, Env=APP_ENV)"))
 			Expect(msg).To(ContainSubstring("-d, --default       Default thing (Default=0)"))
 			Expect(msg).To(ContainSubstring("-p, --power-level   Specify our power level"))
 			Expect(msg).To(ContainSubstring("Small Description"))
+		})
+		It("Should generate formated description if flag is set", func() {
+			desc := `
+			Custom formated description ----------------------------------------------------------- over 80
+
+			With lots of new lines
+			`
+			parser := args.NewParser(args.Desc(desc, args.IsFormated),
+				args.Name("dragon-ball"), args.WrapLen(80))
+			parser.AddOption("--environ").Default("1").Alias("-e").Help("Default thing")
+			msg := parser.GenerateHelp()
+			Expect(msg).To(ContainSubstring("Custom formated description --------------------" +
+				"--------------------------------------- over 80"))
 		})
 	})
 	Describe("ArgParser.AddCommand()", func() {

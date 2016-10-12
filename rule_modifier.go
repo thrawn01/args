@@ -153,7 +153,7 @@ func (self *RuleModifier) Count() *RuleModifier {
 }
 
 func (self *RuleModifier) Env(varName string) *RuleModifier {
-	self.rule.EnvVars = append(self.rule.EnvVars, varName)
+	self.rule.EnvVars = append(self.rule.EnvVars, self.parser.EnvPrefix+varName)
 	return self
 }
 

@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"strings"
 
 	"path"
 
@@ -167,26 +166,15 @@ func joinUrl(shared *SharedStruct, slugs ...string) string {
 	return uri.String()
 }
 
-func curlString(req *http.Request, payload *[]byte) string {
-	parts := []string{"curl", "-i", "-X", req.Method, req.URL.String()}
-	for key, value := range req.Header {
-		parts = append(parts, fmt.Sprintf("-H \"%s: %s\"", key, value[0]))
-	}
-
-	if payload != nil {
-		parts = append(parts, fmt.Sprintf(" -d '%s'", string(*payload)))
-	}
-	return strings.Join(parts, " ")
-}
-
 func sendRequest(opts *args.Options, req *http.Request, payload *[]byte) (string, error) {
 	req.Header.Set("Content-Type", "application/json")
 
-	// Preform the Request
-	curl := curlString(req, payload)
+	// Print a curl representation of the request if verbose
+	curl := args.CurlString(req, payload)
 	if opts.Bool("verbose") {
 		fmt.Printf("-- %s\n", curl)
 	}
+
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
