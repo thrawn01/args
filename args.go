@@ -405,7 +405,7 @@ type HelpErrorInterface interface {
 type HelpError struct{}
 
 func (e *HelpError) Error() string {
-	return ""
+	return "User asked for help; Inspect this error with args.AskedForHelp(err)"
 }
 
 func (e *HelpError) IsHelpError() bool {
