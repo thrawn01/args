@@ -605,7 +605,8 @@ var _ = Describe("ArgParser", func() {
 				parent.AddArgument("first").Required()
 				_, err := parent.ParseArgs(nil)
 				Expect(err).To(Not(BeNil()))
-				Expect(err.Error()).To(Equal(""))
+				Expect(err.Error()).To(Equal("User asked for help; Inspect this error " +
+					"with args.AskedForHelp(err)"))
 				Expect(args.AskedForHelp(err)).To(Equal(true))
 
 				called++

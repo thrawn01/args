@@ -211,7 +211,11 @@ func (self *ArgParser) GetRules() Rules {
 func (self *ArgParser) ParseAndRun(args *[]string, data interface{}) (int, error) {
 	_, err := self.ParseArgs(args)
 	if err != nil {
-		return -1, err
+		if AskedForHelp(err) {
+			self.PrintHelp()
+			return 1, nil
+		}
+		return 1, err
 	}
 	return self.RunCommand(data)
 }
@@ -222,7 +226,7 @@ func (self *ArgParser) RunCommand(data interface{}) (int, error) {
 	// If user didn't provide a command via the commandline
 	if self.Command == nil {
 		self.PrintHelp()
-		return -1, nil
+		return 1, nil
 	}
 
 	parser := self.SubParser()
@@ -257,7 +261,7 @@ func (self *ArgParser) ParseArgsSimple(args *[]string) *Options {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		self.PrintHelp()
-		os.Exit(-1)
+		os.Exit(1)
 	}
 	return opt
 }
