@@ -269,14 +269,22 @@ func (self *Options) KeySlice(key string) []string {
 
 func (self *Options) IsSet(key string) bool {
 	if opt, ok := self.values[key]; ok {
-		return !(opt.GetRule().Flags&NoValue != 0)
+		rule := opt.GetRule()
+		if rule == nil {
+			return false
+		}
+		return !(rule.Flags&NoValue != 0)
 	}
 	return false
 }
 
 func (self *Options) IsSeen(key string) bool {
 	if opt, ok := self.values[key]; ok {
-		return (opt.GetRule().Flags&Seen != 0)
+		rule := opt.GetRule()
+		if rule == nil {
+			return false
+		}
+		return (rule.Flags&Seen != 0)
 	}
 	return false
 }
