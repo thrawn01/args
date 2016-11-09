@@ -83,7 +83,7 @@ func (self *Rule) GenerateUsage() string {
 		return fmt.Sprintf("[%s]", self.Aliases[0])
 	case self.Flags&IsArgument != 0:
 		if self.HasFlags(IsRequired) {
-			return fmt.Sprintf("%s", self.Name)
+			return fmt.Sprintf("<%s>", self.Name)
 		}
 		return fmt.Sprintf("[%s]", self.Name)
 	}

@@ -492,7 +492,7 @@ func (self *ArgParser) GenerateUsage(flags int64) string {
 		if !rule.HasFlags(flags) {
 			continue
 		}
-		result.WriteString(rule.GenerateUsage())
+		result.WriteString(" " + rule.GenerateUsage())
 	}
 	return result.String()
 }
