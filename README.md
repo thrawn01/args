@@ -135,32 +135,6 @@ cancelWatch := etcdBackend.Watch(client, func(event args.ChangeEvent, err error)
 // -- snip ---
 ```
 
-## JSON-RPC Handler
-The JSON-RPC handler will provide access to the config via http using JSON-RPC (Feature is still a WIP)
-```go
-parser := args.NewParser(args.Desc("Demo Service showcasing args JSON-RPC interface"))
-parser.AddConfig("simple").Help("Demo of simple config item")
-opt := parser.ParseArgsSimple(nil)
-
-// Simple Application that just displays our current config
-http.HandleFunc("/my-app", func(w http.ResponseWriter, r *http.Request) {
-    conf := parser.GetOpts()
-
-    payload, err := json.Marshal(map[string]string{
-        "simple": conf.String("simple"),
-    })
-    w.Header().Set("Content-Type", "application/json")
-    w.Write(payload)
-})
-
-// Allow admin users to change our config remotely via the JSON-RPC handler
-// This path should be protected by authentication middleware.
-http.HandleFunc("/config", parser.JsonRPCHandler)
-
-fmt.Printf("Listening on %s...\n", opt.String("bind"))
-log.Fatal(http.ListenAndServe(opt.String("bind"), nil))
-```
-
 ## Command Support
 The following code creates a command, and sub-command such that usage works like this
 ```
@@ -323,6 +297,9 @@ func main() {
     parser.AddArgument("the-answer").IsInt().Default("42").
         StoreInt(&conf.TheAnswer).Help("It must be 42")
 
+    // Greedy arguments (my-prog lie1 lie2) becomes []string{"lie1", "lie2"}
+    parser.AddArgument("lies").IsStringSlice().Help("lots of lies in a []string")
+
     // 'Conf' options are not set via the command line but can be set
     // via a config file or an environment variable
     parser.AddConfig("twelve-factor").Env("TWELVE_FACTOR").Help("Demo of config options")
@@ -376,6 +353,7 @@ func main() {
     fmt.Printf("Power               '%d'\n", opt.Int("power-level"))
     fmt.Printf("Message             '%s'\n", opt.String("message"))
     fmt.Printf("String Slice        '%s'\n", opt.StringSlice("slice"))
+    fmt.Printf("String Slice Lies   '%s'\n", opt.StringSlice("lies"))
     fmt.Printf("Verbose             '%d'\n", opt.Int("verbose"))
     fmt.Printf("Debug               '%t'\n", opt.Bool("debug"))
     fmt.Printf("TheAnswer           '%d'\n", opt.Int("the-answer"))

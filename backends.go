@@ -78,7 +78,7 @@ func (self *ArgParser) ParseBackend(backend Backend) (*Options, error) {
 	defer func() { cancel() }()
 	//
 	for _, rule := range self.rules {
-		if rule.HasFlags(IsConfigGroup) {
+		if rule.HasFlag(IsConfigGroup) {
 			pairs, err := backend.List(ctx, rule.BackendKey)
 			if err != nil {
 				self.info("args.FromStore().List() fetching '%s' - '%s'", rule.BackendKey, err.Error())
@@ -103,7 +103,7 @@ func (self *ArgParser) ParseBackend(backend Backend) (*Options, error) {
 func (self *ArgParser) matchBackendRule(key string) *Rule {
 	for _, rule := range self.rules {
 		comparePath := key
-		if rule.HasFlags(IsConfigGroup) {
+		if rule.HasFlag(IsConfigGroup) {
 			comparePath = path.Dir(key)
 		}
 		if comparePath == rule.BackendKey {

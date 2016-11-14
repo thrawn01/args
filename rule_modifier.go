@@ -73,11 +73,13 @@ func (self *RuleModifier) StoreTrue(dest *bool) *RuleModifier {
 
 func (self *RuleModifier) IsStringSlice() *RuleModifier {
 	self.rule.Cast = castStringSlice
+	self.rule.SetFlag(IsGreedy)
 	return self
 }
 
 func (self *RuleModifier) IsStringMap() *RuleModifier {
 	self.rule.Cast = castStringMap
+	self.rule.SetFlag(IsGreedy)
 	return self
 }
 
@@ -118,13 +120,13 @@ func (self *RuleModifier) Alias(aliasName string) *RuleModifier {
 
 // Makes this option or positional argument required
 func (self *RuleModifier) Required() *RuleModifier {
-	self.rule.SetFlags(IsRequired)
+	self.rule.SetFlag(IsRequired)
 	return self
 }
 
 // Value of this option can only be one of the provided choices; Required() is implied
 func (self *RuleModifier) Choices(choices []string) *RuleModifier {
-	self.rule.SetFlags(IsRequired)
+	self.rule.SetFlag(IsRequired)
 	self.rule.Choices = choices
 	return self
 }
@@ -170,7 +172,7 @@ func (self *RuleModifier) InGroup(group string) *RuleModifier {
 func (self *RuleModifier) AddConfigGroup(group string) *RuleModifier {
 	var newRule Rule
 	newRule = *self.rule
-	newRule.SetFlags(IsConfigGroup)
+	newRule.SetFlag(IsConfigGroup)
 	newRule.Group = group
 	// Make a new RuleModifier using self as the template
 	return self.parser.AddRule(group, newRuleModifier(&newRule, self.parser))
@@ -179,7 +181,7 @@ func (self *RuleModifier) AddConfigGroup(group string) *RuleModifier {
 func (self *RuleModifier) AddOption(name string) *RuleModifier {
 	var newRule Rule
 	newRule = *self.rule
-	newRule.SetFlags(IsOption)
+	newRule.SetFlag(IsOption)
 	// Make a new RuleModifier using self as the template
 	return self.parser.AddRule(name, newRuleModifier(&newRule, self.parser))
 }
@@ -188,7 +190,7 @@ func (self *RuleModifier) AddConfig(name string) *RuleModifier {
 	var newRule Rule
 	newRule = *self.rule
 	// Make a new Rule using self.rule as the template
-	newRule.SetFlags(IsConfig)
+	newRule.SetFlag(IsConfig)
 	return self.parser.AddRule(name, newRuleModifier(&newRule, self.parser))
 }
 

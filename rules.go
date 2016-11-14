@@ -27,6 +27,7 @@ const (
 	IsRequired
 	IsOption
 	IsFormated
+	IsGreedy
 	NoValue
 	Seen
 )
@@ -57,15 +58,15 @@ func newRule() *Rule {
 	return &Rule{Cast: castString, Group: DefaultOptionGroup}
 }
 
-func (self *Rule) HasFlags(flag int64) bool {
+func (self *Rule) HasFlag(flag int64) bool {
 	return self.Flags&flag != 0
 }
 
-func (self *Rule) SetFlags(flag int64) {
+func (self *Rule) SetFlag(flag int64) {
 	self.Flags = (self.Flags | flag)
 }
 
-func (self *Rule) ClearFlags(flag int64) {
+func (self *Rule) ClearFlag(flag int64) {
 	mask := (self.Flags ^ flag)
 	self.Flags &= mask
 }
@@ -77,12 +78,12 @@ func (self *Rule) Validate() error {
 func (self *Rule) GenerateUsage() string {
 	switch {
 	case self.Flags&IsOption != 0:
-		if self.HasFlags(IsRequired) {
+		if self.HasFlag(IsRequired) {
 			return fmt.Sprintf("%s", self.Aliases[0])
 		}
 		return fmt.Sprintf("[%s]", self.Aliases[0])
 	case self.Flags&IsArgument != 0:
-		if self.HasFlags(IsRequired) {
+		if self.HasFlag(IsRequired) {
 			return fmt.Sprintf("<%s>", self.Name)
 		}
 		return fmt.Sprintf("[%s]", self.Name)
@@ -94,7 +95,7 @@ func (self *Rule) GenerateHelp() (string, string) {
 	var parens []string
 	paren := ""
 
-	if !self.HasFlags(IsCommand) {
+	if !self.HasFlag(IsCommand) {
 		if self.Default != nil {
 			parens = append(parens, fmt.Sprintf("Default=%s", *self.Default))
 		}
@@ -107,7 +108,7 @@ func (self *Rule) GenerateHelp() (string, string) {
 		}
 	}
 
-	if self.HasFlags(IsArgument) {
+	if self.HasFlag(IsArgument) {
 		return ("  " + self.Name), self.RuleDesc
 	}
 	// TODO: This sort should happen when we validate rules
@@ -128,46 +129,39 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	name := self.Name
 	var matched bool
 
-	if self.HasFlags(IsConfig) {
+	if self.HasFlag(IsConfig) {
 		return false, nil
 	}
 
-	if self.HasFlags(IsArgument) {
-		// If we are a positional and we have already been seen, and not greedy
-		if self.HasFlags(Seen) && self.NotGreedy {
-			// Do not match this argument
+	// If this is an argument
+	if self.HasFlag(IsArgument) {
+		// And we have already seen this argument and it's not greedy
+		if self.HasFlag(Seen) && !self.HasFlag(IsGreedy) {
 			return false, nil
 		}
-		// TODO: Handle Greedy
 	} else {
-		//fmt.Printf("Matched Positional Arg: %s\n", args[*idx])
+		// Match any known aliases
 		matched, name = self.MatchesAlias(args, idx)
-		//fmt.Printf("Matched Optional Arg: %v - %s\n", matched, alias)
 		if !matched {
 			return false, nil
 		}
 	}
-	self.SetFlags(Seen)
+	self.SetFlag(Seen)
 
 	// If user defined an action
 	if self.Action != nil {
-		err := self.Action(self, name, args, idx)
-		if err != nil {
-			return true, err
-		}
-		return true, nil
+		return true, self.Action(self, name, args, idx)
 	}
 
-	if !self.HasFlags(IsArgument) {
-		// If no actions are specified assume a value follows this argument and should be converted
+	// If no actions are specified assume a value follows this argument
+	if !self.HasFlag(IsArgument) {
 		*idx++
 		if len(args) <= *idx {
 			return true, errors.New(fmt.Sprintf("Expected '%s' to have an argument", name))
 		}
 	}
 
-	// If we get here, this argument is associated with either an option value or a positional
-	//fmt.Printf("arg: %s value: %s\n", alias, args[*idx])
+	// If we get here, this argument is associated with either an option value or an positional argument
 	value, err := self.Cast(name, self.Value, self.UnEscape(args[*idx]))
 	if err != nil {
 		return true, err
@@ -198,7 +192,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	}
 
 	// If rule matched argument on command line
-	if self.HasFlags(Seen) {
+	if self.HasFlag(Seen) {
 		return self.Value, nil
 	}
 
@@ -213,7 +207,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	}
 
 	// TODO: Move this logic from here, This method should be all about getting the value
-	if self.HasFlags(IsConfigGroup) {
+	if self.HasFlag(IsConfigGroup) {
 		return nil, nil
 	}
 
@@ -221,7 +215,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	if values != nil {
 		group := values.Group(self.Group)
 		if group.HasKey(self.Name) {
-			self.ClearFlags(NoValue)
+			self.ClearFlag(NoValue)
 			return self.Cast(self.Name, self.Value, group.Get(self.Name))
 		}
 	}
@@ -232,12 +226,12 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	}
 
 	// TODO: Move this logic from here, This method should be all about getting the value
-	if self.HasFlags(IsRequired) {
+	if self.HasFlag(IsRequired) {
 		return nil, errors.New(self.RequiredMessage())
 	}
 
 	// Flag that we found no value for this rule
-	self.SetFlags(NoValue)
+	self.SetFlag(NoValue)
 
 	// Return the default value for our type choice
 	value, _ = self.Cast(self.Name, self.Value, nil)
@@ -264,7 +258,7 @@ func (self *Rule) BackendKeyPath(rootPath string) string {
 		self.Key = self.Name
 	}
 
-	if self.HasFlags(IsConfigGroup) {
+	if self.HasFlag(IsConfigGroup) {
 		return path.Join("/", rootPath, self.Group)
 	}
 	if self.Group == DefaultOptionGroup {

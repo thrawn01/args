@@ -80,7 +80,7 @@ func (self *ArgParser) SubParser() *ArgParser {
 
 	// Remove all Commands from our rules
 	for i := len(parser.rules) - 1; i >= 0; i-- {
-		if parser.rules[i].HasFlags(IsCommand) {
+		if parser.rules[i].HasFlag(IsCommand) {
 			// Remove the rule
 			parser.rules = append(parser.rules[:i], parser.rules[i+1:]...)
 		}
@@ -110,6 +110,7 @@ func (self *ArgParser) info(format string, args ...interface{}) {
 }
 
 func (self *ArgParser) ValidateRules() error {
+	var greedyRule *Rule
 	for idx, rule := range self.rules {
 		// Duplicate rule check
 		next := idx + 1
@@ -117,7 +118,7 @@ func (self *ArgParser) ValidateRules() error {
 			for ; next < len(self.rules); next++ {
 				// If the name and groups are the same
 				if rule.Name == self.rules[next].Name && rule.Group == self.rules[next].Group {
-					return errors.New(fmt.Sprintf("Duplicate option '%s' defined", rule.Name))
+					return errors.Errorf("Duplicate option '%s' defined", rule.Name)
 				}
 			}
 		}
@@ -126,6 +127,20 @@ func (self *ArgParser) ValidateRules() error {
 			_, err := rule.Cast(rule.Name, nil, *rule.Default)
 			if err != nil {
 				return errors.Wrap(err, "Bad default value")
+			}
+		}
+		if !rule.HasFlag(IsArgument) {
+			continue
+		}
+		// If we already found a greedy rule, no other argument should follow
+		if greedyRule != nil {
+			return errors.Errorf("'%s' is ambiguous when following greedy argument '%s'",
+				rule.Name, greedyRule.Name)
+		}
+		// Check for ambiguous greedy arguments
+		if rule.HasFlag(IsGreedy) {
+			if greedyRule == nil {
+				greedyRule = rule
 			}
 		}
 	}
@@ -142,13 +157,13 @@ func (self *ArgParser) AddConfigGroup(group string) *RuleModifier {
 
 func (self *ArgParser) AddOption(name string) *RuleModifier {
 	rule := newRule()
-	rule.SetFlags(IsOption)
+	rule.SetFlag(IsOption)
 	return self.AddRule(name, newRuleModifier(rule, self))
 }
 
 func (self *ArgParser) AddConfig(name string) *RuleModifier {
 	rule := newRule()
-	rule.SetFlags(IsConfig)
+	rule.SetFlag(IsConfig)
 	return self.AddRule(name, newRuleModifier(rule, self))
 }
 
@@ -161,14 +176,13 @@ func (self *ArgParser) AddArgument(name string) *RuleModifier {
 	rule := newRule()
 	self.posCount++
 	rule.Order = self.posCount
-	rule.SetFlags(IsArgument)
-	rule.NotGreedy = true
+	rule.SetFlag(IsArgument)
 	return self.AddRule(name, newRuleModifier(rule, self))
 }
 
 func (self *ArgParser) AddCommand(name string, cmdFunc CommandFunc) *RuleModifier {
 	rule := newRule()
-	rule.SetFlags(IsCommand)
+	rule.SetFlag(IsCommand)
 	rule.CommandFunc = cmdFunc
 	rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
 		return nil
@@ -194,7 +208,7 @@ func (self *ArgParser) AddRule(name string, modifier *RuleModifier) *RuleModifie
 			rule.Name = group[2]
 		}
 	} else {
-		if rule.HasFlags(IsCommand) {
+		if rule.HasFlag(IsCommand) {
 			rule.Aliases = append(rule.Aliases, name)
 		}
 		rule.Name = name
@@ -326,11 +340,11 @@ func (self *ArgParser) parseUntil(terminator string) (*Options, error) {
 		self.idx += startIdx - (self.idx + 1)
 
 		// If we matched a command
-		if rule.HasFlags(IsCommand) {
+		if rule.HasFlag(IsCommand) {
 			// If we already found a command token on the commandline
 			if self.Command != nil {
 				// Ignore this match, it must be a sub command or a positional argument
-				rule.ClearFlags(Seen)
+				rule.ClearFlag(Seen)
 			}
 			self.Command = rule
 			// If user asked us to stop parsing arguments after finding a command
@@ -373,7 +387,7 @@ func (self *ArgParser) Apply(values *Options) (*Options, error) {
 		}
 
 		// Special Case here for Config Groups
-		if rule.HasFlags(IsConfigGroup) && values != nil {
+		if rule.HasFlag(IsConfigGroup) && values != nil {
 			for _, key := range values.Group(rule.Group).Keys() {
 				value := values.Group(rule.Group).Get(key)
 				results.Group(rule.Group).SetWithRule(key, value, rule)
@@ -489,7 +503,7 @@ func (self *ArgParser) GenerateUsage(flags int64) string {
 	}
 
 	for _, rule := range self.rules {
-		if !rule.HasFlags(flags) {
+		if !rule.HasFlag(flags) {
 			continue
 		}
 		result.WriteString(" " + rule.GenerateUsage())
@@ -509,7 +523,7 @@ func (self *ArgParser) GenerateHelpSection(flags int64) string {
 	// Ask each rule to generate a Help message for the options
 	maxLen := 0
 	for _, rule := range self.rules {
-		if !rule.HasFlags(flags) {
+		if !rule.HasFlag(flags) {
 			continue
 		}
 		flags, message := rule.GenerateHelp()

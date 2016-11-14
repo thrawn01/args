@@ -109,6 +109,7 @@ var _ = Describe("ArgParser", func() {
 			Expect(err.Error()).To(Equal("option '--power-level' is required"))
 		})
 	})
+
 	Describe("ArgParser.IsStringSlice()", func() {
 		It("Should allow slices in a comma delimited string", func() {
 			parser := args.NewParser()
@@ -136,7 +137,7 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.StringSlice("list")).To(Equal([]string{"belt", "car", "table"}))
 			Expect(list).To(Equal([]string{"belt", "car", "table"}))
 		})
-		It("Should allow multiple iterations of the same argument to create a slice", func() {
+		It("Should allow multiple iterations of the same option to create a slice", func() {
 			parser := args.NewParser()
 			parser.AddOption("--list").IsStringSlice()
 
@@ -145,7 +146,7 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"bee", "cat", "dad"}))
 		})
-		It("Should allow multiple iterations of the same argument to create a slice - with var", func() {
+		It("Should allow multiple iterations of the same option to create a slice - with var", func() {
 			parser := args.NewParser()
 			var list []string
 			parser.AddOption("--list").StoreStringSlice(&list)
@@ -155,6 +156,15 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"bee", "cat", "dad"}))
 			Expect(list).To(Equal([]string{"bee", "cat", "dad"}))
+		})
+		It("Should allow multiple iterations of the same argument to create a slice", func() {
+			parser := args.NewParser()
+			parser.AddArgument("list").IsStringSlice()
+
+			cmdLine := []string{"bee", "cat", "dad"}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.StringSlice("list")).To(Equal([]string{"bee", "cat", "dad"}))
 		})
 	})
 	Describe("ArgParser.IsStringMap()", func() {
@@ -418,6 +428,28 @@ var _ = Describe("ArgParser", func() {
 			_, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("argument 'second' is required"))
+		})
+		It("Should raise an error if a slice argument is followed by another argument", func() {
+			parser := args.NewParser()
+			parser.AddArgument("first").IsStringSlice()
+			parser.AddArgument("second")
+
+			cmdLine := []string{"one"}
+			_, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(Not(BeNil()))
+			Expect(err.Error()).To(Equal("'second' is ambiguous when " +
+				"following greedy argument 'first'"))
+		})
+		It("Should raise an error if a slice argument is followed by another slice argument", func() {
+			parser := args.NewParser()
+			parser.AddArgument("first").IsStringSlice()
+			parser.AddArgument("second").IsStringSlice()
+
+			cmdLine := []string{"one"}
+			_, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(Not(BeNil()))
+			Expect(err.Error()).To(Equal("'second' is ambiguous when " +
+				"following greedy argument 'first'"))
 		})
 		It("Should respect escaped sequences in arguments", func() {
 			parser := args.NewParser()

@@ -18,20 +18,20 @@ var _ = Describe("Rule", func() {
 	Describe("Rule.SetFlags()", func() {
 		It("Should set the proper flags", func() {
 			rule := &args.Rule{}
-			rule.SetFlags(args.Seen)
-			Expect(rule.HasFlags(args.Seen)).To(Equal(true))
+			rule.SetFlag(args.Seen)
+			Expect(rule.HasFlag(args.Seen)).To(Equal(true))
 		})
 	})
 
 	Describe("Rule.ClearFlags()", func() {
 		It("Should clear flags", func() {
 			rule := &args.Rule{}
-			rule.SetFlags(args.Seen)
-			rule.ClearFlags(args.Seen)
-			Expect(rule.HasFlags(args.Seen)).To(Equal(false))
+			rule.SetFlag(args.Seen)
+			rule.ClearFlag(args.Seen)
+			Expect(rule.HasFlag(args.Seen)).To(Equal(false))
 			// Regression, ClearFlags was not clearing the flag, just rotating it
-			rule.ClearFlags(args.Seen)
-			Expect(rule.HasFlags(args.Seen)).To(Equal(false))
+			rule.ClearFlag(args.Seen)
+			Expect(rule.HasFlag(args.Seen)).To(Equal(false))
 		})
 	})
 })
