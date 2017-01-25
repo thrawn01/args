@@ -291,6 +291,11 @@ func castStringMap(name string, dest interface{}, value interface{}) (interface{
 		dest = make(map[string]string, 0)
 	}
 
+	// Don't attempt to cast a nil value
+	if value == nil {
+		return nil, nil
+	}
+
 	// could already be a map[string]string
 	if isMapString(value) {
 		return mergeStringMap(dest.(map[string]string), value.(map[string]string)), nil

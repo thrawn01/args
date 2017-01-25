@@ -191,6 +191,14 @@ var _ = Describe("ArgParser", func() {
 			_, err := parser.Apply(options)
 			Expect(err).To(Not(BeNil()))
 		})
+		It("Should error not error if no map value is supplied", func() {
+			parser := args.NewParser()
+			parser.AddOption("--list").IsStringMap()
+			parser.AddOption("--foo")
+
+			_, err := parser.ParseArgs(nil)
+			Expect(err).To(BeNil())
+		})
 		It("Should allow string map with '=' expression in a comma delimited string", func() {
 			parser := args.NewParser()
 			parser.AddOption("--map").IsStringMap().Default("foo=bar,bar=foo")
