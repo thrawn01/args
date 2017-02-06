@@ -191,6 +191,26 @@ var _ = Describe("ArgParser", func() {
 			_, err := parser.Apply(options)
 			Expect(err).To(Not(BeNil()))
 		})
+		It("Should not error if key contains non alpha char", func() {
+			parser := args.NewParser()
+			parser.AddOption("--map").IsStringMap()
+			parser.AddOption("--foo")
+
+			cmdLine := []string{"--map", "http.ip=192.168.1.1"}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(opt.StringMap("map")).To(Equal(map[string]string{"http.ip": "192.168.1.1"}))
+			Expect(err).To(BeNil())
+		})
+		It("Should not error if key or value contains an escaped equal or comma", func() {
+			parser := args.NewParser()
+			parser.AddOption("--map").IsStringMap()
+			parser.AddOption("--foo")
+
+			cmdLine := []string{"--map", `http\=ip=192.168.1.1`}
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.StringMap("map")).To(Equal(map[string]string{"http=ip": "192.168.1.1"}))
+		})
 		It("Should error not error if no map value is supplied", func() {
 			parser := args.NewParser()
 			parser.AddOption("--list").IsStringMap()
@@ -296,10 +316,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(Not(BeNil()))
 
 			cmdLine = []string{"--map", "belt="}
-			opt, err = parser.ParseArgs(&cmdLine)
-			Expect(err).To(Not(BeNil()))
-
-			cmdLine = []string{"--map", "belt=blue;"}
 			opt, err = parser.ParseArgs(&cmdLine)
 			Expect(err).To(Not(BeNil()))
 
@@ -458,17 +474,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("'second' is ambiguous when " +
 				"following greedy argument 'first'"))
-		})
-		It("Should respect escaped sequences in arguments", func() {
-			parser := args.NewParser()
-			parser.AddOption("--me").IsTrue()
-			parser.AddArgument("first").Required()
-
-			cmdLine := []string{"\\-\\-me"}
-			opts, err := parser.ParseArgs(&cmdLine)
-			Expect(err).To(BeNil())
-			Expect(opts.String("first")).To(Equal("--me"))
-			Expect(opts.Bool("me")).To(Equal(false))
 		})
 	})
 	Describe("ArgParser.AddConfig()", func() {
