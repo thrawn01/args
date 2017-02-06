@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"text/scanner"
 )
 
 const (
@@ -346,43 +345,35 @@ func JSONToMap(value string) (map[string]string, error) {
 }
 
 func StringToMap(value string) (map[string]string, error) {
-	var tokenizer scanner.Scanner
-	tokenizer.Init(strings.NewReader(value))
-	tokenizer.Error = func(*scanner.Scanner, string) {}
-
+	tokenizer := NewKeyValueTokenizer(value)
 	result := make(map[string]string)
-	next := func() string {
-		tokenizer.Scan()
-		return tokenizer.TokenText()
-	}
 
 	var lvalue, rvalue, expression string
 	for {
-		lvalue = next()
+		lvalue = tokenizer.Next()
 		if lvalue == "" {
 			return result, errors.New(fmt.Sprintf("Expected key at pos '%d' but found none; "+
-				"map values should be 'key=value' separated by commas", tokenizer.Pos().Offset))
+				"map values should be 'key=value' separated by commas", tokenizer.Pos))
 		}
-		if lvalue == "{" {
+		if strings.HasPrefix(lvalue, "{") {
 			// Assume this is JSON format and attempt to un-marshal
 			return JSONToMap(value)
 		}
 
-		expression = next()
+		expression = tokenizer.Next()
 		if expression != "=" {
 			return result, errors.New(fmt.Sprintf("Expected '=' after '%s' but found '%s'; "+
 				"map values should be 'key=value' separated by commas", lvalue, expression))
 		}
-		rvalue = next()
+		rvalue = tokenizer.Next()
 		if rvalue == "" {
 			return result, errors.New(fmt.Sprintf("Expected value after '%s' but found none; "+
 				"map values should be 'key=value' separated by commas", expression))
 		}
-		// TODO: Handle quoted strings and escaped double quotes
 		result[lvalue] = rvalue
 
 		// Are there anymore tokens?
-		delimiter := next()
+		delimiter := tokenizer.Next()
 		if delimiter == "" {
 			break
 		}
@@ -393,7 +384,6 @@ func StringToMap(value string) (map[string]string, error) {
 				"map values should be 'key=value' separated by commas", rvalue, delimiter))
 		}
 	}
-
 	return result, nil
 }
 

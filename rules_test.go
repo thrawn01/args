@@ -7,14 +7,6 @@ import (
 )
 
 var _ = Describe("Rule", func() {
-	Describe("Rule.UnEscape()", func() {
-		It("Should unescape strings with black slash's", func() {
-			rule := &args.Rule{}
-			Expect(rule.UnEscape("\\-\\-help")).To(Equal("--help"))
-			Expect(rule.UnEscape("--help")).To(Equal("--help"))
-		})
-	})
-
 	Describe("Rule.SetFlags()", func() {
 		It("Should set the proper flags", func() {
 			rule := &args.Rule{}

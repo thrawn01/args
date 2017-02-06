@@ -162,16 +162,12 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	}
 
 	// If we get here, this argument is associated with either an option value or an positional argument
-	value, err := self.Cast(name, self.Value, self.UnEscape(args[*idx]))
+	value, err := self.Cast(name, self.Value, args[*idx])
 	if err != nil {
 		return true, err
 	}
 	self.Value = value
 	return true, nil
-}
-
-func (self *Rule) UnEscape(str string) string {
-	return strings.Replace(str, "\\", "", -1)
 }
 
 // Returns the appropriate required warning to display to the user
