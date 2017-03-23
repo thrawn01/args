@@ -29,6 +29,8 @@ const (
 	IsFormated
 	IsGreedy
 	NoValue
+	DefaultValue
+	EnvValue
 	Seen
 )
 
@@ -199,6 +201,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	}
 
 	if value != nil {
+		self.SetFlag(EnvValue)
 		return value, nil
 	}
 
@@ -218,6 +221,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 
 	// Apply default if available
 	if self.Default != nil {
+		self.SetFlag(DefaultValue)
 		return self.Cast(self.Name, self.Value, *self.Default)
 	}
 
