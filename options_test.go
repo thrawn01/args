@@ -1,6 +1,8 @@
 package args_test
 
 import (
+	"os"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/thrawn01/args"
@@ -36,7 +38,7 @@ var _ = Describe("Options", func() {
 	Describe("log", func() {
 		It("Should log to StdLogger when cast fails", func() {
 			result := opts.Int("string")
-			Expect(log.GetEntry()).To(Equal("Unable to Cast \"one\" to int for key 'string'|"))
+			Expect(log.GetEntry()).To(Equal(`unable to cast "one" of type string to int for key 'string'|`))
 			Expect(result).To(Equal(0))
 		})
 	})
@@ -120,8 +122,52 @@ var _ = Describe("Options", func() {
 
 		})
 	})
+	Describe("IsArg()", func() {
+		It("Should return true if the option as set via the command line", func() {
+			cmdLine := []string{"--two", "2"}
+			parser := args.NewParser()
+			parser.AddOption("--one").IsInt().Default("1")
+			parser.AddOption("--two").IsInt().Default("0")
 
-	Describe("IsSeen()", func() {
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Int("one")).To(Equal(1))
+			Expect(opt.Int("two")).To(Equal(2))
+			Expect(opt.IsArg("one")).To(Equal(false))
+			Expect(opt.IsArg("two")).To(Equal(true))
+		})
+	})
+	Describe("IsEnv()", func() {
+		It("Should return true if the option was set via an environment variable", func() {
+			parser := args.NewParser()
+			parser.AddOption("--one").IsInt().Default("1").Env("ONE")
+			parser.AddOption("--two").IsInt().Default("0").Env("TWO")
+
+			os.Setenv("TWO", "2")
+			opt, err := parser.ParseArgs(nil)
+			Expect(err).To(BeNil())
+			Expect(opt.Int("one")).To(Equal(1))
+			Expect(opt.Int("two")).To(Equal(2))
+			Expect(opt.IsEnv("one")).To(Equal(false))
+			Expect(opt.IsEnv("two")).To(Equal(true))
+		})
+	})
+	Describe("IsDefault()", func() {
+		It("Should return true if the option used the default value", func() {
+			cmdLine := []string{"--two", "2"}
+			parser := args.NewParser()
+			parser.AddOption("--one").IsInt().Default("1")
+			parser.AddOption("--two").IsInt().Default("0")
+			opt, err := parser.ParseArgs(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Int("one")).To(Equal(1))
+			Expect(opt.Int("two")).To(Equal(2))
+			Expect(opt.IsDefault("one")).To(Equal(true))
+			Expect(opt.IsDefault("two")).To(Equal(false))
+		})
+	})
+
+	Describe("WasSeen()", func() {
 		It("Should return true if the option was seen on the commandline", func() {
 			cmdLine := []string{"--is-seen"}
 			parser := args.NewParser()
@@ -130,10 +176,23 @@ var _ = Describe("Options", func() {
 			parser.AddOption("--not-set")
 			opt, err := parser.ParseArgs(&cmdLine)
 			Expect(err).To(BeNil())
-			Expect(opt.IsSeen("is-set")).To(Equal(false))
-			Expect(opt.IsSeen("not-set")).To(Equal(false))
-			Expect(opt.IsSeen("is-seen")).To(Equal(true))
+			Expect(opt.WasSeen("is-set")).To(Equal(false))
+			Expect(opt.WasSeen("not-set")).To(Equal(false))
+			Expect(opt.WasSeen("is-seen")).To(Equal(true))
 
+		})
+		It("Should return true if the option was seen in the environment", func() {
+			parser := args.NewParser()
+			parser.AddOption("--is-set").IsInt().Default("1")
+			parser.AddOption("--is-seen").IsTrue().Env("IS_SEEN")
+			parser.AddOption("--not-set")
+
+			os.Setenv("IS_SEEN", "true")
+			opt, err := parser.ParseArgs(nil)
+			Expect(err).To(BeNil())
+			Expect(opt.WasSeen("is-set")).To(Equal(false))
+			Expect(opt.WasSeen("not-set")).To(Equal(false))
+			Expect(opt.WasSeen("is-seen")).To(Equal(true))
 		})
 	})
 
@@ -146,7 +205,7 @@ var _ = Describe("Options", func() {
 			Expect(err).To(BeNil())
 			option := opt.InspectOpt("is-set")
 			Expect(option.GetValue().(int)).To(Equal(1))
-			Expect(option.GetRule().Flags).To(Equal(int64(32)))
+			Expect(option.GetRule().Flags).To(Equal(int64(544)))
 		})
 	})
 

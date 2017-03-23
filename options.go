@@ -267,6 +267,8 @@ func (self *Options) KeySlice(key string) []string {
 	return self.Group(key).Keys()
 }
 
+// Returns true if the argument value is set.
+// Use IsDefault(), IsEnv(), IsArg() to determine how the parser set the value
 func (self *Options) IsSet(key string) bool {
 	if opt, ok := self.values[key]; ok {
 		rule := opt.GetRule()
@@ -278,13 +280,50 @@ func (self *Options) IsSet(key string) bool {
 	return false
 }
 
-func (self *Options) IsSeen(key string) bool {
+// Returns true if this argument is set via the environment
+func (self *Options) IsEnv(key string) bool {
+	if opt, ok := self.values[key]; ok {
+		rule := opt.GetRule()
+		if rule == nil {
+			return false
+		}
+		return (rule.Flags&EnvValue != 0)
+	}
+	return false
+}
+
+// Returns true if this argument is set via the command line
+func (self *Options) IsArg(key string) bool {
 	if opt, ok := self.values[key]; ok {
 		rule := opt.GetRule()
 		if rule == nil {
 			return false
 		}
 		return (rule.Flags&Seen != 0)
+	}
+	return false
+}
+
+// Returns true if this argument is set via the default value
+func (self *Options) IsDefault(key string) bool {
+	if opt, ok := self.values[key]; ok {
+		rule := opt.GetRule()
+		if rule == nil {
+			return false
+		}
+		return (rule.Flags&DefaultValue != 0)
+	}
+	return false
+}
+
+// Returns true if this argument was set via the command line or was set by an environment variable
+func (self *Options) WasSeen(key string) bool {
+	if opt, ok := self.values[key]; ok {
+		rule := opt.GetRule()
+		if rule == nil {
+			return false
+		}
+		return (rule.Flags&Seen != 0) || (rule.Flags&EnvValue != 0)
 	}
 	return false
 }
