@@ -367,6 +367,20 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.String("first")).To(Equal("one"))
 		})
 	})
+	Describe("ArgParser.GetRule()", func() {
+		It("Should return allow user to modify an existing rule ", func() {
+			parser := args.NewParser()
+			parser.AddOption("first").IsString().Default("one")
+			opt, err := parser.ParseArgs(nil)
+			Expect(err).To(BeNil())
+			Expect(opt.String("first")).To(Equal("one"))
+			// Modify the rule and parse again
+			parser.GetRule("first").Default("two")
+			opt, err = parser.ParseArgs(nil)
+			Expect(err).To(BeNil())
+			Expect(opt.String("first")).To(Equal("two"))
+		})
+	})
 
 	Describe("ArgParser.AddArgument()", func() {
 		cmdLine := []string{"one", "two", "three", "four"}
