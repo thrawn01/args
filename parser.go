@@ -218,8 +218,29 @@ func (self *ArgParser) AddRule(name string, modifier *RuleModifier) *RuleModifie
 	return modifier
 }
 
+// Returns the current list of rules for this parser. If you want to modify a rule
+// use GetRule() instead.
 func (self *ArgParser) GetRules() Rules {
 	return self.rules
+}
+
+// Allow the user to modify an existing parser rule
+//	parser := args.NewParser()
+//	parser.AddOption("--endpoint").Default("http://localhost:19092")
+//	parser.AddOption("--grpc").IsTrue()
+// 	opts := parser.ParseArgsSimple(nil)
+//
+//	if opts.Bool("grpc") && !opts.WasSeen("endpoint") {
+//		parser.GetRule("endpoint").SetDefault("localhost:19091")
+//		opts = parser.ParseArgsSimple(nil)
+//	}
+func (self *ArgParser) GetRule(name string) *RuleModifier {
+	for _, rule := range self.rules {
+		if rule.Name == name {
+			return newRuleModifier(rule, self)
+		}
+	}
+	return nil
 }
 
 func (self *ArgParser) ParseAndRun(args *[]string, data interface{}) (int, error) {
