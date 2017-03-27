@@ -63,7 +63,7 @@ func EnvPrefix(prefix string) ParseModifier {
 
 func NoHelp() ParseModifier {
 	return func(parser *ArgParser) {
-		parser.addHelp = false
+		parser.AddHelpOption = false
 	}
 }
 
@@ -254,15 +254,23 @@ func castStringSlice(name string, dest interface{}, value interface{}) (interfac
 	}
 
 	// Assume the value must be a parsable string
-	strValue := value.(string)
+	return append(dest.([]string), StringToSlice(value.(string))...), nil
+}
 
+// Given a comma separated string, return a slice of string items.
+// Return the entire string as the first item if no comma is found.
+//	// Returns []string{"one"}
+// 	result := args.StringToSlice("one")
+//	// Returns []string{"one", "two", "three"}
+// 	result := args.StringToSlice("one,two,three")
+func StringToSlice(value string) []string {
 	// If no comma is found, then assume this is a single value
-	if strings.Index(strValue, ",") == -1 {
-		return append(dest.([]string), strValue), nil
+	if strings.Index(value, ",") == -1 {
+		return []string{value}
 	}
 
 	// Split the values separated by comma's
-	return append(dest.([]string), strings.Split(strValue, ",")...), nil
+	return strings.Split(value, ",")
 }
 
 func mergeStringMap(src, dest map[string]string) map[string]string {
@@ -388,12 +396,18 @@ func StringToMap(value string) (map[string]string, error) {
 }
 
 // Returns true if the error was because help message was printed
-func AskedForHelp(err error) bool {
-	obj, ok := err.(HelpErrorInterface)
+func IsHelpError(err error) bool {
+	obj, ok := err.(isHelpError)
 	return ok && obj.IsHelpError()
 }
 
-type HelpErrorInterface interface {
+// Returns true if the error was because help message was printed
+func AskedForHelp(err error) bool {
+	obj, ok := err.(isHelpError)
+	return ok && obj.IsHelpError()
+}
+
+type isHelpError interface {
 	IsHelpError() bool
 }
 

@@ -30,7 +30,7 @@ func main() {
 	parser.AddOption("--endpoint").Default("http://localhost:1234").Env("API_ENDPOINT").
 		Help("The HTTP endpoint our client will talk too")
 
-	parser.AddCommand("super-chickens", func(subParser *args.ArgParser, data interface{}) int {
+	parser.AddCommand("super-chickens", func(subParser *args.ArgParser, data interface{}) (int, error) {
 		subParser.AddCommand("create", createChickens)
 		subParser.AddCommand("list", listChickens)
 		subParser.AddCommand("delete", deleteChickens)
@@ -42,10 +42,9 @@ func main() {
 		// Run the sub-commands
 		retCode, err := subParser.ParseAndRun(nil, data)
 		if err != nil {
-			fmt.Println(err.Error())
-			return 1
+			return 1, err
 		}
-		return retCode
+		return retCode, nil
 	})
 
 	// Add our non super chicken actions
@@ -54,7 +53,7 @@ func main() {
 	parser.AddCommand("delete", deleteChickens)
 
 	// Parse the command line
-	opts, err := parser.ParseArgs(nil)
+	opts, err := parser.Parse(nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
@@ -80,12 +79,11 @@ func main() {
 	os.Exit(retCode)
 }
 
-func createChickens(subParser *args.ArgParser, data interface{}) int {
+func createChickens(subParser *args.ArgParser, data interface{}) (int, error) {
 	subParser.AddArgument("name").Required().Help("The name of the chicken to create")
-	opts, err := subParser.ParseArgs(nil)
-	if err != nil {
-		fmt.Println(err.Error())
-		return 1
+	opts := subParser.ParseSimple(nil)
+	if opts == nil {
+		return 1, nil
 	}
 
 	shared := data.(*SharedStruct)
@@ -96,64 +94,57 @@ func createChickens(subParser *args.ArgParser, data interface{}) int {
 		"metadata": shared.Metadata,
 	})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "JSON Marshalling Error -", err)
-		return 1
+		return 1, errors.Wrap(err, "while marshalling JSON")
 	}
 
 	// Create the new Request
 	req, err := http.NewRequest("POST", joinUrl(shared, "chickens"), bytes.NewBuffer(payload))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		return 1
+		return 1, errors.Wrap(err, "while creating new http request")
 	}
 	resp, err := sendRequest(opts, req, &payload)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
+		return 1, err
 	}
 	fmt.Println(resp)
-	return 0
+	return 0, nil
 }
 
-func listChickens(subParser *args.ArgParser, data interface{}) int {
+func listChickens(subParser *args.ArgParser, data interface{}) (int, error) {
 	opts := subParser.GetOpts()
 
 	shared := data.(*SharedStruct)
 	req, err := http.NewRequest("GET", joinUrl(shared, "chickens"), nil)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
+		return 1, errors.Wrap(err, "while creating new http request")
 	}
 	resp, err := sendRequest(opts, req, nil)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
+		return 1, err
 	}
 	fmt.Println(resp)
-	return 0
+	return 0, nil
 }
 
-func deleteChickens(subParser *args.ArgParser, data interface{}) int {
+func deleteChickens(subParser *args.ArgParser, data interface{}) (int, error) {
 	subParser.AddArgument("name").Required().Help("The name of the chicken to delete")
-	opts, err := subParser.ParseArgs(nil)
-	if err != nil {
-		fmt.Println(err.Error())
-		return 1
+	opts := subParser.ParseSimple(nil)
+	if opts == nil {
+		return 1, nil
 	}
 
 	shared := data.(*SharedStruct)
 	req, err := http.NewRequest("DELETE", joinUrl(shared, "chickens", opts.String("name")), nil)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
+		return 1, errors.Wrap(err, "while creating new http request")
 	}
 	resp, err := sendRequest(opts, req, nil)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
+		return 1, err
 	}
 	fmt.Println(resp)
-	return 0
+	return 0, nil
 }
 
 func joinUrl(shared *SharedStruct, slugs ...string) string {

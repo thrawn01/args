@@ -29,7 +29,7 @@ var _ = Describe("ArgParser", func() {
 			parser.AddOption("--two").IsString()
 			parser.AddOption("--three").IsString()
 			cmdLine := []string{"--three", "this is three value"}
-			opt, err := parser.ParseArgs(&cmdLine)
+			opt, err := parser.Parse(&cmdLine)
 			input := []byte("one=this is one value\ntwo=this is two value\n")
 			opt, err = parser.FromINI(input)
 			Expect(err).To(BeNil())
@@ -43,7 +43,7 @@ var _ = Describe("ArgParser", func() {
 			parser.AddOption("--two").IsString()
 			parser.AddOption("--three").IsString()
 			cmdLine := []string{"--three", "this is three value", "--one", "this is from the cmd line"}
-			opt, err := parser.ParseArgs(&cmdLine)
+			opt, err := parser.Parse(&cmdLine)
 			input := []byte("one=this is one value\ntwo=this is two value\n")
 			opt, err = parser.FromINI(input)
 			Expect(err).To(BeNil())
@@ -56,7 +56,7 @@ var _ = Describe("ArgParser", func() {
 			var list []string
 			parser.AddOption("--list").StoreStringSlice(&list).Default("foo,bar,bit")
 
-			opt, err := parser.ParseArgs(nil)
+			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"foo", "bar", "bit"}))
 			Expect(list).To(Equal([]string{"foo", "bar", "bit"}))
@@ -81,7 +81,7 @@ var _ = Describe("ArgParser", func() {
 			parser.AddConfig("debug").InGroup("database").IsBool()
 
 			cmdLine := []string{"--debug"}
-			opts, err := parser.ParseArgs(&cmdLine)
+			opts, err := parser.Parse(&cmdLine)
 
 			iniFile := []byte(`
 				[database]
@@ -102,7 +102,7 @@ var _ = Describe("ArgParser", func() {
 
 			// 'two' is missing from the command line
 			cmdLine := []string{"--one", "this is one"}
-			opt, err := parser.ParseArgs(&cmdLine)
+			opt, err := parser.Parse(&cmdLine)
 			Expect(opt.String("one")).To(Equal("this is one"))
 			Expect(opt.IsSet("one")).To(Equal(true))
 			Expect(opt.IsSet("two")).To(Equal(false))
@@ -133,7 +133,7 @@ var _ = Describe("ArgParser", func() {
 			parser.AddOption("--one").IsString()
 			parser.AddConfigGroup("candy-bars")
 
-			opt, err := parser.ParseArgs(&cmdLine)
+			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(log.GetEntry()).To(Equal(""))
 			Expect(opt.String("one")).To(Equal("one-thing"))

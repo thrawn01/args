@@ -23,7 +23,7 @@ type TestBackend struct {
 func NewTestBackend() args.Backend {
 	return &TestBackend{
 		keys: map[string]args.Pair{
-			"/root/DEFAULT/bind": args.Pair{Key: "bind", Value: []byte("thrawn01.org:3366")}},
+			"/root/bind": args.Pair{Key: "bind", Value: []byte("thrawn01.org:3366")}},
 		lists: map[string][]args.Pair{
 			"/root/endpoints": []args.Pair{
 				args.Pair{Key: "endpoint1", Value: []byte("http://endpoint1.com:3366")},
