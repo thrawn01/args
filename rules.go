@@ -17,7 +17,7 @@ import (
 type CastFunc func(string, interface{}, interface{}) (interface{}, error)
 type ActionFunc func(*Rule, string, []string, *int) error
 type StoreFunc func(interface{})
-type CommandFunc func(*ArgParser, interface{}) int
+type CommandFunc func(*ArgParser, interface{}) (int, error)
 
 const (
 	IsCommand int64 = 1 << iota
@@ -51,7 +51,6 @@ type Rule struct {
 	CommandFunc CommandFunc
 	Group       string
 	Key         string
-	BackendKey  string
 	NotGreedy   bool
 	Flags       int64
 }
@@ -252,19 +251,24 @@ func (self *Rule) GetEnvValue() (interface{}, error) {
 	return nil, nil
 }
 
-func (self *Rule) BackendKeyPath(rootPath string) string {
-	rootPath = strings.TrimPrefix(rootPath, "/")
-	if self.Key == "" {
-		self.Key = self.Name
+func (self *Rule) BackendKey(rootPath string) string {
+	// Do this so users are not surprised root isn't prefixed with "/"
+	rootPath = "/" + strings.TrimPrefix(rootPath, "/")
+	// If the user provided their own key used that instead
+	if self.Key != "" {
+		return path.Join("/", rootPath, self.Key)
 	}
 
 	if self.HasFlag(IsConfigGroup) {
 		return path.Join("/", rootPath, self.Group)
 	}
+
+	// This might cause a key collision if a group shares the same name as an argument
+	// This can be avoided by assigning a custom key name to the group or argument.
 	if self.Group == DefaultOptionGroup {
-		return path.Join("/", rootPath, "DEFAULT", self.Key)
+		return path.Join("/", rootPath, self.Name)
 	}
-	return path.Join("/", rootPath, self.Group, self.Key)
+	return path.Join("/", rootPath, self.Group, self.Name)
 }
 
 // ***********************************************

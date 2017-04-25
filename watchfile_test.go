@@ -45,7 +45,7 @@ var _ = Describe("args.WatchFile()", func() {
 		parser.AddConfig("value")
 		parser.AddConfig("version").IsInt()
 
-		opt, err := parser.ParseArgs(nil)
+		opt, err := parser.Parse(nil)
 		Expect(err).To(BeNil())
 		Expect(log.GetEntry()).To(Equal(""))
 		Expect(opt.String("value")).To(Equal(""))

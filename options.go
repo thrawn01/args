@@ -2,13 +2,13 @@ package args
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"os/user"
+	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
-
-	"errors"
-
-	"reflect"
 
 	"github.com/spf13/cast"
 )
@@ -211,7 +211,7 @@ func (self *Options) Seen() bool {
 /*
 	Return true if none of the options where seen on the command line
 
-	opts, _ := parser.ParseArgs(nil)
+	opts, _ := parser.Parse(nil)
 	if opts.NoArgs() {
 		fmt.Printf("No arguments provided")
 		os.Exit(-1)
@@ -235,6 +235,25 @@ func (self *Options) String(key string) string {
 		self.log.Printf("%s for key '%s'", err.Error(), key)
 	}
 	return value
+}
+
+// Assumes the option is a string path and performs tilde '~' expansion if necessary
+func (self *Options) FilePath(key string) string {
+	path, err := cast.ToStringE(self.Interface(key))
+	if err != nil {
+		self.log.Printf("%s for key '%s'", err.Error(), key)
+	}
+
+	if len(path) == 0 || path[0] != '~' {
+		return path
+	}
+
+	usr, err := user.Current()
+	if err != nil {
+		self.log.Printf("'%s': while determining user for '%s' expansion: %s", key, path, err)
+		return path
+	}
+	return filepath.Join(usr.HomeDir, path[1:])
 }
 
 func (self *Options) Bool(key string) bool {

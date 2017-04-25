@@ -21,6 +21,7 @@ var _ = Describe("Options", func() {
 				"int":    1,
 				"bool":   true,
 				"string": "one",
+				"path":   "~/.myrc",
 				"endpoints": map[string]interface{}{
 					"endpoint1": "host1",
 					"endpoint2": "host2",
@@ -77,12 +78,29 @@ var _ = Describe("Options", func() {
 			Expect(result).To(Equal(""))
 		})
 	})
+	Describe("FilePath()", func() {
+		It("Should return values as string", func() {
+			result := opts.FilePath("string")
+			Expect(log.GetEntry()).To(Equal(""))
+			Expect(result).To(Equal("one"))
+		})
+		It("Should return default value if key doesn't exist", func() {
+			result := opts.FilePath("none")
+			Expect(result).To(Equal(""))
+		})
+		It("Should return expanded path if value contains a tilde", func() {
+			result := opts.FilePath("path")
+			if len(result) == 7 {
+				Fail("Tilde was not expanded")
+			}
+		})
+	})
 	Describe("NoArgs()", func() {
 		It("Should return true if no arguments on the command line", func() {
 			parser := args.NewParser()
 			parser.AddOption("--power-level").IsInt().Default("1")
 
-			opt, err := parser.ParseArgs(nil)
+			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(1))
 			Expect(opt.NoArgs()).To(Equal(true))
@@ -91,7 +109,7 @@ var _ = Describe("Options", func() {
 			parser := args.NewParser()
 			parser.AddOption("--power-level").IsInt().Default("1")
 
-			opt, err := parser.ParseArgs(&[]string{"--power-level", "2"})
+			opt, err := parser.Parse(&[]string{"--power-level", "2"})
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(2))
 			Expect(opt.NoArgs()).To(Equal(false))
@@ -115,7 +133,7 @@ var _ = Describe("Options", func() {
 			parser := args.NewParser()
 			parser.AddOption("--is-set").IsInt().Default("1")
 			parser.AddOption("--not-set")
-			opt, err := parser.ParseArgs(nil)
+			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
 			Expect(opt.IsSet("is-set")).To(Equal(true))
 			Expect(opt.IsSet("not-set")).To(Equal(false))
@@ -129,7 +147,7 @@ var _ = Describe("Options", func() {
 			parser.AddOption("--one").IsInt().Default("1")
 			parser.AddOption("--two").IsInt().Default("0")
 
-			opt, err := parser.ParseArgs(&cmdLine)
+			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("one")).To(Equal(1))
 			Expect(opt.Int("two")).To(Equal(2))
@@ -144,7 +162,7 @@ var _ = Describe("Options", func() {
 			parser.AddOption("--two").IsInt().Default("0").Env("TWO")
 
 			os.Setenv("TWO", "2")
-			opt, err := parser.ParseArgs(nil)
+			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("one")).To(Equal(1))
 			Expect(opt.Int("two")).To(Equal(2))
@@ -158,7 +176,7 @@ var _ = Describe("Options", func() {
 			parser := args.NewParser()
 			parser.AddOption("--one").IsInt().Default("1")
 			parser.AddOption("--two").IsInt().Default("0")
-			opt, err := parser.ParseArgs(&cmdLine)
+			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("one")).To(Equal(1))
 			Expect(opt.Int("two")).To(Equal(2))
@@ -174,7 +192,7 @@ var _ = Describe("Options", func() {
 			parser.AddOption("--is-set").IsInt().Default("1")
 			parser.AddOption("--is-seen").IsTrue()
 			parser.AddOption("--not-set")
-			opt, err := parser.ParseArgs(&cmdLine)
+			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.WasSeen("is-set")).To(Equal(false))
 			Expect(opt.WasSeen("not-set")).To(Equal(false))
@@ -188,7 +206,7 @@ var _ = Describe("Options", func() {
 			parser.AddOption("--not-set")
 
 			os.Setenv("IS_SEEN", "true")
-			opt, err := parser.ParseArgs(nil)
+			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
 			Expect(opt.WasSeen("is-set")).To(Equal(false))
 			Expect(opt.WasSeen("not-set")).To(Equal(false))
@@ -201,7 +219,7 @@ var _ = Describe("Options", func() {
 			parser := args.NewParser()
 			parser.AddOption("--is-set").IsInt().Default("1")
 			parser.AddOption("--not-set")
-			opt, err := parser.ParseArgs(nil)
+			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
 			option := opt.InspectOpt("is-set")
 			Expect(option.GetValue().(int)).To(Equal(1))
@@ -215,7 +233,7 @@ var _ = Describe("Options", func() {
 			parser.AddOption("--is-set").IsInt().Default("1")
 			parser.AddOption("--is-provided")
 			parser.AddOption("--not-set")
-			opt, err := parser.ParseArgs(&[]string{"--is-provided", "foo"})
+			opt, err := parser.Parse(&[]string{"--is-provided", "foo"})
 			Expect(err).To(BeNil())
 
 			// All options required have values
@@ -245,6 +263,7 @@ var _ = Describe("Options", func() {
     'endpoint3' = host3
   }
   'int' = 1
+  'path' = ~/.myrc
   'string' = one
 }`))
 		})
