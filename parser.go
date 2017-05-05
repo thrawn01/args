@@ -56,7 +56,7 @@ func NewParser(modifiers ...ParseModifier) *ArgParser {
 	return parser
 }
 
-// Takes the current parser and return a new parser with
+// Takes the current parser and return a new parser
 // appropriate for use within a command function
 func (self *ArgParser) SubParser() *ArgParser {
 	parser := NewParser()
@@ -416,8 +416,16 @@ Apply:
 	// TODO: This should include the isRequired check
 	// return self.PostValidation(self.Apply(nil))
 
-	// If we specified a command, we probably do not want help even if we see -h on the commandline
-	if self.helpAdded && opts.Bool("help") && self.Command == nil {
+	// When the user asks for --help
+	if self.helpAdded && opts.Bool("help") {
+		// Ignore the --help request if we see a sub command so the
+		// sub command gets a change to process the --help request
+		if self.Command != nil {
+			// root parsers that want to know if the -h option was provided
+			// can still ask if the option was `WasSeen("help")`
+			rule := opts.InspectOpt("help").GetRule()
+			return opts.SetWithRule("help", false, rule), err
+		}
 		return opts, &HelpError{}
 	}
 	return opts, err
