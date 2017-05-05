@@ -40,11 +40,7 @@ func main() {
 		shared.Metadata = "super"
 
 		// Run the sub-commands
-		retCode, err := subParser.ParseAndRun(nil, data)
-		if err != nil {
-			return 1, err
-		}
-		return retCode, nil
+		return subParser.ParseAndRun(nil, data)
 	})
 
 	// Add our non super chicken actions

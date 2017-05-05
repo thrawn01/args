@@ -639,7 +639,6 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(BeNil())
 			Expect(retCode).To(Equal(0))
 			Expect(called).To(Equal(1))
-
 		})
 		It("Should allow sub commands to be a thing", func() {
 			parser := args.NewParser()
@@ -686,6 +685,44 @@ var _ = Describe("ArgParser", func() {
 			})
 			cmdLine := []string{"set", "-h"}
 			retCode, err := parser.ParseAndRun(&cmdLine, nil)
+			Expect(err).To(BeNil())
+			Expect(retCode).To(Equal(0))
+			Expect(called).To(Equal(1))
+		})
+		It("Should root parser should ignore help option if a sub command was provided", func() {
+			// ignoring help gives a sub command a chance to provide help
+
+			parser := args.NewParser()
+			// Capture the help message via Pipe()
+			_, ioWriter, _ := os.Pipe()
+			parser.HelpIO = ioWriter
+
+			called := 0
+			parser.AddCommand("set", func(parent *args.ArgParser, data interface{}) (int, error) {
+				parent.AddArgument("first").Required()
+				_, err := parent.Parse(nil)
+				Expect(err).To(Not(BeNil()))
+				Expect(err.Error()).To(Equal("User asked for help; Inspect this error " +
+					"with args.AskedForHelp(err)"))
+				Expect(args.IsHelpError(err)).To(Equal(true))
+				Expect(args.AskedForHelp(err)).To(Equal(true))
+
+				called++
+				return 0, nil
+			})
+
+			// Parse at this point will indicate `--help` is false because the
+			// sub command `set` was provided
+			cmdLine := []string{"set", "-h"}
+			opt := parser.ParseSimple(&cmdLine)
+			Expect(opt).To(Not(BeNil()))
+			Expect(opt.Bool("help")).To(Equal(false))
+			// We can still tell if the help option `WasSeen` if root the parser
+			// needs to know if help was requested by the user
+			Expect(opt.WasSeen("help")).To(Equal(true))
+
+			// Thus allowing the sub command `set` to provide help
+			retCode, err := parser.RunCommand(nil)
 			Expect(err).To(BeNil())
 			Expect(retCode).To(Equal(0))
 			Expect(called).To(Equal(1))
