@@ -23,6 +23,7 @@ all: test examples
 travis-ci: get-deps
 	go get -u github.com/mattn/goveralls
 	go get -u golang.org/x/tools/cmd/cover
+	go get -u golang.org/x/text/encoding
 	goveralls -service=travis-ci
 
 $(GLIDE):

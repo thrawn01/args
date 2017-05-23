@@ -208,10 +208,15 @@ func (self *ArgParser) AddRule(name string, modifier *RuleModifier) *RuleModifie
 			rule.Name = group[2]
 		}
 	} else {
-		if rule.HasFlag(IsCommand) {
+		switch true {
+		case rule.HasFlag(IsCommand):
 			rule.Aliases = append(rule.Aliases, name)
 			rule.Name = fmt.Sprintf("!cmd-%s", name)
-		} else {
+		case rule.HasFlag(IsOption):
+			rule.Aliases = append(rule.Aliases, fmt.Sprintf("--%s", name))
+			rule.Aliases = append(rule.Aliases, fmt.Sprintf("-%s", name))
+			rule.Name = name
+		default:
 			rule.Name = name
 		}
 	}

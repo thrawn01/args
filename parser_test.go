@@ -99,6 +99,15 @@ var _ = Describe("ArgParser", func() {
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(1))
 		})
+		It("Should match 'no-docker'", func() {
+			cmdLine := []string{"--no-docker"}
+
+			parser := args.NewParser()
+			parser.AddOption("no-docker").Count()
+			opt, err := parser.Parse(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.Bool("no-docker")).To(Equal(true))
+		})
 		It("Should raise an error if a option is required but not provided", func() {
 			parser := args.NewParser()
 			parser.AddOption("--power-level").Required()

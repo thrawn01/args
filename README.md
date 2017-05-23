@@ -236,6 +236,7 @@ See more code examples in the ```examples/``` directory
 * Support Default Arguments
 * Support Reading arguments from an ini file
 * Support different types of optional prefixes (--, -, ++, +, etc..)
+* If AddOption() is called with a name that doesn’t begin with a prefix, apply some default rules to match - or -— prefix
 * Support for Config only options
 * Support for Groups
 * Support for Etcd v3 (See: https://github.com/thrawn01/args-backends)
@@ -263,5 +264,4 @@ See more code examples in the ```examples/``` directory
 * Write better intro document
 * Write godoc
 * Ability to include Config() options in help message
-* if AddOption() is called with a name that doesn’t begin with a prefix, apply some default rules to match - or — prefix
 * Add support for updating etcd values from the Option{} object. (shouldn't be hard)
