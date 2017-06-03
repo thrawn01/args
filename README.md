@@ -142,8 +142,7 @@ Volume 'my-new-volume' created
 
 ```go
 func main() {
-    parser := args.NewParser(args.Name("subcommand"),
-        args.Desc("Example subcommand CLI"))
+    parser := args.NewParser().Name("subcommand").Desc("Example subcommand CLI")
 
     // Add a subcommand
     parser.AddCommand("show", show)
@@ -197,7 +196,7 @@ Args can reload your config when modifications are made to a watched config file
 with Kubernetes ConfigMap**
 ```go
     parser := args.NewParser()
-    parser.AddOption("--config").Alias("-c").Help("Read options from a config file")
+    parser.AddFlag("config").Flag("c").Help("Read options from a config file")
     opt := parser.ParseSimple(nil)
     configFile := opt.String("config")
     // Initial load of our config file
@@ -236,7 +235,7 @@ See more code examples in the ```examples/``` directory
 * Support Default Arguments
 * Support Reading arguments from an ini file
 * Support different types of optional prefixes (--, -, ++, +, etc..)
-* If AddOption() is called with a name that doesn’t begin with a prefix, apply some default rules to match - or -— prefix
+* If AddFlag() is called with a name that doesn’t begin with a prefix, apply some default rules to match - or -— prefix
 * Support for Config only options
 * Support for Groups
 * Support for Etcd v3 (See: https://github.com/thrawn01/args-backends)
@@ -255,13 +254,13 @@ See more code examples in the ```examples/``` directory
 * Support Greedy Arguments ```[<files>….]```
 * Support Parent Parsing
 * Support for Kubernetes ConfigMap file watching
+* Support for custom usage
 
 ## TODO
-* Custom Help and Usage
+* Custom Help
 * Support counting arguments in this format -vvvv
 * Support float type '--float=3.14'
 * Support '-arg=value'
 * Write better intro document
 * Write godoc
 * Ability to include Config() options in help message
-* Add support for updating etcd values from the Option{} object. (shouldn't be hard)

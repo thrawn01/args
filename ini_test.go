@@ -16,7 +16,7 @@ var _ = Describe("ArgParser", func() {
 	Describe("FromIni()", func() {
 		It("Should provide arg values from INI file", func() {
 			parser := args.NewParser()
-			parser.AddOption("--one").IsString()
+			parser.AddFlag("--one").IsString()
 			input := []byte("one=this is one value\ntwo=this is two value\n")
 			opt, err := parser.FromINI(input)
 			Expect(err).To(BeNil())
@@ -25,9 +25,9 @@ var _ = Describe("ArgParser", func() {
 
 		It("Should provide arg values from INI file after parsing the command line", func() {
 			parser := args.NewParser()
-			parser.AddOption("--one").IsString()
-			parser.AddOption("--two").IsString()
-			parser.AddOption("--three").IsString()
+			parser.AddFlag("--one").IsString()
+			parser.AddFlag("--two").IsString()
+			parser.AddFlag("--three").IsString()
 			cmdLine := []string{"--three", "this is three value"}
 			opt, err := parser.Parse(&cmdLine)
 			input := []byte("one=this is one value\ntwo=this is two value\n")
@@ -39,9 +39,9 @@ var _ = Describe("ArgParser", func() {
 
 		It("Should not overide options supplied via the command line", func() {
 			parser := args.NewParser()
-			parser.AddOption("--one").IsString()
-			parser.AddOption("--two").IsString()
-			parser.AddOption("--three").IsString()
+			parser.AddFlag("--one").IsString()
+			parser.AddFlag("--two").IsString()
+			parser.AddFlag("--three").IsString()
 			cmdLine := []string{"--three", "this is three value", "--one", "this is from the cmd line"}
 			opt, err := parser.Parse(&cmdLine)
 			input := []byte("one=this is one value\ntwo=this is two value\n")
@@ -54,7 +54,7 @@ var _ = Describe("ArgParser", func() {
 		It("Should clear any pre existing slices in the struct before assignment", func() {
 			parser := args.NewParser()
 			var list []string
-			parser.AddOption("--list").StoreStringSlice(&list).Default("foo,bar,bit")
+			parser.AddFlag("--list").StoreStringSlice(&list).Default("foo,bar,bit")
 
 			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
@@ -77,7 +77,7 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should not raise if options and configs share the same name, but are in diff groups", func() {
 			parser := args.NewParser()
-			parser.AddOption("--debug").IsTrue()
+			parser.AddFlag("--debug").IsTrue()
 			parser.AddConfig("debug").InGroup("database").IsBool()
 
 			cmdLine := []string{"--debug"}
@@ -94,10 +94,10 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should report IsSet properly", func() {
 			parser := args.NewParser()
-			parser.AddOption("--one")
-			parser.AddOption("--two")
+			parser.AddFlag("--one")
+			parser.AddFlag("--two")
 			parser.AddConfig("three")
-			parser.AddOption("four")
+			parser.AddFlag("four")
 			parser.AddConfig("five")
 
 			// 'two' is missing from the command line
@@ -129,8 +129,8 @@ var _ = Describe("ArgParser", func() {
 		It("Should Parser an adhoc group from the ini file", func() {
 			cmdLine := []string{"--one", "one-thing"}
 			parser := args.NewParser()
-			parser.SetLog(log)
-			parser.AddOption("--one").IsString()
+			parser.Log(log)
+			parser.AddFlag("--one").IsString()
 			parser.AddConfigGroup("candy-bars")
 
 			opt, err := parser.Parse(&cmdLine)

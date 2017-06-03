@@ -40,7 +40,7 @@ var _ = Describe("args.WatchFile()", func() {
 
 	It("Should reload a config file when watched file is modified", func() {
 		parser := args.NewParser()
-		parser.SetLog(log)
+		parser.Log(log)
 
 		parser.AddConfig("value")
 		parser.AddConfig("version").IsInt()

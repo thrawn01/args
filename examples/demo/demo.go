@@ -22,62 +22,64 @@ func main() {
 
 	// Create the parser with program name 'example'
 	// and environment variables prefixed with APP_
-	parser := args.NewParser(args.Name("demo"), args.EnvPrefix("APP_"),
-		args.Desc("This is a demo app to showcase some features of args"))
+	parser := args.NewParser().
+		Name("demo").
+		EnvPrefix("APP_").
+		Desc("This is a demo app to showcase some features of args")
 
 	// Store Integers directly into a struct with a default value
-	parser.AddOption("--power-level").Alias("-p").StoreInt(&conf.PowerLevel).
+	parser.AddFlag("--power-level").Alias("-p").StoreInt(&conf.PowerLevel).
 		Env("POWER_LEVEL").Default("10000").Help("set our power level")
 
-	// Command line options can begin with -name, --name or even ++name
+	// Command line flags can begin with -name, --name or even ++name
 	// Most non word characters are supported
-	parser.AddOption("++config-file").Alias("+c").IsString().
+	parser.AddFlag("++config-file").Alias("+c").IsString().
 		Default("/path/to/config").Help("path to config file")
 
 	// Use the args.Env() function to define an environment variable
 	// NOTE: Since the parser was passed args.EnvPrefix("APP_") the actual
 	// environment variable name is 'APP_MESSAGE'
-	parser.AddOption("--message").Alias("-m").StoreStr(&conf.Message).
+	parser.AddFlag("--message").Alias("-m").StoreStr(&conf.Message).
 		Env("MESSAGE").Default("over-ten-thousand").Help("send a message")
 
 	// Pass a comma separated list of strings and get a []string slice
-	parser.AddOption("--slice").Alias("-s").StoreStringSlice(&conf.StringSlice).Env("LIST").
+	parser.AddFlag("--slice").Alias("-s").StoreStringSlice(&conf.StringSlice).Env("LIST").
 		Default("one,two,three").Help("list of messages")
 
 	// Count the number of times an option is seen
-	parser.AddOption("--verbose").Alias("-v").Count().StoreInt(&conf.Verbose).Help("be verbose")
+	parser.AddFlag("--verbose").Alias("-v").Count().StoreInt(&conf.Verbose).Help("be verbose")
 
 	// Set bool to true if the option is present on the command line
-	parser.AddOption("--debug").Alias("-d").IsTrue().Help("turn on Debug")
+	parser.AddFlag("--debug").Alias("-d").IsTrue().Help("turn on Debug")
 
 	// Specify the type of the arg with IsInt(), IsString(), IsBool() or IsTrue()
-	parser.AddOption("--help").Alias("-h").IsTrue().Help("show this help message")
+	parser.AddFlag("--help").Alias("-h").IsTrue().Help("show this help message")
 
 	// Add Required arguments
-	parser.AddArgument("the-question").Required().
+	parser.AddArg("the-question").Required().
 		StoreStr(&conf.TheQuestion).Help("Before you have an answer")
 
 	// Add Optional arguments
-	parser.AddArgument("the-answer").IsInt().Default("42").
+	parser.AddArg("the-answer").IsInt().Default("42").
 		StoreInt(&conf.TheAnswer).Help("It must be 42")
 
-	// 'Conf' options are not set via the command line but can be set
+	// 'Conf' flags are not set via the command line but can be set
 	// via a config file or an environment variable
-	parser.AddConfig("twelve-factor").Env("TWELVE_FACTOR").Help("Demo of config options")
+	parser.AddConfig("twelve-factor").Env("TWELVE_FACTOR").Help("Demo of config flags")
 
 	// Define a 'database' subgroup
 	db := parser.InGroup("database")
 
-	// Add command line options to the subgroup
-	db.AddOption("--host").Alias("-dH").StoreStr(&conf.DbHost).
+	// Add command line flags to the subgroup
+	db.AddFlag("--host").Alias("-dH").StoreStr(&conf.DbHost).
 		Default("localhost").Help("database hostname")
 
-	// Add subgroup specific config. 'Conf' options are not set via the
+	// Add subgroup specific config. 'Conf' flags are not set via the
 	// command line but can be set via a config file or anything that calls parser.Apply()
 	db.AddConfig("debug").IsTrue().Help("enable database debug")
 
 	// 'Conf' option names are not allowed to start with a non word character like
-	// '--' or '++' so they can not be confused with command line options
+	// '--' or '++' so they can not be confused with command line flags
 	db.AddConfig("database").IsString().Default("myDatabase").Help("name of database to use")
 
 	// If no type is specified, defaults to 'IsString'
@@ -182,7 +184,7 @@ func main() {
 		},
 	)
 
-	// Small demo of how Group() works with options
+	// Small demo of how Group() works with flags
 	opts.String("string")                       // == "one"
 	opts.Group("endpoints")                     // == *args.Options
 	opts.Group("endpoints").String("endpoint1") // == "host1"

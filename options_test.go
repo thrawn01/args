@@ -14,7 +14,7 @@ var _ = Describe("Options", func() {
 	BeforeEach(func() {
 		log = NewTestLogger()
 		parser := args.NewParser()
-		parser.SetLog(log)
+		parser.Log(log)
 
 		opts = parser.NewOptionsFromMap(
 			map[string]interface{}{
@@ -98,7 +98,7 @@ var _ = Describe("Options", func() {
 	Describe("NoArgs()", func() {
 		It("Should return true if no arguments on the command line", func() {
 			parser := args.NewParser()
-			parser.AddOption("--power-level").IsInt().Default("1")
+			parser.AddFlag("--power-level").IsInt().Default("1")
 
 			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
@@ -107,7 +107,7 @@ var _ = Describe("Options", func() {
 		})
 		It("Should return false if arguments on the command line", func() {
 			parser := args.NewParser()
-			parser.AddOption("--power-level").IsInt().Default("1")
+			parser.AddFlag("--power-level").IsInt().Default("1")
 
 			opt, err := parser.Parse(&[]string{"--power-level", "2"})
 			Expect(err).To(BeNil())
@@ -131,8 +131,8 @@ var _ = Describe("Options", func() {
 	Describe("IsSet()", func() {
 		It("Should return true if the value is not a cast default", func() {
 			parser := args.NewParser()
-			parser.AddOption("--is-set").IsInt().Default("1")
-			parser.AddOption("--not-set")
+			parser.AddFlag("--is-set").IsInt().Default("1")
+			parser.AddFlag("--not-set")
 			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
 			Expect(opt.IsSet("is-set")).To(Equal(true))
@@ -144,8 +144,8 @@ var _ = Describe("Options", func() {
 		It("Should return true if the option as set via the command line", func() {
 			cmdLine := []string{"--two", "2"}
 			parser := args.NewParser()
-			parser.AddOption("--one").IsInt().Default("1")
-			parser.AddOption("--two").IsInt().Default("0")
+			parser.AddFlag("--one").IsInt().Default("1")
+			parser.AddFlag("--two").IsInt().Default("0")
 
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
@@ -158,8 +158,8 @@ var _ = Describe("Options", func() {
 	Describe("IsEnv()", func() {
 		It("Should return true if the option was set via an environment variable", func() {
 			parser := args.NewParser()
-			parser.AddOption("--one").IsInt().Default("1").Env("ONE")
-			parser.AddOption("--two").IsInt().Default("0").Env("TWO")
+			parser.AddFlag("--one").IsInt().Default("1").Env("ONE")
+			parser.AddFlag("--two").IsInt().Default("0").Env("TWO")
 
 			os.Setenv("TWO", "2")
 			opt, err := parser.Parse(nil)
@@ -174,8 +174,8 @@ var _ = Describe("Options", func() {
 		It("Should return true if the option used the default value", func() {
 			cmdLine := []string{"--two", "2"}
 			parser := args.NewParser()
-			parser.AddOption("--one").IsInt().Default("1")
-			parser.AddOption("--two").IsInt().Default("0")
+			parser.AddFlag("--one").IsInt().Default("1")
+			parser.AddFlag("--two").IsInt().Default("0")
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("one")).To(Equal(1))
@@ -189,9 +189,9 @@ var _ = Describe("Options", func() {
 		It("Should return true if the option was seen on the commandline", func() {
 			cmdLine := []string{"--is-seen"}
 			parser := args.NewParser()
-			parser.AddOption("--is-set").IsInt().Default("1")
-			parser.AddOption("--is-seen").IsTrue()
-			parser.AddOption("--not-set")
+			parser.AddFlag("--is-set").IsInt().Default("1")
+			parser.AddFlag("--is-seen").IsTrue()
+			parser.AddFlag("--not-set")
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.WasSeen("is-set")).To(Equal(false))
@@ -201,9 +201,9 @@ var _ = Describe("Options", func() {
 		})
 		It("Should return true if the option was seen in the environment", func() {
 			parser := args.NewParser()
-			parser.AddOption("--is-set").IsInt().Default("1")
-			parser.AddOption("--is-seen").IsTrue().Env("IS_SEEN")
-			parser.AddOption("--not-set")
+			parser.AddFlag("--is-set").IsInt().Default("1")
+			parser.AddFlag("--is-seen").IsTrue().Env("IS_SEEN")
+			parser.AddFlag("--not-set")
 
 			os.Setenv("IS_SEEN", "true")
 			opt, err := parser.Parse(nil)
@@ -217,22 +217,23 @@ var _ = Describe("Options", func() {
 	Describe("InspectOpt()", func() {
 		It("Should return the option object requested", func() {
 			parser := args.NewParser()
-			parser.AddOption("--is-set").IsInt().Default("1")
-			parser.AddOption("--not-set")
+			parser.AddFlag("--is-set").IsInt().Default("1")
+			parser.AddFlag("--not-set")
 			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
 			option := opt.InspectOpt("is-set")
 			Expect(option.GetValue().(int)).To(Equal(1))
-			Expect(option.GetRule().Flags).To(Equal(int64(544)))
+			Expect(option.GetRule().Flags & args.IsFlag).To(Not(Equal(0)))
+			Expect(option.GetRule().Flags & args.HasNoValue).To(Not(Equal(0)))
 		})
 	})
 
 	Describe("Required()", func() {
 		It("Should return nil if all values are provided", func() {
 			parser := args.NewParser()
-			parser.AddOption("--is-set").IsInt().Default("1")
-			parser.AddOption("--is-provided")
-			parser.AddOption("--not-set")
+			parser.AddFlag("--is-set").IsInt().Default("1")
+			parser.AddFlag("--is-provided")
+			parser.AddFlag("--not-set")
 			opt, err := parser.Parse(&[]string{"--is-provided", "foo"})
 			Expect(err).To(BeNil())
 

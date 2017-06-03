@@ -22,7 +22,7 @@ type Value interface {
 
 type Options struct {
 	log    StdLogger
-	parser *ArgParser
+	parser *Parser
 	values map[string]Value
 }
 
@@ -44,13 +44,13 @@ func (self *RawValue) GetRule() *Rule {
 }
 
 func (self *RawValue) Seen() bool {
-	if self.Rule.Flags&Seen != 0 {
+	if self.Rule.Flags& WasSeenInArgv != 0 {
 		return true
 	}
 	return false
 }
 
-func (self *ArgParser) NewOptions() *Options {
+func (self *Parser) NewOptions() *Options {
 	return &Options{
 		values: make(map[string]Value),
 		log:    self.log,
@@ -58,7 +58,7 @@ func (self *ArgParser) NewOptions() *Options {
 	}
 }
 
-func (self *ArgParser) NewOptionsFromMap(values map[string]interface{}) *Options {
+func (self *Parser) NewOptionsFromMap(values map[string]interface{}) *Options {
 	options := self.NewOptions()
 	for key, value := range values {
 		// If the value is a map of interfaces
@@ -294,7 +294,7 @@ func (self *Options) IsSet(key string) bool {
 		if rule == nil {
 			return false
 		}
-		return !(rule.Flags&NoValue != 0)
+		return !(rule.Flags& HasNoValue != 0)
 	}
 	return false
 }
@@ -306,7 +306,7 @@ func (self *Options) IsEnv(key string) bool {
 		if rule == nil {
 			return false
 		}
-		return (rule.Flags&EnvValue != 0)
+		return (rule.Flags& IsEnvValue != 0)
 	}
 	return false
 }
@@ -318,7 +318,7 @@ func (self *Options) IsArg(key string) bool {
 		if rule == nil {
 			return false
 		}
-		return (rule.Flags&Seen != 0)
+		return (rule.Flags& WasSeenInArgv != 0)
 	}
 	return false
 }
@@ -330,7 +330,7 @@ func (self *Options) IsDefault(key string) bool {
 		if rule == nil {
 			return false
 		}
-		return (rule.Flags&DefaultValue != 0)
+		return (rule.Flags& IsDefaultValue != 0)
 	}
 	return false
 }
@@ -342,7 +342,7 @@ func (self *Options) WasSeen(key string) bool {
 		if rule == nil {
 			return false
 		}
-		return (rule.Flags&Seen != 0) || (rule.Flags&EnvValue != 0)
+		return (rule.Flags& WasSeenInArgv != 0) || (rule.Flags& IsEnvValue != 0)
 	}
 	return false
 }

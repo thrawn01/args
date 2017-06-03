@@ -56,7 +56,7 @@ type Backend interface {
 	Close()
 }
 
-func (self *ArgParser) FromBackend(backend Backend) (*Options, error) {
+func (self *Parser) FromBackend(backend Backend) (*Options, error) {
 
 	options, err := self.ParseBackend(backend)
 	if err != nil {
@@ -66,7 +66,7 @@ func (self *ArgParser) FromBackend(backend Backend) (*Options, error) {
 	return self.Apply(options)
 }
 
-func (self *ArgParser) ParseBackend(backend Backend) (*Options, error) {
+func (self *Parser) ParseBackend(backend Backend) (*Options, error) {
 	values := self.NewOptions()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -96,7 +96,7 @@ func (self *ArgParser) ParseBackend(backend Backend) (*Options, error) {
 	return values, nil
 }
 
-func (self *ArgParser) matchBackendRule(key string, backend Backend) *Rule {
+func (self *Parser) matchBackendRule(key string, backend Backend) *Rule {
 	for _, rule := range self.rules {
 		comparePath := key
 		if rule.HasFlag(IsConfigGroup) {
@@ -109,7 +109,7 @@ func (self *ArgParser) matchBackendRule(key string, backend Backend) *Rule {
 	return nil
 }
 
-func (self *ArgParser) Watch(backend Backend, callBack func(*ChangeEvent, error)) WatchCancelFunc {
+func (self *Parser) Watch(backend Backend, callBack func(*ChangeEvent, error)) WatchCancelFunc {
 	var isRunning sync.WaitGroup
 	var once sync.Once
 	done := make(chan struct{})
@@ -158,7 +158,7 @@ func (self *ArgParser) Watch(backend Backend, callBack func(*ChangeEvent, error)
 	return func() { close(done) }
 }
 
-func (self *ArgParser) Sleep() {
+func (self *Parser) Sleep() {
 	self.attempts = self.attempts + 1
 	delay := time.Duration(self.attempts) * 2 * time.Millisecond
 	if delay > MAX_BACKOFF_WAIT {

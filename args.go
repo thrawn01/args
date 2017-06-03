@@ -31,43 +31,6 @@ func (self *NullLogger) Printf(string, ...interface{}) {}
 func (self *NullLogger) Println(...interface{})        {}
 
 // ***********************************************
-// PUBLIC FUNCTIONS
-// ***********************************************
-func Name(name string) ParseModifier {
-	return func(parser *ArgParser) {
-		parser.Name = name
-	}
-}
-
-func Desc(desc string, flags ...int64) ParseModifier {
-	return func(parser *ArgParser) {
-		// Set any flags if provided
-		for _, flag := range flags {
-			SetFlags(&parser.flags, flag)
-		}
-		parser.Description = desc
-	}
-}
-
-func WrapLen(length int) ParseModifier {
-	return func(parser *ArgParser) {
-		parser.WordWrap = length
-	}
-}
-
-func EnvPrefix(prefix string) ParseModifier {
-	return func(parser *ArgParser) {
-		parser.EnvPrefix = prefix
-	}
-}
-
-func NoHelp() ParseModifier {
-	return func(parser *ArgParser) {
-		parser.AddHelpOption = false
-	}
-}
-
-// ***********************************************
 // Public Word Formatting Functions
 // ***********************************************
 

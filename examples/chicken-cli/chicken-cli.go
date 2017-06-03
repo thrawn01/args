@@ -1,15 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
-
-	"bytes"
-	"encoding/json"
-	"io/ioutil"
-
 	"path"
 
 	"github.com/pkg/errors"
@@ -22,15 +20,16 @@ type SharedStruct struct {
 }
 
 func main() {
-	parser := args.NewParser(args.Name("http-client"),
-		args.Desc("Example http client client"))
+	parser := args.NewParser().
+		Name("http-client").
+		Desc("Example http client client")
 
-	parser.AddOption("--verbose").Alias("-v").Count().
+	parser.AddFlag("--verbose").Alias("-v").Count().
 		Help("Be verbose")
-	parser.AddOption("--endpoint").Default("http://localhost:1234").Env("API_ENDPOINT").
+	parser.AddFlag("--endpoint").Default("http://localhost:1234").Env("API_ENDPOINT").
 		Help("The HTTP endpoint our client will talk too")
 
-	parser.AddCommand("super-chickens", func(subParser *args.ArgParser, data interface{}) (int, error) {
+	parser.AddCommand("super-chickens", func(subParser *args.Parser, data interface{}) (int, error) {
 		subParser.AddCommand("create", createChickens)
 		subParser.AddCommand("list", listChickens)
 		subParser.AddCommand("delete", deleteChickens)
@@ -75,7 +74,7 @@ func main() {
 	os.Exit(retCode)
 }
 
-func createChickens(subParser *args.ArgParser, data interface{}) (int, error) {
+func createChickens(subParser *args.Parser, data interface{}) (int, error) {
 	subParser.AddArgument("name").Required().Help("The name of the chicken to create")
 	opts := subParser.ParseSimple(nil)
 	if opts == nil {
@@ -107,7 +106,7 @@ func createChickens(subParser *args.ArgParser, data interface{}) (int, error) {
 	return 0, nil
 }
 
-func listChickens(subParser *args.ArgParser, data interface{}) (int, error) {
+func listChickens(subParser *args.Parser, data interface{}) (int, error) {
 	opts := subParser.GetOpts()
 
 	shared := data.(*SharedStruct)
@@ -123,7 +122,7 @@ func listChickens(subParser *args.ArgParser, data interface{}) (int, error) {
 	return 0, nil
 }
 
-func deleteChickens(subParser *args.ArgParser, data interface{}) (int, error) {
+func deleteChickens(subParser *args.Parser, data interface{}) (int, error) {
 	subParser.AddArgument("name").Required().Help("The name of the chicken to delete")
 	opts := subParser.ParseSimple(nil)
 	if opts == nil {

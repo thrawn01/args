@@ -4,14 +4,14 @@ import "reflect"
 
 type RuleModifier struct {
 	rule   *Rule
-	parser *ArgParser
+	parser *Parser
 }
 
-func NewRuleModifier(parser *ArgParser) *RuleModifier {
+func NewRuleModifier(parser *Parser) *RuleModifier {
 	return &RuleModifier{newRule(), parser}
 }
 
-func newRuleModifier(rule *Rule, parser *ArgParser) *RuleModifier {
+func newRuleModifier(rule *Rule, parser *Parser) *RuleModifier {
 	return &RuleModifier{rule, parser}
 }
 
@@ -113,8 +113,14 @@ func (self *RuleModifier) StoreStringMap(dest *map[string]string) *RuleModifier 
 }
 
 // Indicates this option has an alias it can go by
-func (self *RuleModifier) Alias(aliasName string) *RuleModifier {
-	self.rule.Aliases = append(self.rule.Aliases, aliasName)
+func (self *RuleModifier) Alias(name string) *RuleModifier {
+	self.rule.AddAlias(name, self.parser.prefixChars)
+	return self
+}
+
+// Add the abbreviated version of the option (-a, -b, -c, etc...)
+func (self *RuleModifier) Short(name string) *RuleModifier {
+	self.rule.AddAlias(name, []string{"-"})
 	return self
 }
 
@@ -155,7 +161,7 @@ func (self *RuleModifier) Count() *RuleModifier {
 }
 
 func (self *RuleModifier) Env(varName string) *RuleModifier {
-	self.rule.EnvVars = append(self.rule.EnvVars, self.parser.EnvPrefix+varName)
+	self.rule.EnvVars = append(self.rule.EnvVars, self.parser.envPrefix+varName)
 	return self
 }
 
@@ -175,15 +181,15 @@ func (self *RuleModifier) AddConfigGroup(group string) *RuleModifier {
 	newRule.SetFlag(IsConfigGroup)
 	newRule.Group = group
 	// Make a new RuleModifier using self as the template
-	return self.parser.AddRule(group, newRuleModifier(&newRule, self.parser))
+	return self.parser.addRule(group, newRuleModifier(&newRule, self.parser))
 }
 
-func (self *RuleModifier) AddOption(name string) *RuleModifier {
+func (self *RuleModifier) AddFlag(name string) *RuleModifier {
 	var newRule Rule
 	newRule = *self.rule
-	newRule.SetFlag(IsOption)
+	newRule.SetFlag(IsFlag)
 	// Make a new RuleModifier using self as the template
-	return self.parser.AddRule(name, newRuleModifier(&newRule, self.parser))
+	return self.parser.addRule(name, newRuleModifier(&newRule, self.parser))
 }
 
 func (self *RuleModifier) AddConfig(name string) *RuleModifier {
@@ -191,7 +197,7 @@ func (self *RuleModifier) AddConfig(name string) *RuleModifier {
 	newRule = *self.rule
 	// Make a new Rule using self.rule as the template
 	newRule.SetFlag(IsConfig)
-	return self.parser.AddRule(name, newRuleModifier(&newRule, self.parser))
+	return self.parser.addRule(name, newRuleModifier(&newRule, self.parser))
 }
 
 func (self *RuleModifier) Key(key string) *RuleModifier {

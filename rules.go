@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
 )
+
+var regexHasPrefix = regexp.MustCompile(`^(\W+)([\w|-]*)$`)
 
 // ***********************************************
 // Rule Object
@@ -17,21 +20,22 @@ import (
 type CastFunc func(string, interface{}, interface{}) (interface{}, error)
 type ActionFunc func(*Rule, string, []string, *int) error
 type StoreFunc func(interface{})
-type CommandFunc func(*ArgParser, interface{}) (int, error)
+type CommandFunc func(*Parser, interface{}) (int, error)
+
+type RuleFlag int64
 
 const (
-	IsCommand int64 = 1 << iota
+	IsCommand RuleFlag = 1 << iota
 	IsArgument
 	IsConfig
 	IsConfigGroup
 	IsRequired
-	IsOption
-	IsFormated
+	IsFlag
 	IsGreedy
-	NoValue
-	DefaultValue
-	EnvValue
-	Seen
+	HasNoValue
+	IsDefaultValue
+	IsEnvValue
+	WasSeenInArgv
 )
 
 type Rule struct {
@@ -52,22 +56,49 @@ type Rule struct {
 	Group       string
 	Key         string
 	NotGreedy   bool
-	Flags       int64
+	Flags       RuleFlag
 }
 
 func newRule() *Rule {
 	return &Rule{Cast: castString, Group: DefaultOptionGroup}
 }
 
-func (self *Rule) HasFlag(flag int64) bool {
+func (self *Rule) AddAlias(name string, prefixes []string) string {
+	switch true {
+	case self.HasFlag(IsCommand):
+		self.Aliases = append(self.Aliases, name)
+		name = fmt.Sprintf("!cmd-%s", name)
+	case self.HasFlag(IsFlag):
+		// If name begins with a non word character, then user included the prefix in the name
+		if regexHasPrefix.MatchString(name) {
+			// Attempt to extract the name from the prefix
+			group := regexHasPrefix.FindStringSubmatch(name)
+			self.Aliases = append(self.Aliases, name)
+			name = group[2]
+		} else {
+			if len(prefixes) != 0 {
+				// User specified an prefix to apply to all non prefixed options
+				for _, prefix := range prefixes {
+					self.Aliases = append(self.Aliases, fmt.Sprintf("%s%s", prefix, name))
+				}
+			} else {
+				// Apply default '--' prefix if none specified
+				self.Aliases = append(self.Aliases, fmt.Sprintf("--%s", name))
+			}
+		}
+	}
+	return name
+}
+
+func (self *Rule) HasFlag(flag RuleFlag) bool {
 	return self.Flags&flag != 0
 }
 
-func (self *Rule) SetFlag(flag int64) {
+func (self *Rule) SetFlag(flag RuleFlag) {
 	self.Flags = (self.Flags | flag)
 }
 
-func (self *Rule) ClearFlag(flag int64) {
+func (self *Rule) ClearFlag(flag RuleFlag) {
 	mask := (self.Flags ^ flag)
 	self.Flags &= mask
 }
@@ -78,7 +109,7 @@ func (self *Rule) Validate() error {
 
 func (self *Rule) GenerateUsage() string {
 	switch {
-	case self.Flags&IsOption != 0:
+	case self.Flags&IsFlag != 0:
 		if self.HasFlag(IsRequired) {
 			return fmt.Sprintf("%s", self.Aliases[0])
 		}
@@ -137,7 +168,7 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 	// If this is an argument
 	if self.HasFlag(IsArgument) {
 		// And we have already seen this argument and it's not greedy
-		if self.HasFlag(Seen) && !self.HasFlag(IsGreedy) {
+		if self.HasFlag(WasSeenInArgv) && !self.HasFlag(IsGreedy) {
 			return false, nil
 		}
 	} else {
@@ -147,7 +178,7 @@ func (self *Rule) Match(args []string, idx *int) (bool, error) {
 			return false, nil
 		}
 	}
-	self.SetFlag(Seen)
+	self.SetFlag(WasSeenInArgv)
 
 	// If user defined an action
 	if self.Action != nil {
@@ -189,7 +220,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	}
 
 	// If rule matched argument on command line
-	if self.HasFlag(Seen) {
+	if self.HasFlag(WasSeenInArgv) {
 		return self.Value, nil
 	}
 
@@ -200,7 +231,8 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	}
 
 	if value != nil {
-		self.SetFlag(EnvValue)
+		// Flag the value is from the environment
+		self.SetFlag(IsEnvValue)
 		return value, nil
 	}
 
@@ -213,14 +245,14 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	if values != nil {
 		group := values.Group(self.Group)
 		if group.HasKey(self.Name) {
-			self.ClearFlag(NoValue)
+			self.ClearFlag(HasNoValue)
 			return self.Cast(self.Name, self.Value, group.Get(self.Name))
 		}
 	}
 
 	// Apply default if available
 	if self.Default != nil {
-		self.SetFlag(DefaultValue)
+		self.SetFlag(IsDefaultValue)
 		return self.Cast(self.Name, self.Value, *self.Default)
 	}
 
@@ -230,7 +262,7 @@ func (self *Rule) ComputedValue(values *Options) (interface{}, error) {
 	}
 
 	// Flag that we found no value for this rule
-	self.SetFlag(NoValue)
+	self.SetFlag(HasNoValue)
 
 	// Return the default value for our type choice
 	value, _ = self.Cast(self.Name, self.Value, nil)

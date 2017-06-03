@@ -8,19 +8,19 @@ import (
 	"github.com/thrawn01/args"
 )
 
-var _ = Describe("ArgParser", func() {
+var _ = Describe("Parser", func() {
 	var log *TestLogger
 
 	BeforeEach(func() {
 		log = NewTestLogger()
 	})
 
-	Describe("ArgParser.Parse(nil)", func() {
+	Describe("Parser.Parse(nil)", func() {
 		It("Should return error if AddOption() was never called", func() {
-			parser := args.NewParser(args.NoHelp())
+			parser := args.NewParser().AddHelp(false)
 			_, err := parser.Parse(nil)
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal("Must create some options to match with args.AddOption() before calling arg.Parse()"))
+			Expect(err.Error()).To(Equal("Must create some options to match with before calling arg.Parse()"))
 		})
 		It("Should add Help option if none provided", func() {
 			parser := args.NewParser()
@@ -30,19 +30,25 @@ var _ = Describe("ArgParser", func() {
 			Expect(rule.Name).To(Equal("help"))
 		})
 	})
-	Describe("ArgParser.AddOption()", func() {
+	Describe("Parser.AddHelp()", func() {
+		It("Should return true on new parser", func() {
+			parser := args.NewParser()
+			Expect(parser.GetAddHelp()).To(Equal(true))
+		})
+	})
+	Describe("Parser.AddOption()", func() {
 		cmdLine := []string{"--one", "-two", "++three", "+four", "--power-level"}
 
 		It("Should create optional rule --one", func() {
 			parser := args.NewParser()
-			parser.AddOption("--one").Count()
+			parser.AddFlag("--one").Count()
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
 			Expect(rule.Order).To(Equal(0))
 		})
 		It("Should create optional rule ++one", func() {
 			parser := args.NewParser()
-			parser.AddOption("++one").Count()
+			parser.AddFlag("++one").Count()
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
 			Expect(rule.Order).To(Equal(0))
@@ -50,7 +56,7 @@ var _ = Describe("ArgParser", func() {
 
 		It("Should create optional rule -one", func() {
 			parser := args.NewParser()
-			parser.AddOption("-one").Count()
+			parser.AddFlag("-one").Count()
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
 			Expect(rule.Order).To(Equal(0))
@@ -58,7 +64,7 @@ var _ = Describe("ArgParser", func() {
 
 		It("Should create optional rule +one", func() {
 			parser := args.NewParser()
-			parser.AddOption("+one").Count()
+			parser.AddFlag("+one").Count()
 			rule := parser.GetRules()[0]
 			Expect(rule.Name).To(Equal("one"))
 			Expect(rule.Order).To(Equal(0))
@@ -66,35 +72,35 @@ var _ = Describe("ArgParser", func() {
 
 		It("Should match --one", func() {
 			parser := args.NewParser()
-			parser.AddOption("--one").Count()
+			parser.AddFlag("--one").Count()
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("one")).To(Equal(1))
 		})
 		It("Should match -two", func() {
 			parser := args.NewParser()
-			parser.AddOption("-two").Count()
+			parser.AddFlag("-two").Count()
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("two")).To(Equal(1))
 		})
 		It("Should match ++three", func() {
 			parser := args.NewParser()
-			parser.AddOption("++three").Count()
+			parser.AddFlag("++three").Count()
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("three")).To(Equal(1))
 		})
 		It("Should match +four", func() {
 			parser := args.NewParser()
-			parser.AddOption("+four").Count()
+			parser.AddFlag("+four").Count()
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("four")).To(Equal(1))
 		})
 		It("Should match --power-level", func() {
 			parser := args.NewParser()
-			parser.AddOption("--power-level").Count()
+			parser.AddFlag("--power-level").Count()
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(1))
@@ -103,14 +109,14 @@ var _ = Describe("ArgParser", func() {
 			cmdLine := []string{"--no-docker"}
 
 			parser := args.NewParser()
-			parser.AddOption("no-docker").Count()
+			parser.AddFlag("no-docker").Count()
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Bool("no-docker")).To(Equal(true))
 		})
 		It("Should raise an error if a option is required but not provided", func() {
 			parser := args.NewParser()
-			parser.AddOption("--power-level").Required()
+			parser.AddFlag("--power-level").Required()
 			cmdLine := []string{""}
 			_, err := parser.Parse(&cmdLine)
 
@@ -119,10 +125,10 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("ArgParser.IsStringSlice()", func() {
+	Describe("Parser.IsStringSlice()", func() {
 		It("Should allow slices in a comma delimited string", func() {
 			parser := args.NewParser()
-			parser.AddOption("--list").IsStringSlice().Default("foo,bar,bit")
+			parser.AddFlag("--list").IsStringSlice().Default("foo,bar,bit")
 
 			// Test Default Value
 			opt, err := parser.Parse(nil)
@@ -138,7 +144,7 @@ var _ = Describe("ArgParser", func() {
 		It("Should allow slices in a comma delimited string saved to a variable", func() {
 			parser := args.NewParser()
 			var list []string
-			parser.AddOption("--list").StoreStringSlice(&list).Default("foo,bar,bit")
+			parser.AddFlag("--list").StoreStringSlice(&list).Default("foo,bar,bit")
 
 			cmdLine := []string{"--list", "belt,car,table"}
 			opt, err := parser.Parse(&cmdLine)
@@ -148,7 +154,7 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should allow multiple iterations of the same option to create a slice", func() {
 			parser := args.NewParser()
-			parser.AddOption("--list").IsStringSlice()
+			parser.AddFlag("--list").IsStringSlice()
 
 			cmdLine := []string{"--list", "bee", "--list", "cat", "--list", "dad"}
 			opt, err := parser.Parse(&cmdLine)
@@ -158,7 +164,7 @@ var _ = Describe("ArgParser", func() {
 		It("Should allow multiple iterations of the same option to create a slice - with var", func() {
 			parser := args.NewParser()
 			var list []string
-			parser.AddOption("--list").StoreStringSlice(&list)
+			parser.AddFlag("--list").StoreStringSlice(&list)
 
 			cmdLine := []string{"--list", "bee", "--list", "cat", "--list", "dad"}
 			opt, err := parser.Parse(&cmdLine)
@@ -176,10 +182,10 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.StringSlice("list")).To(Equal([]string{"bee", "cat", "dad"}))
 		})
 	})
-	Describe("ArgParser.IsStringMap()", func() {
+	Describe("Parser.IsStringMap()", func() {
 		It("Should handle slice apply from alternate sources", func() {
 			parser := args.NewParser()
-			parser.AddOption("--list").IsStringSlice()
+			parser.AddFlag("--list").IsStringSlice()
 
 			options := parser.NewOptionsFromMap(
 				map[string]interface{}{
@@ -191,7 +197,7 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should error if apply on map is invalid type", func() {
 			parser := args.NewParser()
-			parser.AddOption("--list").IsStringSlice()
+			parser.AddFlag("--list").IsStringSlice()
 
 			options := parser.NewOptionsFromMap(
 				map[string]interface{}{
@@ -202,8 +208,8 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should not error if key contains non alpha char", func() {
 			parser := args.NewParser()
-			parser.AddOption("--map").IsStringMap()
-			parser.AddOption("--foo")
+			parser.AddFlag("--map").IsStringMap()
+			parser.AddFlag("--foo")
 
 			cmdLine := []string{"--map", "http.ip=192.168.1.1"}
 			opt, err := parser.Parse(&cmdLine)
@@ -212,8 +218,8 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should not error if key or value contains an escaped equal or comma", func() {
 			parser := args.NewParser()
-			parser.AddOption("--map").IsStringMap()
-			parser.AddOption("--foo")
+			parser.AddFlag("--map").IsStringMap()
+			parser.AddFlag("--foo")
 
 			cmdLine := []string{"--map", `http\=ip=192.168.1.1`}
 			opt, err := parser.Parse(&cmdLine)
@@ -222,15 +228,15 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should error not error if no map value is supplied", func() {
 			parser := args.NewParser()
-			parser.AddOption("--list").IsStringMap()
-			parser.AddOption("--foo")
+			parser.AddFlag("--list").IsStringMap()
+			parser.AddFlag("--foo")
 
 			_, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
 		})
 		It("Should allow string map with '=' expression in a comma delimited string", func() {
 			parser := args.NewParser()
-			parser.AddOption("--map").IsStringMap().Default("foo=bar,bar=foo")
+			parser.AddFlag("--map").IsStringMap().Default("foo=bar,bar=foo")
 
 			// Test Default Value
 			opt, err := parser.Parse(nil)
@@ -248,7 +254,7 @@ var _ = Describe("ArgParser", func() {
 		It("Should store string map into a struct", func() {
 			parser := args.NewParser()
 			var destMap map[string]string
-			parser.AddOption("--map").StoreStringMap(&destMap).Default("foo=bar,bar=foo")
+			parser.AddFlag("--map").StoreStringMap(&destMap).Default("foo=bar,bar=foo")
 
 			// Test Default Value
 			opt, err := parser.Parse(nil)
@@ -265,7 +271,7 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should allow string map with JSON string", func() {
 			parser := args.NewParser()
-			parser.AddOption("--map").IsStringMap().Default(`{"foo":"bar", "bar":"foo"}`)
+			parser.AddFlag("--map").IsStringMap().Default(`{"foo":"bar", "bar":"foo"}`)
 
 			// Test Default Value
 			opt, err := parser.Parse(nil)
@@ -280,7 +286,7 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should allow multiple iterations of the same argument to create a map", func() {
 			parser := args.NewParser()
-			parser.AddOption("--map").IsStringMap()
+			parser.AddFlag("--map").IsStringMap()
 
 			cmdLine := []string{"--map", "blue=bell", "--map", "cat=dog", "--map", "dad=boy"}
 			opt, err := parser.Parse(&cmdLine)
@@ -293,7 +299,7 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should handle map apply from alternate sources", func() {
 			parser := args.NewParser()
-			parser.AddOption("--map").IsStringMap()
+			parser.AddFlag("--map").IsStringMap()
 
 			options := parser.NewOptionsFromMap(
 				map[string]interface{}{
@@ -307,7 +313,7 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should error if apply on map is invalid type", func() {
 			parser := args.NewParser()
-			parser.AddOption("--map").IsStringMap()
+			parser.AddFlag("--map").IsStringMap()
 
 			options := parser.NewOptionsFromMap(
 				map[string]interface{}{
@@ -318,7 +324,7 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should fail with incomplete key=values", func() {
 			parser := args.NewParser()
-			parser.AddOption("--map").IsStringMap()
+			parser.AddFlag("--map").IsStringMap()
 
 			cmdLine := []string{"--map", "belt"}
 			opt, err := parser.Parse(&cmdLine)
@@ -340,7 +346,7 @@ var _ = Describe("ArgParser", func() {
 
 		It("Should allow multiple iterations of the same argument to create a map with JSON", func() {
 			parser := args.NewParser()
-			parser.AddOption("--map").IsStringMap()
+			parser.AddFlag("--map").IsStringMap()
 
 			cmdLine := []string{
 				"--map", `{"blue":"bell"}`,
@@ -357,29 +363,41 @@ var _ = Describe("ArgParser", func() {
 		})
 
 	})
-
-	// Here until we complete deprecation of AddPositional()
-	Describe("ArgParser.AddPositional()", func() {
-		cmdLine := []string{"one", "two", "three", "four"}
-		It("Should create argument rule first", func() {
-			parser := args.NewParser()
-			parser.AddPositional("first").IsString()
-			rule := parser.GetRules()[0]
-			Expect(rule.Name).To(Equal("first"))
-			Expect(rule.Order).To(Equal(1))
-		})
-		It("Should match first argument 'one'", func() {
-			parser := args.NewParser()
-			parser.AddArgument("first").IsString()
+	Describe("Parser.PrefixChars()", func() {
+		It("Should return allow user to modify which prefix characters to match optional args with", func() {
+			cmdLine := []string{"-first", "first", "+second", "second"}
+			parser := args.NewParser().PrefixChars([]string{"+", "-"})
+			parser.AddFlag("first")
+			parser.AddFlag("second")
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
-			Expect(opt.String("first")).To(Equal("one"))
+			Expect(opt.String("first")).To(Equal("first"))
+			Expect(opt.String("second")).To(Equal("second"))
+			Expect(parser.GetPrefixChars()).To(Equal([]string{"+", "-"}))
 		})
+		It("Should return not allow invalid prefix characters", func() {
+			parser := args.NewParser().PrefixChars([]string{"_"})
+			_, err := parser.Parse(nil)
+			Expect(err.Error()).To(Equal("invalid PrefixChars() '_'; alpha, underscore and whitespace not allowed"))
+
+			parser = args.NewParser().PrefixChars([]string{"a"})
+			_, err = parser.Parse(nil)
+			Expect(err.Error()).To(Equal("invalid PrefixChars() 'a'; alpha, underscore and whitespace not allowed"))
+
+			parser = args.NewParser().PrefixChars([]string{" "})
+			_, err = parser.Parse(nil)
+			Expect(err.Error()).To(Equal("invalid PrefixChars() ' '; alpha, underscore and whitespace not allowed"))
+
+			parser = args.NewParser().PrefixChars([]string{""})
+			_, err = parser.Parse(nil)
+			Expect(err.Error()).To(Equal("invalid PrefixChars() prefix cannot be empty"))
+		})
+
 	})
-	Describe("ArgParser.ModifyRule()", func() {
+	Describe("Parser.ModifyRule()", func() {
 		It("Should return allow user to modify an existing rule ", func() {
 			parser := args.NewParser()
-			parser.AddOption("first").IsString().Default("one")
+			parser.AddFlag("first").IsString().Default("one")
 			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
 			Expect(opt.String("first")).To(Equal("one"))
@@ -390,10 +408,10 @@ var _ = Describe("ArgParser", func() {
 			Expect(opt.String("first")).To(Equal("two"))
 		})
 	})
-	Describe("ArgParser.GetRule()", func() {
+	Describe("Parser.GetRule()", func() {
 		It("Should return allow user to modify an existing rule ", func() {
 			parser := args.NewParser()
-			parser.AddOption("first").IsString().Default("one")
+			parser.AddFlag("first").IsString().Default("one")
 			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
 			Expect(opt.String("first")).To(Equal("one"))
@@ -403,7 +421,7 @@ var _ = Describe("ArgParser", func() {
 		})
 	})
 
-	Describe("ArgParser.AddArgument()", func() {
+	Describe("Parser.AddArgument()", func() {
 		cmdLine := []string{"one", "two", "three", "four"}
 
 		It("Should create argument rule first", func() {
@@ -446,8 +464,8 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should mixing optionals and arguments", func() {
 			parser := args.NewParser()
-			parser.AddOption("--verbose").IsTrue()
-			parser.AddOption("--first").IsString()
+			parser.AddFlag("--verbose").IsTrue()
+			parser.AddFlag("--first").IsString()
 			parser.AddArgument("second").IsString()
 			parser.AddArgument("third").IsString()
 
@@ -461,7 +479,7 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should raise an error if an optional and an argument share the same name", func() {
 			parser := args.NewParser()
-			parser.AddOption("--first").IsString()
+			parser.AddFlag("--first").IsString()
 			parser.AddArgument("first").IsString()
 
 			cmdLine := []string{"--first", "one", "one"}
@@ -471,7 +489,7 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should raise if options and configs share the same name", func() {
 			parser := args.NewParser()
-			parser.AddOption("--debug").IsTrue()
+			parser.AddFlag("--debug").IsTrue()
 			parser.AddConfig("debug").IsBool()
 
 			_, err := parser.Parse(nil)
@@ -511,7 +529,7 @@ var _ = Describe("ArgParser", func() {
 				"following greedy argument 'first'"))
 		})
 	})
-	Describe("ArgParser.AddConfig()", func() {
+	Describe("Parser.AddConfig()", func() {
 		cmdLine := []string{"--power-level", "--power-level"}
 		It("Should add new config only rule", func() {
 			parser := args.NewParser()
@@ -534,59 +552,77 @@ var _ = Describe("ArgParser", func() {
 			Expect(newOpt.Int("power-level")).To(Equal(3))
 		})
 	})
-	Describe("ArgParser.InGroup()", func() {
+	Describe("Parser.InGroup()", func() {
 		cmdLine := []string{"--power-level", "--hostname", "mysql.com"}
 		It("Should add a new group", func() {
 			parser := args.NewParser()
-			parser.AddOption("--power-level").Count()
-			parser.InGroup("database").AddOption("--hostname")
+			parser.AddFlag("--power-level").Count()
+			parser.InGroup("database").AddFlag("--hostname")
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(1))
 			Expect(opt.Group("database").String("hostname")).To(Equal("mysql.com"))
 		})
 	})
-	Describe("ArgParser.AddRule()", func() {
-		cmdLine := []string{"--power-level", "--power-level"}
-		It("Should add new rules", func() {
-			parser := args.NewParser()
-			rule := args.NewRuleModifier(parser).Count().Help("My help message")
-			parser.AddRule("--power-level", rule)
-			opt, err := parser.Parse(&cmdLine)
-			Expect(err).To(BeNil())
-			Expect(opt.Int("power-level")).To(Equal(2))
-		})
-	})
-	Describe("ArgParser.GenerateOptHelp()", func() {
+	Describe("Parser.GenerateOptHelp()", func() {
 		It("Should generate help messages given a set of rules", func() {
-			parser := args.NewParser(args.WrapLen(80))
-			parser.AddOption("--power-level").Alias("-p").Help("Specify our power level")
-			parser.AddOption("--cat-level").
+			parser := args.NewParser().WordWrap(80)
+			parser.AddFlag("--power-level").Alias("-p").Help("Specify our power level")
+			parser.AddFlag("--cat-level").
 				Alias("-c").
 				Help(`Lorem ipsum dolor sit amet, consectetur
 			mollit anim id est laborum.`)
-			msg := parser.GenerateHelpSection(args.IsOption)
+			msg := parser.GenerateHelpSection(args.IsFlag)
 			Expect(msg).To(Equal("  -p, --power-level   Specify our power level" +
 				"\n  -c, --cat-level     Lorem ipsum dolor sit amet, consecteturmollit anim id est" +
 				"\n                      laborum.\n"))
 		})
 	})
-	Describe("ArgParser.GenerateHelp()", func() {
+	Describe("Parser.Epilog()", func() {
+		It("Should generate help message with an epilog at the end", func() {
+			parser := args.NewParser().Epilog("Now with more magical cow powers")
+			parser.AddFlag("--power-level").Alias("-p").Help("Specify our power level")
+			msg := parser.GenerateHelp()
+			Expect(msg).To(ContainSubstring("Usage:  [OPTIONS]"))
+			Expect(msg).To(ContainSubstring("Now with more magical cow powers"))
+			Expect(msg).To(ContainSubstring("-p, --power-level   Specify our power level"))
+			Expect(parser.GetEpilog()).To(Equal("Now with more magical cow powers"))
+		})
+	})
+	Describe("Parser.Usage()", func() {
+		It("Should generate help message with custom useage", func() {
+			parser := args.NewParser().Usage("-asdfbsx [ARGUMENT] -- [CONTAINER ARGS]...")
+			parser.AddFlag("--power-level").Alias("-p").Help("Specify our power level")
+			msg := parser.GenerateHelp()
+			Expect(msg).To(ContainSubstring("Usage: -asdfbsx [ARGUMENT] -- [CONTAINER ARGS]..."))
+			Expect(msg).To(ContainSubstring("-p, --power-level   Specify our power level"))
+			Expect(parser.GetUsage()).To(Equal("-asdfbsx [ARGUMENT] -- [CONTAINER ARGS]..."))
+
+		})
+	})
+	Describe("Parser.GenerateHelp()", func() {
 		It("Should generate help messages given a set of rules", func() {
-			parser := args.NewParser(args.EnvPrefix("APP_"), args.Desc("Small Description"),
-				args.Name("dragon-ball"), args.WrapLen(80))
-			parser.AddOption("--environ").Default("1").Alias("-e").Env("ENV").Help("Default thing")
-			parser.AddOption("--default").Default("0").Alias("-d").Help("Default thing")
-			parser.AddOption("--power-level").Alias("-p").Help("Specify our power level")
-			parser.AddOption("--cat-level").Alias("-c").Help(`Lorem ipsum dolor sit amet, consectetur
+			parser := args.NewParser().
+				Name("dragon-ball").
+				Desc("Small Description").
+				EnvPrefix("APP_").
+				WordWrap(80)
+
+			parser.AddFlag("--environ").Default("1").Alias("-e").Env("ENV").Help("Default thing")
+			parser.AddFlag("--default").Default("0").Alias("-d").Help("Default thing")
+			parser.AddFlag("--power-level").Alias("-p").Help("Specify our power level")
+			parser.AddFlag("--cat-level").Alias("-c").Help(`Lorem ipsum dolor sit amet, consectetur
 				adipiscing elit, sed do eiusmod tempor incididunt ut labore et
 				mollit anim id est laborum.`)
 			msg := parser.GenerateHelp()
 			Expect(msg).To(ContainSubstring("Usage: dragon-ball [OPTIONS]"))
+			Expect(msg).To(ContainSubstring("Small Description"))
 			Expect(msg).To(ContainSubstring("-e, --environ       Default thing (Default=1, Env=APP_ENV)"))
 			Expect(msg).To(ContainSubstring("-d, --default       Default thing (Default=0)"))
 			Expect(msg).To(ContainSubstring("-p, --power-level   Specify our power level"))
-			Expect(msg).To(ContainSubstring("Small Description"))
+			Expect(parser.GetEnvPrefix()).To(Equal("APP_"))
+			Expect(parser.GetWordWrap()).To(Equal(80))
+			Expect(parser.GetName()).To(Equal("dragon-ball"))
 		})
 		It("Should generate formated description if flag is set", func() {
 			desc := `
@@ -594,19 +630,23 @@ var _ = Describe("ArgParser", func() {
 
 			With lots of new lines
 			`
-			parser := args.NewParser(args.Desc(desc, args.IsFormated),
-				args.Name("dragon-ball"), args.WrapLen(80))
-			parser.AddOption("--environ").Default("1").Alias("-e").Help("Default thing")
+			parser := args.NewParser().
+				Desc(desc, args.IsFormatted).
+				Name("dragon-ball").
+				WordWrap(80)
+
+			parser.AddFlag("--environ").Default("1").Alias("-e").Help("Default thing")
 			msg := parser.GenerateHelp()
 			Expect(msg).To(ContainSubstring("Custom formated description --------------------" +
 				"--------------------------------------- over 80"))
+			Expect(parser.GetDesc()).To(ContainSubstring("Custom formated description"))
 		})
 	})
-	Describe("ArgParser.AddCommand()", func() {
+	Describe("Parser.AddCommand()", func() {
 		It("Should run a command if seen on the command line", func() {
 			parser := args.NewParser()
 			called := false
-			parser.AddCommand("command1", func(parent *args.ArgParser, data interface{}) (int, error) {
+			parser.AddCommand("command1", func(parent *args.Parser, data interface{}) (int, error) {
 				called = true
 				return 0, nil
 			})
@@ -619,7 +659,7 @@ var _ = Describe("ArgParser", func() {
 		It("Should not confuse a command with a following argument", func() {
 			parser := args.NewParser()
 			called := 0
-			parser.AddCommand("set", func(parent *args.ArgParser, data interface{}) (int, error) {
+			parser.AddCommand("set", func(parent *args.Parser, data interface{}) (int, error) {
 				called++
 				return 0, nil
 			})
@@ -632,7 +672,7 @@ var _ = Describe("ArgParser", func() {
 		It("Should provide a sub parser with that will not confuse a following argument", func() {
 			parser := args.NewParser()
 			called := 0
-			parser.AddCommand("set", func(parent *args.ArgParser, data interface{}) (int, error) {
+			parser.AddCommand("set", func(parent *args.Parser, data interface{}) (int, error) {
 				parent.AddArgument("first").Required()
 				parent.AddArgument("second").Required()
 				opts, err := parent.Parse(nil)
@@ -652,8 +692,8 @@ var _ = Describe("ArgParser", func() {
 		It("Should allow sub commands to be a thing", func() {
 			parser := args.NewParser()
 			called := 0
-			parser.AddCommand("volume", func(parent *args.ArgParser, data interface{}) (int, error) {
-				parent.AddCommand("create", func(subParent *args.ArgParser, data interface{}) (int, error) {
+			parser.AddCommand("volume", func(parent *args.Parser, data interface{}) (int, error) {
+				parent.AddCommand("create", func(subParent *args.Parser, data interface{}) (int, error) {
 					subParent.AddArgument("volume-name").Required()
 					opts, err := subParent.Parse(nil)
 					Expect(err).To(BeNil())
@@ -677,10 +717,10 @@ var _ = Describe("ArgParser", func() {
 			parser := args.NewParser()
 			// Capture the help message via Pipe()
 			_, ioWriter, _ := os.Pipe()
-			parser.HelpIO = ioWriter
+			parser.SetHelpIO(ioWriter)
 
 			called := 0
-			parser.AddCommand("set", func(parent *args.ArgParser, data interface{}) (int, error) {
+			parser.AddCommand("set", func(parent *args.Parser, data interface{}) (int, error) {
 				parent.AddArgument("first").Required()
 				_, err := parent.Parse(nil)
 				Expect(err).To(Not(BeNil()))
@@ -704,10 +744,10 @@ var _ = Describe("ArgParser", func() {
 			parser := args.NewParser()
 			// Capture the help message via Pipe()
 			_, ioWriter, _ := os.Pipe()
-			parser.HelpIO = ioWriter
+			parser.SetHelpIO(ioWriter)
 
 			called := 0
-			parser.AddCommand("set", func(parent *args.ArgParser, data interface{}) (int, error) {
+			parser.AddCommand("set", func(parent *args.Parser, data interface{}) (int, error) {
 				parent.AddArgument("first").Required()
 				_, err := parent.Parse(nil)
 				Expect(err).To(Not(BeNil()))
@@ -737,12 +777,12 @@ var _ = Describe("ArgParser", func() {
 			Expect(called).To(Equal(1))
 		})
 	})
-	Describe("ArgParser.GetArgs()", func() {
+	Describe("Parser.GetArgs()", func() {
 		It("Should return all un-matched arguments and options", func() {
 			parser := args.NewParser()
 			parser.AddArgument("image")
-			parser.AddOption("-output").Alias("-o").Required()
-			parser.AddOption("-runtime").Default("docker")
+			parser.AddFlag("-output").Alias("-o").Required()
+			parser.AddFlag("-runtime").Default("docker")
 
 			cmdLine := []string{"golang:1.6", "build", "-o",
 				"amd64-my-prog", "-installsuffix", "static", "./..."}
@@ -754,7 +794,7 @@ var _ = Describe("ArgParser", func() {
 		})
 		It("Should return all empty if all arguments and options matched", func() {
 			parser := args.NewParser()
-			parser.AddOption("--list").IsStringSlice()
+			parser.AddFlag("--list").IsStringSlice()
 
 			cmdLine := []string{"--list", "bee", "--list", "cat", "--list", "dad"}
 			opt, err := parser.Parse(&cmdLine)

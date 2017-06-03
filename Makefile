@@ -7,8 +7,8 @@ GLIDE := $(GOPATH)/bin/glide
 PATH := $(GOPATH)/bin:$(PATH)
 export $(PATH)
 
-bin/chicken-cli: examples/chicken-cli/checkin-cli.go
-	go build -o bin/chicken-cli examples/chicken-cli/checkin-cli.go
+bin/chicken-cli: examples/chicken-cli/chicken-cli.go
+	go build -o bin/chicken-cli examples/chicken-cli/chicken-cli.go
 
 bin/demo: examples/demo/demo.go
 	go build -o bin/demo examples/demo/demo.go

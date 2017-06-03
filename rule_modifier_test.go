@@ -40,12 +40,58 @@ var _ = Describe("RuleModifier", func() {
 			Expect(newOpt.Group("database").String("pass")).To(Equal("my-pass"))
 		})
 	})
+	Describe("RuleModifier.Flag()", func() {
+		It("Should allow the user add an abbreviations for the option", func() {
+			parser := args.NewParser()
+			parser.AddFlag("host").Short("h")
+
+			cmdLine := []string{"--host", "google.com"}
+			opt, err := parser.Parse(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.String("host")).To(Equal("google.com"))
+
+			cmdLine = []string{"-h", "yahoo.com"}
+			opt, err = parser.Parse(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.String("host")).To(Equal("yahoo.com"))
+		})
+	})
+	Describe("RuleModifier.Alias()", func() {
+		It("Should allow the user to alias an option with another long name", func() {
+			parser := args.NewParser()
+			parser.AddFlag("host").Alias("endpoint")
+
+			cmdLine := []string{"--host", "google.com"}
+			opt, err := parser.Parse(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.String("host")).To(Equal("google.com"))
+
+			cmdLine = []string{"--endpoint", "yahoo.com"}
+			opt, err = parser.Parse(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.String("host")).To(Equal("yahoo.com"))
+		})
+		It("Should allow the user to alias the same name with a different prefix", func() {
+			parser := args.NewParser()
+			parser.AddFlag("host").Alias("+host")
+
+			cmdLine := []string{"--host", "google.com"}
+			opt, err := parser.Parse(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.String("host")).To(Equal("google.com"))
+
+			cmdLine = []string{"+host", "yahoo.com"}
+			opt, err = parser.Parse(&cmdLine)
+			Expect(err).To(BeNil())
+			Expect(opt.String("host")).To(Equal("yahoo.com"))
+		})
+	})
 	Describe("RuleModifier.InGroup()", func() {
 		cmdLine := []string{"--power-level", "--hostname", "mysql.com"}
 		It("Should add a new group", func() {
 			parser := args.NewParser()
-			parser.AddOption("--power-level").Count()
-			parser.AddOption("--hostname").InGroup("database")
+			parser.AddFlag("--power-level").Count()
+			parser.AddFlag("--hostname").InGroup("database")
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(1))
@@ -54,7 +100,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Regression: Should not modify the original group rule, but a new group rule", func() {
 			parser := args.NewParser()
 			db := parser.InGroup("database")
-			db.AddOption("--host").Alias("-dH").Default("localhost")
+			db.AddFlag("--host").Alias("-dH").Default("localhost")
 			db.AddConfig("debug").IsTrue()
 
 			_, err := parser.Parse(nil)
@@ -79,7 +125,7 @@ var _ = Describe("RuleModifier", func() {
 
 		It("Should add a new group", func() {
 			parser := args.NewParser()
-			parser.AddOption("--power-level").IsInt()
+			parser.AddFlag("--power-level").IsInt()
 			parser.AddConfigGroup("endpoints").Help("List of http endpoints")
 			opt, err := parser.FromINI(iniFile)
 			Expect(err).To(BeNil())
@@ -96,7 +142,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should count one", func() {
 			parser := args.NewParser()
 			cmdLine := []string{"--verbose"}
-			parser.AddOption("--verbose").Count()
+			parser.AddFlag("--verbose").Count()
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("verbose")).To(Equal(1))
@@ -104,7 +150,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should count three times", func() {
 			parser := args.NewParser()
 			cmdLine := []string{"--verbose", "--verbose", "--verbose"}
-			parser.AddOption("--verbose").Count()
+			parser.AddFlag("--verbose").Count()
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("verbose")).To(Equal(3))
@@ -113,7 +159,7 @@ var _ = Describe("RuleModifier", func() {
 	Describe("RuleModifier.IsInt()", func() {
 		It("Should ensure value supplied is an integer", func() {
 			parser := args.NewParser()
-			parser.AddOption("--power-level").IsInt()
+			parser.AddFlag("--power-level").IsInt()
 
 			cmdLine := []string{"--power-level", "10000"}
 			opt, err := parser.Parse(&cmdLine)
@@ -124,7 +170,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should set err if the option value is not parsable as an integer", func() {
 			parser := args.NewParser()
 			cmdLine := []string{"--power-level", "over-ten-thousand"}
-			parser.AddOption("--power-level").IsInt()
+			parser.AddFlag("--power-level").IsInt()
 			_, err := parser.Parse(&cmdLine)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Invalid value for '--power-level' - 'over-ten-thousand' is not an Integer"))
@@ -134,7 +180,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should set err if no option value is provided", func() {
 			parser := args.NewParser()
 			cmdLine := []string{"--power-level"}
-			parser.AddOption("--power-level").IsInt()
+			parser.AddFlag("--power-level").IsInt()
 			_, err := parser.Parse(&cmdLine)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Expected '--power-level' to have an argument"))
@@ -145,7 +191,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should ensure value supplied is assigned to passed value", func() {
 			parser := args.NewParser()
 			var value int
-			parser.AddOption("--power-level").StoreInt(&value)
+			parser.AddFlag("--power-level").StoreInt(&value)
 
 			cmdLine := []string{"--power-level", "10000"}
 			opt, err := parser.Parse(&cmdLine)
@@ -157,7 +203,7 @@ var _ = Describe("RuleModifier", func() {
 	Describe("RuleModifier.IsString()", func() {
 		It("Should provide string value", func() {
 			parser := args.NewParser()
-			parser.AddOption("--power-level").IsString()
+			parser.AddFlag("--power-level").IsString()
 
 			cmdLine := []string{"--power-level", "over-ten-thousand"}
 			opt, err := parser.Parse(&cmdLine)
@@ -168,7 +214,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should set err if no option value is provided", func() {
 			parser := args.NewParser()
 			cmdLine := []string{"--power-level"}
-			parser.AddOption("--power-level").IsString()
+			parser.AddFlag("--power-level").IsString()
 			_, err := parser.Parse(&cmdLine)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Expected '--power-level' to have an argument"))
@@ -178,7 +224,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should ensure value supplied is assigned to passed value", func() {
 			parser := args.NewParser()
 			var value string
-			parser.AddOption("--power-level").StoreString(&value)
+			parser.AddFlag("--power-level").StoreString(&value)
 
 			cmdLine := []string{"--power-level", "over-ten-thousand"}
 			opt, err := parser.Parse(&cmdLine)
@@ -191,7 +237,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should ensure value supplied is assigned to passed value", func() {
 			parser := args.NewParser()
 			var value string
-			parser.AddOption("--power-level").StoreStr(&value)
+			parser.AddFlag("--power-level").StoreStr(&value)
 
 			cmdLine := []string{"--power-level", "over-ten-thousand"}
 			opt, err := parser.Parse(&cmdLine)
@@ -204,7 +250,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should ensure value supplied is true when argument is seen", func() {
 			parser := args.NewParser()
 			var debug bool
-			parser.AddOption("--debug").StoreTrue(&debug)
+			parser.AddFlag("--debug").StoreTrue(&debug)
 
 			cmdLine := []string{"--debug"}
 			opt, err := parser.Parse(&cmdLine)
@@ -216,7 +262,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should ensure value supplied is false when argument is NOT seen", func() {
 			parser := args.NewParser()
 			var debug bool
-			parser.AddOption("--debug").StoreTrue(&debug)
+			parser.AddFlag("--debug").StoreTrue(&debug)
 
 			cmdLine := []string{"--something-else"}
 			opt, err := parser.Parse(&cmdLine)
@@ -228,7 +274,7 @@ var _ = Describe("RuleModifier", func() {
 	Describe("RuleModifier.IsTrue()", func() {
 		It("Should set true value when seen", func() {
 			parser := args.NewParser()
-			parser.AddOption("--help").IsTrue()
+			parser.AddFlag("--help").IsTrue()
 
 			cmdLine := []string{"--help"}
 			opt, err := parser.Parse(&cmdLine)
@@ -239,7 +285,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should set false when NOT seen", func() {
 			parser := args.NewParser()
 			cmdLine := []string{"--something-else"}
-			parser.AddOption("--help").IsTrue()
+			parser.AddFlag("--help").IsTrue()
 			opt, err := parser.Parse(&cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Bool("help")).To(Equal(false))
@@ -248,7 +294,7 @@ var _ = Describe("RuleModifier", func() {
 	Describe("RuleModifier.IsStringSlice()", func() {
 		It("Should ensure []string provided is set when a comma separated list is provided", func() {
 			parser := args.NewParser()
-			parser.AddOption("--list").IsStringSlice()
+			parser.AddFlag("--list").IsStringSlice()
 
 			cmdLine := []string{"--list", "one,two,three"}
 			opt, err := parser.Parse(&cmdLine)
@@ -260,7 +306,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should ensure []string provided is set when a comma separated list is provided", func() {
 			parser := args.NewParser()
 			var list []string
-			parser.AddOption("--list").StoreStringSlice(&list)
+			parser.AddFlag("--list").StoreStringSlice(&list)
 
 			cmdLine := []string{"--list", "one,two,three"}
 			opt, err := parser.Parse(&cmdLine)
@@ -272,7 +318,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should ensure []string provided is set when a comma separated list is provided", func() {
 			parser := args.NewParser()
 			var list []string
-			parser.AddOption("--list").StoreStringSlice(&list)
+			parser.AddFlag("--list").StoreStringSlice(&list)
 
 			cmdLine := []string{"--list", "one,two,three"}
 			opt, err := parser.Parse(&cmdLine)
@@ -284,7 +330,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should ensure []interface{} provided is set if a single value is provided", func() {
 			parser := args.NewParser()
 			var list []string
-			parser.AddOption("--list").StoreStringSlice(&list)
+			parser.AddFlag("--list").StoreStringSlice(&list)
 
 			cmdLine := []string{"--list", "one"}
 			opt, err := parser.Parse(&cmdLine)
@@ -296,7 +342,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should set err if no list value is provided", func() {
 			parser := args.NewParser()
 			var list []string
-			parser.AddOption("--list").StoreStringSlice(&list)
+			parser.AddFlag("--list").StoreStringSlice(&list)
 
 			cmdLine := []string{"--list"}
 			_, err := parser.Parse(&cmdLine)
@@ -309,7 +355,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should ensure default values is supplied if no matching argument is found", func() {
 			parser := args.NewParser()
 			var value int
-			parser.AddOption("--power-level").StoreInt(&value).Default("10")
+			parser.AddFlag("--power-level").StoreInt(&value).Default("10")
 
 			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
@@ -319,7 +365,7 @@ var _ = Describe("RuleModifier", func() {
 
 		It("Should return err if default value does not match AddOption() type", func() {
 			parser := args.NewParser()
-			parser.AddOption("--power-level").IsInt().Default("over-ten-thousand")
+			parser.AddFlag("--power-level").IsInt().Default("over-ten-thousand")
 			_, err := parser.Parse(nil)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("Bad default value"))
@@ -328,7 +374,7 @@ var _ = Describe("RuleModifier", func() {
 	Describe("RuleModifier.Choices()", func() {
 		It("Should err if not provided", func() {
 			parser := args.NewParser()
-			parser.AddOption("--choices").Choices([]string{"one", "two", "three"})
+			parser.AddFlag("--choices").Choices([]string{"one", "two", "three"})
 
 			_, err := parser.Parse(nil)
 			Expect(err).To(Not(BeNil()))
@@ -336,7 +382,7 @@ var _ = Describe("RuleModifier", func() {
 		})
 		It("Should allow valid choices", func() {
 			parser := args.NewParser()
-			parser.AddOption("--choices").Choices([]string{"one", "two", "three"})
+			parser.AddFlag("--choices").Choices([]string{"one", "two", "three"})
 
 			cmdLine := []string{"--choices", "one"}
 			opt, err := parser.Parse(&cmdLine)
@@ -345,7 +391,7 @@ var _ = Describe("RuleModifier", func() {
 		})
 		It("Should err if not valid choice", func() {
 			parser := args.NewParser()
-			parser.AddOption("--choices").Choices([]string{"one", "two", "three"})
+			parser.AddFlag("--choices").Choices([]string{"one", "two", "three"})
 
 			cmdLine := []string{"--choices", "five"}
 			_, err := parser.Parse(&cmdLine)
@@ -355,7 +401,7 @@ var _ = Describe("RuleModifier", func() {
 		})
 		It("Should work with default value", func() {
 			parser := args.NewParser()
-			parser.AddOption("--choices").Default("two").Choices([]string{"one", "two", "three"})
+			parser.AddFlag("--choices").Default("two").Choices([]string{"one", "two", "three"})
 
 			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())
@@ -363,7 +409,7 @@ var _ = Describe("RuleModifier", func() {
 		})
 		It("Should work with non string values", func() {
 			parser := args.NewParser()
-			parser.AddOption("--choices").IsInt().Choices([]string{"1", "2", "3"})
+			parser.AddFlag("--choices").IsInt().Choices([]string{"1", "2", "3"})
 
 			cmdLine := []string{"--choices", "5"}
 			_, err := parser.Parse(&cmdLine)
@@ -380,7 +426,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should supply the environ value if argument was not passed", func() {
 			parser := args.NewParser()
 			var value int
-			parser.AddOption("--power-level").StoreInt(&value).Env("POWER_LEVEL")
+			parser.AddFlag("--power-level").StoreInt(&value).Env("POWER_LEVEL")
 
 			os.Setenv("POWER_LEVEL", "10")
 
@@ -393,7 +439,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should return an error if the environ value does not match the AddOption() type", func() {
 			parser := args.NewParser()
 			var value int
-			parser.AddOption("--power-level").StoreInt(&value).Env("POWER_LEVEL")
+			parser.AddFlag("--power-level").StoreInt(&value).Env("POWER_LEVEL")
 
 			os.Setenv("POWER_LEVEL", "over-ten-thousand")
 
@@ -405,7 +451,7 @@ var _ = Describe("RuleModifier", func() {
 		It("Should use the default value if argument was not passed and environment var was not set", func() {
 			parser := args.NewParser()
 			var value int
-			parser.AddOption("--power-level").StoreInt(&value).Env("POWER_LEVEL").Default("1")
+			parser.AddFlag("--power-level").StoreInt(&value).Env("POWER_LEVEL").Default("1")
 
 			opt, err := parser.Parse(nil)
 			Expect(err).To(BeNil())

@@ -43,12 +43,12 @@ func IsCharDevice(file *os.File) bool {
 }
 
 // Returns true if the flags given are set on src
-func HasFlags(src, flag int64) bool {
+func hasFlags(src, flag ParseFlag) bool {
 	return src&flag != 0
 }
 
 // Sets all the flags given on dest
-func SetFlags(dest *int64, flag int64) {
+func setFlags(dest *ParseFlag, flag ParseFlag) {
 	*dest = (*dest | flag)
 }
 

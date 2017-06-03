@@ -113,8 +113,8 @@ var _ = Describe("backend", func() {
 	Describe("args.FromBackend()", func() {
 		It("Should fetch 'bind' value from backend", func() {
 			parser := args.NewParser()
-			parser.SetLog(log)
-			parser.AddConfig("--bind")
+			parser.Log(log)
+			parser.AddConfig("bind")
 
 			opts, err := parser.FromBackend(backend)
 			Expect(err).To(BeNil())
@@ -125,7 +125,7 @@ var _ = Describe("backend", func() {
 
 	It("Should use List() when fetching Config Groups", func() {
 		parser := args.NewParser()
-		parser.SetLog(log)
+		parser.Log(log)
 		parser.AddConfigGroup("endpoints")
 
 		opts, err := parser.FromBackend(backend)
@@ -139,7 +139,7 @@ var _ = Describe("backend", func() {
 
 	It("Should return an error if config option not found in the backend", func() {
 		parser := args.NewParser()
-		parser.SetLog(log)
+		parser.Log(log)
 		parser.AddConfig("--missing")
 
 		opts, err := parser.FromBackend(backend)
@@ -150,7 +150,7 @@ var _ = Describe("backend", func() {
 
 	It("Should call Watch() to watch for new values", func() {
 		parser := args.NewParser()
-		parser.SetLog(log)
+		parser.Log(log)
 		parser.AddConfigGroup("watch")
 
 		_, err := parser.FromBackend(backend)

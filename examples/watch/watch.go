@@ -14,16 +14,16 @@ import (
 
 func main() {
 
-	parser := args.NewParser(args.Name("watch"))
-	parser.AddOption("--bind").Alias("-b").Default("localhost:8080").
+	parser := args.NewParser().Name("watch")
+	parser.AddFlag("--bind").Alias("-b").Default("localhost:8080").
 		Help("Interface to bind the server too")
-	parser.AddOption("--complex-example").Alias("-ce").IsBool().
+	parser.AddFlag("--complex-example").Alias("-ce").IsBool().
 		Help("Run the more complex example")
-	parser.AddOption("--config-file").Alias("-c").
+	parser.AddFlag("--config-file").Alias("-c").
 		Help("The Config file to load and watch our config from")
 
 	// Add a connection string to the database group
-	parser.AddOption("--connection-string").InGroup("database").Alias("-cS").
+	parser.AddFlag("--connection-string").InGroup("database").Alias("-cS").
 		Default("mysql://username@hostname:MyDB").
 		Help("Connection string used to connect to the database")
 
@@ -76,7 +76,7 @@ func main() {
 }
 
 // Simple example always updates the config when file changes are detected.
-func simple(parser *args.ArgParser) args.WatchCancelFunc {
+func simple(parser *args.Parser) args.WatchCancelFunc {
 	// Get our current config
 	appConf := parser.GetOpts()
 	configFile := appConf.String("config-file")
@@ -107,7 +107,7 @@ func simple(parser *args.ArgParser) args.WatchCancelFunc {
 // The complex example allows a user to write the config file multiple times, possibly applying edits incrementally.
 // When the user is ready for the application to apply the config changes, modify the 'version' value and the
 // new config is applied.
-func complex(parser *args.ArgParser) args.WatchCancelFunc {
+func complex(parser *args.Parser) args.WatchCancelFunc {
 	// Get our current config
 	appConf := parser.GetOpts()
 	configFile := appConf.String("config-file")
