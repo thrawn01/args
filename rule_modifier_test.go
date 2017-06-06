@@ -20,7 +20,7 @@ var _ = Describe("RuleModifier", func() {
 			db.AddConfig("pass").Help("database password")
 
 			// Should ignore command line options
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(0))
 
@@ -46,12 +46,12 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("host").Short("h")
 
 			cmdLine := []string{"--host", "google.com"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("host")).To(Equal("google.com"))
 
 			cmdLine = []string{"-h", "yahoo.com"}
-			opt, err = parser.Parse(&cmdLine)
+			opt, err = parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("host")).To(Equal("yahoo.com"))
 		})
@@ -62,12 +62,12 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("host").Alias("endpoint")
 
 			cmdLine := []string{"--host", "google.com"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("host")).To(Equal("google.com"))
 
 			cmdLine = []string{"--endpoint", "yahoo.com"}
-			opt, err = parser.Parse(&cmdLine)
+			opt, err = parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("host")).To(Equal("yahoo.com"))
 		})
@@ -76,12 +76,12 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("host").Alias("+host")
 
 			cmdLine := []string{"--host", "google.com"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("host")).To(Equal("google.com"))
 
 			cmdLine = []string{"+host", "yahoo.com"}
-			opt, err = parser.Parse(&cmdLine)
+			opt, err = parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("host")).To(Equal("yahoo.com"))
 		})
@@ -92,7 +92,7 @@ var _ = Describe("RuleModifier", func() {
 			parser := args.NewParser()
 			parser.AddFlag("--power-level").Count()
 			parser.AddFlag("--hostname").InGroup("database")
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(1))
 			Expect(opt.Group("database").String("hostname")).To(Equal("mysql.com"))
@@ -143,7 +143,7 @@ var _ = Describe("RuleModifier", func() {
 			parser := args.NewParser()
 			cmdLine := []string{"--verbose"}
 			parser.AddFlag("--verbose").Count()
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("verbose")).To(Equal(1))
 		})
@@ -151,7 +151,7 @@ var _ = Describe("RuleModifier", func() {
 			parser := args.NewParser()
 			cmdLine := []string{"--verbose", "--verbose", "--verbose"}
 			parser.AddFlag("--verbose").Count()
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("verbose")).To(Equal(3))
 		})
@@ -162,7 +162,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--power-level").IsInt()
 
 			cmdLine := []string{"--power-level", "10000"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(10000))
 		})
@@ -171,7 +171,7 @@ var _ = Describe("RuleModifier", func() {
 			parser := args.NewParser()
 			cmdLine := []string{"--power-level", "over-ten-thousand"}
 			parser.AddFlag("--power-level").IsInt()
-			_, err := parser.Parse(&cmdLine)
+			_, err := parser.Parse(cmdLine)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Invalid value for '--power-level' - 'over-ten-thousand' is not an Integer"))
 			//Expect(opt.Int("power-level")).To(Equal(0))
@@ -181,7 +181,7 @@ var _ = Describe("RuleModifier", func() {
 			parser := args.NewParser()
 			cmdLine := []string{"--power-level"}
 			parser.AddFlag("--power-level").IsInt()
-			_, err := parser.Parse(&cmdLine)
+			_, err := parser.Parse(cmdLine)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Expected '--power-level' to have an argument"))
 			//Expect(opt.Int("power-level")).To(Equal(0))
@@ -194,7 +194,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--power-level").StoreInt(&value)
 
 			cmdLine := []string{"--power-level", "10000"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(10000))
 			Expect(value).To(Equal(10000))
@@ -206,7 +206,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--power-level").IsString()
 
 			cmdLine := []string{"--power-level", "over-ten-thousand"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("power-level")).To(Equal("over-ten-thousand"))
 		})
@@ -215,7 +215,7 @@ var _ = Describe("RuleModifier", func() {
 			parser := args.NewParser()
 			cmdLine := []string{"--power-level"}
 			parser.AddFlag("--power-level").IsString()
-			_, err := parser.Parse(&cmdLine)
+			_, err := parser.Parse(cmdLine)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Expected '--power-level' to have an argument"))
 		})
@@ -227,7 +227,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--power-level").StoreString(&value)
 
 			cmdLine := []string{"--power-level", "over-ten-thousand"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("power-level")).To(Equal("over-ten-thousand"))
 			Expect(value).To(Equal("over-ten-thousand"))
@@ -240,7 +240,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--power-level").StoreStr(&value)
 
 			cmdLine := []string{"--power-level", "over-ten-thousand"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("power-level")).To(Equal("over-ten-thousand"))
 			Expect(value).To(Equal("over-ten-thousand"))
@@ -253,7 +253,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--debug").StoreTrue(&debug)
 
 			cmdLine := []string{"--debug"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Bool("debug")).To(Equal(true))
 			Expect(debug).To(Equal(true))
@@ -265,7 +265,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--debug").StoreTrue(&debug)
 
 			cmdLine := []string{"--something-else"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Bool("debug")).To(Equal(false))
 			Expect(debug).To(Equal(false))
@@ -277,7 +277,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--help").IsTrue()
 
 			cmdLine := []string{"--help"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Bool("help")).To(Equal(true))
 		})
@@ -286,7 +286,7 @@ var _ = Describe("RuleModifier", func() {
 			parser := args.NewParser()
 			cmdLine := []string{"--something-else"}
 			parser.AddFlag("--help").IsTrue()
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Bool("help")).To(Equal(false))
 		})
@@ -297,7 +297,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--list").IsStringSlice()
 
 			cmdLine := []string{"--list", "one,two,three"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"one", "two", "three"}))
 		})
@@ -309,7 +309,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--list").StoreStringSlice(&list)
 
 			cmdLine := []string{"--list", "one,two,three"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"one", "two", "three"}))
 			Expect(list).To(Equal([]string{"one", "two", "three"}))
@@ -321,7 +321,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--list").StoreStringSlice(&list)
 
 			cmdLine := []string{"--list", "one,two,three"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"one", "two", "three"}))
 			Expect(list).To(Equal([]string{"one", "two", "three"}))
@@ -333,7 +333,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--list").StoreStringSlice(&list)
 
 			cmdLine := []string{"--list", "one"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"one"}))
 			Expect(list).To(Equal([]string{"one"}))
@@ -345,7 +345,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--list").StoreStringSlice(&list)
 
 			cmdLine := []string{"--list"}
-			_, err := parser.Parse(&cmdLine)
+			_, err := parser.Parse(cmdLine)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Expected '--list' to have an argument"))
 		})
@@ -385,7 +385,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--choices").Choices([]string{"one", "two", "three"})
 
 			cmdLine := []string{"--choices", "one"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("choices")).To(Equal("one"))
 		})
@@ -394,7 +394,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--choices").Choices([]string{"one", "two", "three"})
 
 			cmdLine := []string{"--choices", "five"}
-			_, err := parser.Parse(&cmdLine)
+			_, err := parser.Parse(cmdLine)
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("'five' is an invalid argument for 'choices' " +
 				"choose from (one, two, three)"))
@@ -412,7 +412,7 @@ var _ = Describe("RuleModifier", func() {
 			parser.AddFlag("--choices").IsInt().Choices([]string{"1", "2", "3"})
 
 			cmdLine := []string{"--choices", "5"}
-			_, err := parser.Parse(&cmdLine)
+			_, err := parser.Parse(cmdLine)
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("'5' is an invalid argument for 'choices' " +
 				"choose from (1, 2, 3)"))

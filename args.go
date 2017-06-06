@@ -362,29 +362,3 @@ func StringToMap(value string) (map[string]string, error) {
 	}
 	return result, nil
 }
-
-// Returns true if the error was because help message was printed
-func IsHelpError(err error) bool {
-	obj, ok := err.(isHelpError)
-	return ok && obj.IsHelpError()
-}
-
-// Returns true if the error was because help message was printed
-func AskedForHelp(err error) bool {
-	obj, ok := err.(isHelpError)
-	return ok && obj.IsHelpError()
-}
-
-type isHelpError interface {
-	IsHelpError() bool
-}
-
-type HelpError struct{}
-
-func (e *HelpError) Error() string {
-	return "User asked for help; Inspect this error with args.AskedForHelp(err)"
-}
-
-func (e *HelpError) IsHelpError() bool {
-	return true
-}

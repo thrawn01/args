@@ -27,15 +27,14 @@ type Parser struct {
 	stopParsingOnCommand bool
 	description          string
 	wordWrapLen          int
-	isSubParser          bool
 	prefixChars          []string
-	helpAdded            bool
 	envPrefix            string
 	posCount             int
 	attempts             int
 	command              *Rule
 	addHelp              bool
 	options              *Options
+	parent               *Parser
 	helpIO               *os.File
 	epilog               string
 	usage                string
@@ -75,11 +74,11 @@ func (self *Parser) SubParser() *Parser {
 		}
 	}
 
-	parser.helpAdded = self.helpAdded
 	parser.addHelp = self.addHelp
 	parser.options = self.options
 	parser.rules = self.rules
 	parser.args = self.args
+	parser.parent = self
 	parser.log = self.log
 
 	// Remove all Commands from our rules
@@ -91,7 +90,6 @@ func (self *Parser) SubParser() *Parser {
 	}
 	// Clear the selected Commands
 	parser.command = nil
-	parser.isSubParser = true
 	return parser
 }
 
@@ -326,15 +324,25 @@ func (self *Parser) GetRule(name string) *Rule {
 	return nil
 }
 
-func (self *Parser) ParseAndRun(args *[]string, data interface{}) (int, error) {
-	_, err := self.Parse(args)
+func (self *Parser) ParseAndRun(args []string, data interface{}) (int, error) {
+	opts, err := self.Parse(args)
+
+	// NOTE: Always check for help before handling errors, the user should always
+	// be able ask for help regardless of validation or parse errors
+	// TODO: Add this note to the args.Parse() documentation
+
+	// If user asked for help without specifying a command
+	// print the root parsers help and exit
+	if opts.Bool("help") && len(opts.SubCommands()) == 0 {
+		self.PrintHelp()
+		return 0, nil
+	}
+
+	// If there was a validation or parse error
 	if err != nil {
-		if IsHelpError(err) {
-			self.PrintHelp()
-			return 1, nil
-		}
 		return 1, err
 	}
+
 	return self.RunCommand(data)
 }
 
@@ -359,11 +367,12 @@ func (self *Parser) RunCommand(data interface{}) (int, error) {
 //	if opts != nil {
 //		return 0, nil
 //	}
-func (self *Parser) ParseSimple(args *[]string) *Options {
-	opt, err := self.Parse(args)
+func (self *Parser) ParseSimple(args []string) *Options {
+	opts, err := self.Parse(args)
 
-	// We could have a non critical error, in addition to the user asking for help
-	if opt != nil && opt.Bool("help") {
+	// If user asked for help without specifying a command
+	// print the root parsers help and exit
+	if opts.Bool("help") && len(opts.SubCommands()) == 0 {
 		self.PrintHelp()
 		return nil
 	}
@@ -372,17 +381,17 @@ func (self *Parser) ParseSimple(args *[]string) *Options {
 		fmt.Fprintln(os.Stderr, err.Error())
 		return nil
 	}
-	return opt
+	return opts
 }
 
 // Parse the commandline, but also print help and exit if the user asked for --help
-func (self *Parser) ParseOrExit(args *[]string) *Options {
+func (self *Parser) ParseOrExit(args []string) *Options {
 	opt, err := self.Parse(args)
 
 	// We could have a non critical error, in addition to the user asking for help
 	if opt != nil && opt.Bool("help") {
 		self.PrintHelp()
-		os.Exit(1)
+		os.Exit(0)
 	}
 	// Print errors to stderr and include our help message
 	if err != nil {
@@ -393,31 +402,28 @@ func (self *Parser) ParseOrExit(args *[]string) *Options {
 }
 
 // Parses command line arguments using os.Args if 'args' is nil
-func (self *Parser) Parse(args *[]string) (*Options, error) {
+func (self *Parser) Parse(args []string) (*Options, error) {
 	if args != nil {
-		self.args = copyStringSlice(*args)
-	} else if args == nil && !self.isSubParser {
-		// If args is nil and we are not a subparser
+		// Make a copy of the args we are parsing
+		self.args = copyStringSlice(args)
+	} else if args == nil && self.parent == nil {
+		// If args is nil and we are not a sub parser
 		self.args = copyStringSlice(os.Args[1:])
 	}
 
-	if self.addHelp && !self.hasHelpOption() {
-		// Add help option if --help or -h are not already taken by other options
+	// If the user asked us to add 'help' flag and 'help' is not already defined by the user
+	if self.addHelp && !self.HasHelpFlag() {
+		// Add help flag if --help or -h are not already taken by other options
 		self.AddFlag("--help").Alias("-h").IsTrue().Help("Display this help message and exit")
-		self.helpAdded = true
 	}
 	return self.parseUntil("--")
 }
 
-func (self *Parser) hasHelpOption() bool {
+// Return true if the parser has the 'help' flag defined
+func (self *Parser) HasHelpFlag() bool {
 	for _, rule := range self.rules {
 		if rule.Name == "help" {
 			return true
-		}
-		for _, alias := range rule.Aliases {
-			if alias == "-h" {
-				return true
-			}
 		}
 	}
 	return false
@@ -451,14 +457,17 @@ func (self *Parser) parseUntil(terminator string) (*Options, error) {
 		startIdx := self.idx
 		rule, err := self.matchRules(self.rules)
 		if err != nil {
-			return nil, err
+			// errors here are cast and expected argument errors;
+			// users should never expect *Options to be nil
+			return self.NewOptions(), err
 		}
 		if rule == nil {
 			continue
 		}
 		//fmt.Printf("Found rule - %+v\n", rule)
 
-		// Remove the argument so a sub processor won't process it again, this avoids confusing behavior
+		// TODO: I don't think this is useful anymore, consider removing this feature
+		// Remove the argument so a sub parser won't parse it again, this avoids confusing behavior
 		// for sub parsers. IE: [prog -o option sub-command -o option] the first -o will not
 		// be confused with the second -o since we remove it from args here
 		self.args = append(self.args[:startIdx], self.args[self.idx+1:]...)
@@ -485,19 +494,6 @@ Apply:
 	// TODO: Wrap post parsing validation stuff into a method
 	// TODO: This should include the isRequired check
 	// return self.PostValidation(self.Apply(nil))
-
-	// When the user asks for --help
-	if self.helpAdded && opts.Bool("help") {
-		// Ignore the --help request if we see a sub command so the
-		// sub command gets a change to process the --help request
-		if self.command != nil {
-			// root parsers that want to know if the -h option was provided
-			// can still ask if the option was `WasSeen("help")`
-			rule := opts.InspectOpt("help").GetRule()
-			return opts.SetWithRule("help", false, rule), err
-		}
-		return opts, &HelpError{}
-	}
 	return opts, err
 }
 
@@ -544,10 +540,48 @@ func (self *Parser) Apply(values *Options) (*Options, error) {
 	return self.GetOpts(), self.err
 }
 
+// Return the parent parser if there is one, else return nil
+func (self *Parser) Parent() *Parser {
+	return self.parent
+}
+
+// Build a list of parent parsers for this sub parser, return empty list if this parser is the root parser
+func (self *Parser) Parents() []*Parser {
+	result := make([]*Parser, 0)
+	findSubParsers(self, &result)
+	return result
+}
+
+func findSubParsers(parser *Parser, result *[]*Parser) {
+	if parser == nil {
+		return
+	}
+	// Push the parser to then beginning of the slice
+	*result = append([]*Parser{parser}, *result...)
+	findSubParsers(parser.parent, result)
+}
+
 func (self *Parser) SetOpts(options *Options) {
+	commands := self.SubCommands()
+	options.SetSubCommands(commands)
+
 	self.mutex.Lock()
 	self.options = options
 	self.mutex.Unlock()
+}
+
+// Build a list of sub commands that the user provided to reach this sub parser;
+// return an empty list if this parser has no sub commands associated with it
+func (self *Parser) SubCommands() []string {
+	var results []string
+	for _, parser := range self.Parents() {
+		if parser.command == nil {
+			return results
+		}
+		// Get the command name, without the special naming
+		results = append(results, strings.Trim(parser.command.Name, "!cmd-"))
+	}
+	return results
 }
 
 func (self *Parser) GetOpts() *Options {

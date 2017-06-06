@@ -73,35 +73,35 @@ var _ = Describe("Parser", func() {
 		It("Should match --one", func() {
 			parser := args.NewParser()
 			parser.AddFlag("--one").Count()
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("one")).To(Equal(1))
 		})
 		It("Should match -two", func() {
 			parser := args.NewParser()
 			parser.AddFlag("-two").Count()
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("two")).To(Equal(1))
 		})
 		It("Should match ++three", func() {
 			parser := args.NewParser()
 			parser.AddFlag("++three").Count()
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("three")).To(Equal(1))
 		})
 		It("Should match +four", func() {
 			parser := args.NewParser()
 			parser.AddFlag("+four").Count()
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("four")).To(Equal(1))
 		})
 		It("Should match --power-level", func() {
 			parser := args.NewParser()
 			parser.AddFlag("--power-level").Count()
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(1))
 		})
@@ -110,7 +110,7 @@ var _ = Describe("Parser", func() {
 
 			parser := args.NewParser()
 			parser.AddFlag("no-docker").Count()
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Bool("no-docker")).To(Equal(true))
 		})
@@ -118,7 +118,7 @@ var _ = Describe("Parser", func() {
 			parser := args.NewParser()
 			parser.AddFlag("--power-level").Required()
 			cmdLine := []string{""}
-			_, err := parser.Parse(&cmdLine)
+			_, err := parser.Parse(cmdLine)
 
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("option '--power-level' is required"))
@@ -137,7 +137,7 @@ var _ = Describe("Parser", func() {
 
 			// Provided on the command line
 			cmdLine := []string{"--list", "belt,car,table"}
-			opt, err = parser.Parse(&cmdLine)
+			opt, err = parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"belt", "car", "table"}))
 		})
@@ -147,7 +147,7 @@ var _ = Describe("Parser", func() {
 			parser.AddFlag("--list").StoreStringSlice(&list).Default("foo,bar,bit")
 
 			cmdLine := []string{"--list", "belt,car,table"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"belt", "car", "table"}))
 			Expect(list).To(Equal([]string{"belt", "car", "table"}))
@@ -157,7 +157,7 @@ var _ = Describe("Parser", func() {
 			parser.AddFlag("--list").IsStringSlice()
 
 			cmdLine := []string{"--list", "bee", "--list", "cat", "--list", "dad"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"bee", "cat", "dad"}))
 		})
@@ -167,7 +167,7 @@ var _ = Describe("Parser", func() {
 			parser.AddFlag("--list").StoreStringSlice(&list)
 
 			cmdLine := []string{"--list", "bee", "--list", "cat", "--list", "dad"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"bee", "cat", "dad"}))
 			Expect(list).To(Equal([]string{"bee", "cat", "dad"}))
@@ -177,7 +177,7 @@ var _ = Describe("Parser", func() {
 			parser.AddArgument("list").IsStringSlice()
 
 			cmdLine := []string{"bee", "cat", "dad"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"bee", "cat", "dad"}))
 		})
@@ -212,7 +212,7 @@ var _ = Describe("Parser", func() {
 			parser.AddFlag("--foo")
 
 			cmdLine := []string{"--map", "http.ip=192.168.1.1"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(opt.StringMap("map")).To(Equal(map[string]string{"http.ip": "192.168.1.1"}))
 			Expect(err).To(BeNil())
 		})
@@ -222,7 +222,7 @@ var _ = Describe("Parser", func() {
 			parser.AddFlag("--foo")
 
 			cmdLine := []string{"--map", `http\=ip=192.168.1.1`}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringMap("map")).To(Equal(map[string]string{"http=ip": "192.168.1.1"}))
 		})
@@ -247,7 +247,7 @@ var _ = Describe("Parser", func() {
 
 			// Provided on the command line
 			cmdLine := []string{"--map", "belt=car,table=cloth"}
-			opt, err = parser.Parse(&cmdLine)
+			opt, err = parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringMap("map")).To(Equal(map[string]string{"belt": "car", "table": "cloth"}))
 		})
@@ -265,7 +265,7 @@ var _ = Describe("Parser", func() {
 
 			// Provided on the command line
 			cmdLine := []string{"--map", "belt=car,table=cloth"}
-			opt, err = parser.Parse(&cmdLine)
+			opt, err = parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(destMap).To(Equal(map[string]string{"belt": "car", "table": "cloth"}))
 		})
@@ -280,7 +280,7 @@ var _ = Describe("Parser", func() {
 
 			// Provided on the command line
 			cmdLine := []string{"--map", `{"belt":"car","table":"cloth"}`}
-			opt, err = parser.Parse(&cmdLine)
+			opt, err = parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringMap("map")).To(Equal(map[string]string{"belt": "car", "table": "cloth"}))
 		})
@@ -289,7 +289,7 @@ var _ = Describe("Parser", func() {
 			parser.AddFlag("--map").IsStringMap()
 
 			cmdLine := []string{"--map", "blue=bell", "--map", "cat=dog", "--map", "dad=boy"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringMap("map")).To(Equal(map[string]string{
 				"blue": "bell",
@@ -327,19 +327,19 @@ var _ = Describe("Parser", func() {
 			parser.AddFlag("--map").IsStringMap()
 
 			cmdLine := []string{"--map", "belt"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(Not(BeNil()))
 
 			cmdLine = []string{"--map", "belt="}
-			opt, err = parser.Parse(&cmdLine)
+			opt, err = parser.Parse(cmdLine)
 			Expect(err).To(Not(BeNil()))
 
 			cmdLine = []string{"--map", "belt=blue;,"}
-			opt, err = parser.Parse(&cmdLine)
+			opt, err = parser.Parse(cmdLine)
 			Expect(err).To(Not(BeNil()))
 
 			cmdLine = []string{"--map", "belt=car,table=cloth"}
-			opt, err = parser.Parse(&cmdLine)
+			opt, err = parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringMap("map")).To(Equal(map[string]string{"belt": "car", "table": "cloth"}))
 		})
@@ -353,7 +353,7 @@ var _ = Describe("Parser", func() {
 				"--map", `{"cat":"dog"}`,
 				"--map", `{"dad":"boy"}`,
 			}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringMap("map")).To(Equal(map[string]string{
 				"blue": "bell",
@@ -369,7 +369,7 @@ var _ = Describe("Parser", func() {
 			parser := args.NewParser().PrefixChars([]string{"+", "-"})
 			parser.AddFlag("first")
 			parser.AddFlag("second")
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("first")).To(Equal("first"))
 			Expect(opt.String("second")).To(Equal("second"))
@@ -420,6 +420,22 @@ var _ = Describe("Parser", func() {
 			Expect(rule.Name).To(Equal("first"))
 		})
 	})
+	Describe("Parser.SubCommands()", func() {
+		cmdLine := []string{"one", "-v", "two", "three", "-t", "four"}
+		It("Should return a list of parent sub commands", func() {
+			var parents []string
+			parser := args.NewParser()
+			parser.AddCommand("one", func(parser *args.Parser, _ interface{}) (int, error) {
+				parser.AddCommand("two", func(parser *args.Parser, _ interface{}) (int, error) {
+					parents = parser.SubCommands()
+					return 0, nil
+				})
+				return parser.ParseAndRun(nil, nil)
+			})
+			parser.ParseAndRun(cmdLine, nil)
+			Expect(parents).To(Equal([]string{"one", "two"}))
+		})
+	})
 
 	Describe("Parser.AddArgument()", func() {
 		cmdLine := []string{"one", "two", "three", "four"}
@@ -434,7 +450,7 @@ var _ = Describe("Parser", func() {
 		It("Should match first argument 'one'", func() {
 			parser := args.NewParser()
 			parser.AddArgument("first").IsString()
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("first")).To(Equal("one"))
 		})
@@ -443,7 +459,7 @@ var _ = Describe("Parser", func() {
 			parser.AddArgument("first").IsString()
 			parser.AddArgument("second").IsString()
 			parser.AddArgument("third").IsString()
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("first")).To(Equal("one"))
 			Expect(opt.String("second")).To(Equal("two"))
@@ -456,7 +472,7 @@ var _ = Describe("Parser", func() {
 			parser.AddArgument("third").IsString()
 
 			cmdLine := []string{"one", "two"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("first")).To(Equal("one"))
 			Expect(opt.String("second")).To(Equal("two"))
@@ -470,7 +486,7 @@ var _ = Describe("Parser", func() {
 			parser.AddArgument("third").IsString()
 
 			cmdLine := []string{"--first", "one", "two", "--verbose"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("first")).To(Equal("one"))
 			Expect(opt.String("second")).To(Equal("two"))
@@ -483,7 +499,7 @@ var _ = Describe("Parser", func() {
 			parser.AddArgument("first").IsString()
 
 			cmdLine := []string{"--first", "one", "one"}
-			_, err := parser.Parse(&cmdLine)
+			_, err := parser.Parse(cmdLine)
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("Duplicate option 'first' defined"))
 		})
@@ -502,7 +518,7 @@ var _ = Describe("Parser", func() {
 			parser.AddArgument("second").Required()
 
 			cmdLine := []string{"one"}
-			_, err := parser.Parse(&cmdLine)
+			_, err := parser.Parse(cmdLine)
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("argument 'second' is required"))
 		})
@@ -512,7 +528,7 @@ var _ = Describe("Parser", func() {
 			parser.AddArgument("second")
 
 			cmdLine := []string{"one"}
-			_, err := parser.Parse(&cmdLine)
+			_, err := parser.Parse(cmdLine)
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("'second' is ambiguous when " +
 				"following greedy argument 'first'"))
@@ -523,7 +539,7 @@ var _ = Describe("Parser", func() {
 			parser.AddArgument("second").IsStringSlice()
 
 			cmdLine := []string{"one"}
-			_, err := parser.Parse(&cmdLine)
+			_, err := parser.Parse(cmdLine)
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("'second' is ambiguous when " +
 				"following greedy argument 'first'"))
@@ -536,7 +552,7 @@ var _ = Describe("Parser", func() {
 			parser.AddConfig("power-level").Count().Help("My help message")
 
 			// Should ignore command line options
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(0))
 
@@ -558,7 +574,7 @@ var _ = Describe("Parser", func() {
 			parser := args.NewParser()
 			parser.AddFlag("--power-level").Count()
 			parser.InGroup("database").AddFlag("--hostname")
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(1))
 			Expect(opt.Group("database").String("hostname")).To(Equal("mysql.com"))
@@ -651,7 +667,7 @@ var _ = Describe("Parser", func() {
 				return 0, nil
 			})
 			cmdLine := []string{"command1"}
-			retCode, err := parser.ParseAndRun(&cmdLine, nil)
+			retCode, err := parser.ParseAndRun(cmdLine, nil)
 			Expect(err).To(BeNil())
 			Expect(retCode).To(Equal(0))
 			Expect(called).To(Equal(true))
@@ -664,7 +680,7 @@ var _ = Describe("Parser", func() {
 				return 0, nil
 			})
 			cmdLine := []string{"set", "set"}
-			retCode, err := parser.ParseAndRun(&cmdLine, nil)
+			retCode, err := parser.ParseAndRun(cmdLine, nil)
 			Expect(err).To(BeNil())
 			Expect(retCode).To(Equal(0))
 			Expect(called).To(Equal(1))
@@ -684,7 +700,7 @@ var _ = Describe("Parser", func() {
 				return 0, nil
 			})
 			cmdLine := []string{"set", "foo", "bar"}
-			retCode, err := parser.ParseAndRun(&cmdLine, nil)
+			retCode, err := parser.ParseAndRun(cmdLine, nil)
 			Expect(err).To(BeNil())
 			Expect(retCode).To(Equal(0))
 			Expect(called).To(Equal(1))
@@ -708,7 +724,7 @@ var _ = Describe("Parser", func() {
 				return retCode, nil
 			})
 			cmdLine := []string{"volume", "create", "my-new-volume"}
-			retCode, err := parser.ParseAndRun(&cmdLine, nil)
+			retCode, err := parser.ParseAndRun(cmdLine, nil)
 			Expect(err).To(BeNil())
 			Expect(retCode).To(Equal(0))
 			Expect(called).To(Equal(1))
@@ -722,23 +738,22 @@ var _ = Describe("Parser", func() {
 			called := 0
 			parser.AddCommand("set", func(parent *args.Parser, data interface{}) (int, error) {
 				parent.AddArgument("first").Required()
-				_, err := parent.Parse(nil)
+				opts, err := parent.Parse(nil)
+				Expect(opts.Bool("help")).To(Equal(true))
+
+				// Should be a parse validation error (missing required argument)
 				Expect(err).To(Not(BeNil()))
-				Expect(err.Error()).To(Equal("User asked for help; Inspect this error " +
-					"with args.AskedForHelp(err)"))
-				Expect(args.IsHelpError(err)).To(Equal(true))
-				Expect(args.AskedForHelp(err)).To(Equal(true))
 
 				called++
 				return 0, nil
 			})
 			cmdLine := []string{"set", "-h"}
-			retCode, err := parser.ParseAndRun(&cmdLine, nil)
+			retCode, err := parser.ParseAndRun(cmdLine, nil)
 			Expect(err).To(BeNil())
 			Expect(retCode).To(Equal(0))
 			Expect(called).To(Equal(1))
 		})
-		It("Should root parser should ignore help option if a sub command was provided", func() {
+		It("Root parser should ignore help option if a sub command was provided", func() {
 			// ignoring help gives a sub command a chance to provide help
 
 			parser := args.NewParser()
@@ -749,28 +764,26 @@ var _ = Describe("Parser", func() {
 			called := 0
 			parser.AddCommand("set", func(parent *args.Parser, data interface{}) (int, error) {
 				parent.AddArgument("first").Required()
-				_, err := parent.Parse(nil)
+				opts, err := parent.Parse(nil)
+				Expect(opts.Bool("help")).To(Equal(true))
 				Expect(err).To(Not(BeNil()))
-				Expect(err.Error()).To(Equal("User asked for help; Inspect this error " +
-					"with args.AskedForHelp(err)"))
-				Expect(args.IsHelpError(err)).To(Equal(true))
-				Expect(args.AskedForHelp(err)).To(Equal(true))
+				Expect(err.Error()).To(Equal("argument 'first' is required"))
 
 				called++
 				return 0, nil
 			})
 
-			// Parse at this point will indicate `--help` is false because the
-			// sub command `set` was provided
+			// Parse at this point will indicate `--help` was asked for and
+			// a sub command was specified
 			cmdLine := []string{"set", "-h"}
-			opt := parser.ParseSimple(&cmdLine)
-			Expect(opt).To(Not(BeNil()))
-			Expect(opt.Bool("help")).To(Equal(false))
-			// We can still tell if the help option `WasSeen` if root the parser
-			// needs to know if help was requested by the user
-			Expect(opt.WasSeen("help")).To(Equal(true))
+			opt := parser.ParseSimple(cmdLine)
 
-			// Thus allowing the sub command `set` to provide help
+			Expect(opt).To(Not(BeNil()))
+			Expect(opt.Bool("help")).To(Equal(true))
+			Expect(opt.SubCommands()).To(Equal([]string{"set"}))
+
+			// Since opt.SubCommands() indicates a subcommand was specified we should pass control to
+			// the subcommand, Thus allowing the sub command `set` to provide help
 			retCode, err := parser.RunCommand(nil)
 			Expect(err).To(BeNil())
 			Expect(retCode).To(Equal(0))
@@ -786,7 +799,7 @@ var _ = Describe("Parser", func() {
 
 			cmdLine := []string{"golang:1.6", "build", "-o",
 				"amd64-my-prog", "-installsuffix", "static", "./..."}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("output")).To(Equal("amd64-my-prog"))
 			Expect(opt.String("image")).To(Equal("golang:1.6"))
@@ -797,7 +810,7 @@ var _ = Describe("Parser", func() {
 			parser.AddFlag("--list").IsStringSlice()
 
 			cmdLine := []string{"--list", "bee", "--list", "cat", "--list", "dad"}
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.StringSlice("list")).To(Equal([]string{"bee", "cat", "dad"}))
 			Expect(parser.GetArgs()).To(Equal([]string{}))

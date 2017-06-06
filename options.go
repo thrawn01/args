@@ -21,9 +21,9 @@ type Value interface {
 }
 
 type Options struct {
+	values map[string]Value
 	log    StdLogger
 	parser *Parser
-	values map[string]Value
 }
 
 type RawValue struct {
@@ -44,7 +44,10 @@ func (self *RawValue) GetRule() *Rule {
 }
 
 func (self *RawValue) Seen() bool {
-	if self.Rule.Flags& WasSeenInArgv != 0 {
+	if self.Rule == nil {
+		return false
+	}
+	if self.Rule.Flags&WasSeenInArgv != 0 {
 		return true
 	}
 	return false
@@ -198,6 +201,16 @@ func (self *Options) Set(key string, value interface{}) *Options {
 	return self.SetWithRule(key, value, nil)
 }
 
+// Set the sub command list returned by `SubCommands()`
+func (self *Options) SetSubCommands(values []string) {
+	self.Set("!sub-commands", values)
+}
+
+// Return a list of sub commands that the user provided to reach the sub parser these options are for
+func (self *Options) SubCommands() []string {
+	return self.Get("!sub-commands").([]string)
+}
+
 // Return true if any of the values in this Option object were seen on the command line
 func (self *Options) Seen() bool {
 	for _, opt := range self.values {
@@ -294,7 +307,7 @@ func (self *Options) IsSet(key string) bool {
 		if rule == nil {
 			return false
 		}
-		return !(rule.Flags& HasNoValue != 0)
+		return !(rule.Flags&HasNoValue != 0)
 	}
 	return false
 }
@@ -306,7 +319,7 @@ func (self *Options) IsEnv(key string) bool {
 		if rule == nil {
 			return false
 		}
-		return (rule.Flags& IsEnvValue != 0)
+		return (rule.Flags&IsEnvValue != 0)
 	}
 	return false
 }
@@ -318,7 +331,7 @@ func (self *Options) IsArg(key string) bool {
 		if rule == nil {
 			return false
 		}
-		return (rule.Flags& WasSeenInArgv != 0)
+		return (rule.Flags&WasSeenInArgv != 0)
 	}
 	return false
 }
@@ -330,7 +343,7 @@ func (self *Options) IsDefault(key string) bool {
 		if rule == nil {
 			return false
 		}
-		return (rule.Flags& IsDefaultValue != 0)
+		return (rule.Flags&IsDefaultValue != 0)
 	}
 	return false
 }
@@ -342,7 +355,7 @@ func (self *Options) WasSeen(key string) bool {
 		if rule == nil {
 			return false
 		}
-		return (rule.Flags& WasSeenInArgv != 0) || (rule.Flags& IsEnvValue != 0)
+		return (rule.Flags&WasSeenInArgv != 0) || (rule.Flags&IsEnvValue != 0)
 	}
 	return false
 }

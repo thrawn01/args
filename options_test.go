@@ -96,7 +96,7 @@ var _ = Describe("Options", func() {
 		})
 	})
 	Describe("NoArgs()", func() {
-		It("Should return true if no arguments on the command line", func() {
+		It("Should return true if no arguments found on the command line", func() {
 			parser := args.NewParser()
 			parser.AddFlag("--power-level").IsInt().Default("1")
 
@@ -109,7 +109,7 @@ var _ = Describe("Options", func() {
 			parser := args.NewParser()
 			parser.AddFlag("--power-level").IsInt().Default("1")
 
-			opt, err := parser.Parse(&[]string{"--power-level", "2"})
+			opt, err := parser.Parse([]string{"--power-level", "2"})
 			Expect(err).To(BeNil())
 			Expect(opt.Int("power-level")).To(Equal(2))
 			Expect(opt.NoArgs()).To(Equal(false))
@@ -147,7 +147,7 @@ var _ = Describe("Options", func() {
 			parser.AddFlag("--one").IsInt().Default("1")
 			parser.AddFlag("--two").IsInt().Default("0")
 
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("one")).To(Equal(1))
 			Expect(opt.Int("two")).To(Equal(2))
@@ -176,7 +176,7 @@ var _ = Describe("Options", func() {
 			parser := args.NewParser()
 			parser.AddFlag("--one").IsInt().Default("1")
 			parser.AddFlag("--two").IsInt().Default("0")
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.Int("one")).To(Equal(1))
 			Expect(opt.Int("two")).To(Equal(2))
@@ -192,7 +192,7 @@ var _ = Describe("Options", func() {
 			parser.AddFlag("--is-set").IsInt().Default("1")
 			parser.AddFlag("--is-seen").IsTrue()
 			parser.AddFlag("--not-set")
-			opt, err := parser.Parse(&cmdLine)
+			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.WasSeen("is-set")).To(Equal(false))
 			Expect(opt.WasSeen("not-set")).To(Equal(false))
@@ -234,7 +234,7 @@ var _ = Describe("Options", func() {
 			parser.AddFlag("--is-set").IsInt().Default("1")
 			parser.AddFlag("--is-provided")
 			parser.AddFlag("--not-set")
-			opt, err := parser.Parse(&[]string{"--is-provided", "foo"})
+			opt, err := parser.Parse([]string{"--is-provided", "foo"})
 			Expect(err).To(BeNil())
 
 			// All options required have values
