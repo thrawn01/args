@@ -1,9 +1,8 @@
 package args
 
 import (
-	"time"
-
 	"sync"
+	"time"
 
 	"gopkg.in/fsnotify.v1"
 )

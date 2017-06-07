@@ -19,7 +19,8 @@ const (
 	IsFormatted ParseFlag = 1 << iota
 )
 
-var regexInValidPrefixChars = regexp.MustCompile(`\w|\s`)
+var regexInValidPrefixChars = regexp.MustCompile(`[\w\s]`)
+var regexInValidRuleName = regexp.MustCompile(`[!"#$&'/()*;<>{|}\\\\~\s]`)
 
 type ParseModifier func(*Parser)
 
@@ -206,7 +207,7 @@ func (self *Parser) ValidateRules() error {
 			for ; next < len(self.rules); next++ {
 				// If the name and groups are the same
 				if rule.Name == self.rules[next].Name && rule.Group == self.rules[next].Group {
-					return errors.Errorf("Duplicate option '%s' defined", rule.Name)
+					return errors.Errorf("Duplicate argument or flag '%s' defined", rule.Name)
 				}
 			}
 		}
@@ -217,6 +218,14 @@ func (self *Parser) ValidateRules() error {
 				return errors.Wrap(err, "Bad default value")
 			}
 		}
+		// Check for invalid option and argument names
+		if regexInValidRuleName.MatchString(rule.Name) {
+			if !strings.HasPrefix(rule.Name, "!cmd-") {
+				return errors.Errorf("Bad argument or flag '%s'; contains invalid characters",
+					rule.Name)
+			}
+		}
+
 		if !rule.HasFlag(IsArgument) {
 			continue
 		}

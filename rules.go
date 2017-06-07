@@ -3,7 +3,6 @@ package args
 import (
 	"fmt"
 	"os"
-	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -54,7 +53,6 @@ type Rule struct {
 	StoreValue  StoreFunc
 	CommandFunc CommandFunc
 	Group       string
-	Key         string
 	NotGreedy   bool
 	Flags       RuleFlag
 }
@@ -283,24 +281,16 @@ func (self *Rule) GetEnvValue() (interface{}, error) {
 	return nil, nil
 }
 
-func (self *Rule) BackendKey(rootPath string) string {
+func (self *Rule) BackendKey() Key {
 	// Do this so users are not surprised root isn't prefixed with "/"
-	rootPath = "/" + strings.TrimPrefix(rootPath, "/")
-	// If the user provided their own key used that instead
-	if self.Key != "" {
-		return path.Join("/", rootPath, self.Key)
-	}
+	//rootPath = "/" + strings.TrimPrefix(rootPath, "/")
 
+	// Just return the group
 	if self.HasFlag(IsConfigGroup) {
-		return path.Join("/", rootPath, self.Group)
+		return Key{Group: self.Group}
 	}
 
-	// This might cause a key collision if a group shares the same name as an argument
-	// This can be avoided by assigning a custom key name to the group or argument.
-	if self.Group == DefaultOptionGroup {
-		return path.Join("/", rootPath, self.Name)
-	}
-	return path.Join("/", rootPath, self.Group, self.Name)
+	return Key{Group: self.Group, Name: self.Name}
 }
 
 // ***********************************************

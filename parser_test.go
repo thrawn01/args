@@ -501,7 +501,7 @@ var _ = Describe("Parser", func() {
 			cmdLine := []string{"--first", "one", "one"}
 			_, err := parser.Parse(cmdLine)
 			Expect(err).To(Not(BeNil()))
-			Expect(err.Error()).To(Equal("Duplicate option 'first' defined"))
+			Expect(err.Error()).To(Equal("Duplicate argument or flag 'first' defined"))
 		})
 		It("Should raise if options and configs share the same name", func() {
 			parser := args.NewParser()
@@ -510,7 +510,7 @@ var _ = Describe("Parser", func() {
 
 			_, err := parser.Parse(nil)
 			Expect(err).To(Not(BeNil()))
-			Expect(err.Error()).To(Equal("Duplicate option 'debug' defined"))
+			Expect(err.Error()).To(Equal("Duplicate argument or flag 'debug' defined"))
 		})
 		It("Should raise an error if a argument is required but not provided", func() {
 			parser := args.NewParser()
@@ -543,6 +543,13 @@ var _ = Describe("Parser", func() {
 			Expect(err).To(Not(BeNil()))
 			Expect(err.Error()).To(Equal("'second' is ambiguous when " +
 				"following greedy argument 'first'"))
+		})
+		It("Should raise an error if the name contains invalid characters", func() {
+			parser := args.NewParser()
+			parser.AddArgument("*thing").IsStringSlice()
+			_, err := parser.Parse(nil)
+			Expect(err).To(Not(BeNil()))
+			Expect(err.Error()).To(Equal("Bad argument or flag '*thing'; contains invalid characters"))
 		})
 	})
 	Describe("Parser.AddConfig()", func() {

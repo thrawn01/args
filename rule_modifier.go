@@ -199,8 +199,3 @@ func (self *RuleModifier) AddConfig(name string) *RuleModifier {
 	newRule.SetFlag(IsConfig)
 	return self.parser.addRule(name, newRuleModifier(&newRule, self.parser))
 }
-
-func (self *RuleModifier) Key(key string) *RuleModifier {
-	self.rule.Key = key
-	return self
-}

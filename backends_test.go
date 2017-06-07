@@ -3,8 +3,6 @@ package args_test
 import (
 	"fmt"
 
-	"path"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
@@ -23,37 +21,50 @@ type TestBackend struct {
 func NewTestBackend() args.Backend {
 	return &TestBackend{
 		keys: map[string]args.Pair{
-			"/root/bind": args.Pair{Key: "bind", Value: []byte("thrawn01.org:3366")}},
+			"/root/bind": {Key: args.Key{Name: "bind"}, Value: "thrawn01.org:3366"}},
 		lists: map[string][]args.Pair{
 			"/root/endpoints": []args.Pair{
-				args.Pair{Key: "endpoint1", Value: []byte("http://endpoint1.com:3366")},
-				args.Pair{Key: "endpoint2", Value: []byte(`{ "host": "endpoint2", "port": "3366" }`)},
+				{
+					Key:   args.Key{Group: "endpoints", Name: "endpoint1"},
+					Value: "http://endpoint1.com:3366",
+				},
+				{
+					Key:   args.Key{Group: "endpoints", Name: "endpoint2"},
+					Value: `{ "host": "endpoint2", "port": "3366" }`,
+				},
 			},
 			"/root/watch": []args.Pair{
-				args.Pair{Key: "endpoint1", Value: []byte("http://endpoint1.com:3366")},
+				{
+					Key:   args.Key{Group: "watch", Name: "endpoint1"},
+					Value: "http://endpoint1.com:3366",
+				},
 			},
 		},
 	}
 }
 
-func (self *TestBackend) Get(ctx context.Context, key string) (args.Pair, error) {
-	pair, ok := self.keys[key]
+func fullKey(key args.Key) string {
+	return fmt.Sprintf("/root/%s", key.Join("/"))
+}
+
+func (self *TestBackend) Get(ctx context.Context, key args.Key) (args.Pair, error) {
+	pair, ok := self.keys[fullKey(key)]
 	if !ok {
-		return args.Pair{}, errors.New(fmt.Sprintf("'%s' not found", key))
+		return args.Pair{}, errors.New(fmt.Sprintf("'%s' not found", fullKey(key)))
 	}
 	return pair, nil
 }
 
-func (self *TestBackend) List(ctx context.Context, key string) ([]args.Pair, error) {
-	pairs, ok := self.lists[key]
+func (self *TestBackend) List(ctx context.Context, key args.Key) ([]args.Pair, error) {
+	pairs, ok := self.lists[fullKey(key)]
 	if !ok {
-		return []args.Pair{}, errors.New(fmt.Sprintf("'%s' not found", key))
+		return []args.Pair{}, errors.New(fmt.Sprintf("'%s' not found", fullKey(key)))
 	}
 	return pairs, nil
 }
 
-func (self *TestBackend) Set(ctx context.Context, key string, value []byte) error {
-	self.keys[key] = args.Pair{Key: key, Value: value}
+func (self *TestBackend) Set(ctx context.Context, key args.Key, value string) error {
+	self.keys[fullKey(key)] = args.Pair{Key: key, Value: value}
 	return nil
 }
 
@@ -84,11 +95,10 @@ func (self *TestBackend) GetRootKey() string {
 	return "/root"
 }
 
-func NewChangeEvent(key, value string) *args.ChangeEvent {
+func NewChangeEvent(key args.Key, value string) *args.ChangeEvent {
 	return &args.ChangeEvent{
-		KeyName: path.Base(key),
 		Key:     key,
-		Value:   []byte(value),
+		Value:   value,
 		Deleted: false,
 		Err:     nil,
 	}
@@ -121,72 +131,69 @@ var _ = Describe("backend", func() {
 			Expect(log.GetEntry()).To(Equal(""))
 			Expect(opts.String("bind")).To(Equal("thrawn01.org:3366"))
 		})
-	})
+		It("Should use List() when fetching Config Groups", func() {
+			parser := args.NewParser()
+			parser.Log(log)
+			parser.AddConfigGroup("endpoints")
 
-	It("Should use List() when fetching Config Groups", func() {
-		parser := args.NewParser()
-		parser.Log(log)
-		parser.AddConfigGroup("endpoints")
-
-		opts, err := parser.FromBackend(backend)
-		Expect(err).To(BeNil())
-		Expect(log.GetEntry()).To(Equal(""))
-		Expect(opts.Group("endpoints").ToMap()).To(Equal(map[string]interface{}{
-			"endpoint1": "http://endpoint1.com:3366",
-			"endpoint2": `{ "host": "endpoint2", "port": "3366" }`,
-		}))
-	})
-
-	It("Should return an error if config option not found in the backend", func() {
-		parser := args.NewParser()
-		parser.Log(log)
-		parser.AddConfig("--missing")
-
-		opts, err := parser.FromBackend(backend)
-		Expect(err).To(BeNil())
-		Expect(log.GetEntry()).To(ContainSubstring("not found"))
-		Expect(opts.String("missing")).To(Equal(""))
-	})
-
-	It("Should call Watch() to watch for new values", func() {
-		parser := args.NewParser()
-		parser.Log(log)
-		parser.AddConfigGroup("watch")
-
-		_, err := parser.FromBackend(backend)
-		opts := parser.GetOpts()
-		Expect(err).To(BeNil())
-		Expect(log.GetEntry()).To(Equal(""))
-		Expect(opts.Group("watch").ToMap()).To(Equal(map[string]interface{}{
-			"endpoint1": "http://endpoint1.com:3366",
-		}))
-
-		done := make(chan struct{})
-
-		cancelWatch := parser.Watch(backend, func(event *args.ChangeEvent, err error) {
-			// Always check for errors
-			if err != nil {
-				fmt.Printf("Watch Error - %s\n", err.Error())
-				close(done)
-				return
-			}
-			parser.Apply(opts.FromChangeEvent(event))
-			// Tell the test to continue, Change event was handled
-			close(done)
+			opts, err := parser.FromBackend(backend)
+			Expect(err).To(BeNil())
+			Expect(log.GetEntry()).To(Equal(""))
+			Expect(opts.Group("endpoints").ToMap()).To(Equal(map[string]interface{}{
+				"endpoint1": "http://endpoint1.com:3366",
+				"endpoint2": `{ "host": "endpoint2", "port": "3366" }`,
+			}))
 		})
-		// Add a new endpoint
-		watchChan <- NewChangeEvent("/root/watch/endpoint2", "http://endpoint2.com:3366")
-		// Wait until the change event is handled
-		<-done
-		// Stop the watch
-		cancelWatch()
-		// Get the updated options
-		opts = parser.GetOpts()
+		It("Should return an error if config option not found in the backend", func() {
+			parser := args.NewParser()
+			parser.Log(log)
+			parser.AddConfig("--missing")
 
-		Expect(log.GetEntry()).To(Equal(""))
-		Expect(opts.Group("watch").ToMap()).To(Equal(map[string]interface{}{
-			"endpoint1": "http://endpoint1.com:3366",
-			"endpoint2": "http://endpoint2.com:3366",
-		}))
+			opts, err := parser.FromBackend(backend)
+			Expect(err).To(BeNil())
+			Expect(log.GetEntry()).To(ContainSubstring("not found"))
+			Expect(opts.String("missing")).To(Equal(""))
+		})
+		It("Should call Watch() to watch for new values", func() {
+			parser := args.NewParser()
+			parser.Log(log)
+			parser.AddConfigGroup("watch")
+
+			_, err := parser.FromBackend(backend)
+			opts := parser.GetOpts()
+			Expect(err).To(BeNil())
+			Expect(log.GetEntry()).To(Equal(""))
+			Expect(opts.Group("watch").ToMap()).To(Equal(map[string]interface{}{
+				"endpoint1": "http://endpoint1.com:3366",
+			}))
+
+			done := make(chan struct{})
+
+			cancelWatch := parser.Watch(backend, func(event *args.ChangeEvent, err error) {
+				// Always check for errors
+				if err != nil {
+					fmt.Printf("Watch Error - %s\n", err.Error())
+					close(done)
+					return
+				}
+				parser.Apply(opts.FromChangeEvent(event))
+				// Tell the test to continue, Change event was handled
+				close(done)
+			})
+			// Add a new endpoint
+			watchChan <- NewChangeEvent(args.Key{Group: "watch", Name: "endpoint2"}, "http://endpoint2.com:3366")
+			// Wait until the change event is handled
+			<-done
+			// Stop the watch
+			cancelWatch()
+			// Get the updated options
+			opts = parser.GetOpts()
+
+			Expect(log.GetEntry()).To(Equal(""))
+			Expect(opts.Group("watch").ToMap()).To(Equal(map[string]interface{}{
+				"endpoint1": "http://endpoint1.com:3366",
+				"endpoint2": "http://endpoint2.com:3366",
+			}))
+		})
 	})
 })
