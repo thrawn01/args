@@ -2,6 +2,7 @@ package args_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -78,6 +79,21 @@ var _ = Describe("args", func() {
 		    est laborum.
 		    `, "\n")
 			Expect(text).To(Equal("Lorem ipsum dolor sit amet, consecteturadipiscing elit, sed\ndo eiusmod tempor incididunt ut labore etmollit anim id\nest laborum."))
+		})
+	})
+	Describe("args.StringSlice()", func() {
+		It("Should parse a simple comma separated line", func() {
+			result := args.StringToSlice("one,two,three")
+			Expect(result).To(Equal([]string{"one", "two", "three"}))
+
+			result = args.StringToSlice("one, two, three", strings.TrimSpace)
+			Expect(result).To(Equal([]string{"one", "two", "three"}))
+
+			result = args.StringToSlice("one, two, three", strings.TrimSpace, strings.ToUpper)
+			Expect(result).To(Equal([]string{"ONE", "TWO", "THREE"}))
+
+			result = args.StringToSlice("one", strings.TrimSpace, strings.ToUpper)
+			Expect(result).To(Equal([]string{"ONE"}))
 		})
 	})
 })
