@@ -32,6 +32,7 @@ $(GLIDE):
 get-deps: $(GLIDE)
 	$(GLIDE) install
 	go get -u golang.org/x/net/context
+	go get -u golang.org/x/text/encoding
 
 clean:
 	rm bin/*

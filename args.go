@@ -254,23 +254,28 @@ func castStringSlice(name string, dest interface{}, value interface{}) (interfac
 	}
 
 	// Assume the value must be a parsable string
-	return append(dest.([]string), StringToSlice(value.(string))...), nil
+	return append(dest.([]string), StringToSlice(value.(string), strings.TrimSpace)...), nil
 }
 
 // Given a comma separated string, return a slice of string items.
 // Return the entire string as the first item if no comma is found.
 //	// Returns []string{"one"}
 // 	result := args.StringToSlice("one")
+//
 //	// Returns []string{"one", "two", "three"}
-// 	result := args.StringToSlice("one,two,three")
-func StringToSlice(value string) []string {
-	// If no comma is found, then assume this is a single value
-	if strings.Index(value, ",") == -1 {
-		return []string{value}
+// 	result := args.StringToSlice("one, two, three", strings.TrimSpace)
+//
+//	// Returns []string{"ONE", "TWO", "THREE"}
+// 	result := args.StringToSlice("one, two, three", strings.ToUpper, strings.TrimSpace)
+func StringToSlice(value string, modifiers ...func(s string) string) []string {
+	result := strings.Split(value, ",")
+	// Apply the modifiers
+	for _, modifier := range modifiers {
+		for idx, item := range result {
+			result[idx] = modifier(item)
+		}
 	}
-
-	// Split the values separated by comma's
-	return strings.Split(value, ",")
+	return result
 }
 
 func mergeStringMap(src, dest map[string]string) map[string]string {
