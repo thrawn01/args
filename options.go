@@ -396,7 +396,7 @@ func (self *Options) Interface(key string) interface{} {
 	return nil
 }
 
-func (self *Options) FromChangeEvent(event *ChangeEvent) *Options {
+func (self *Options) FromChangeEvent(event ChangeEvent) *Options {
 	if event.Deleted {
 		self.Group(event.Key.Group).Del(event.Key.Name)
 	} else {

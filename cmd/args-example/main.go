@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/thrawn01/args"
+	"github.com/thrawn01/args/ini"
 )
 
 type Config struct {
@@ -144,7 +145,10 @@ func main() {
 	`)
 
 	// Make configuration simple by reading arguments from an INI file
-	opts, err := parser.FromINI(iniFile)
+	// Parse the ini file
+	backend, err := ini.NewBackend(iniFile, "")
+
+	opts, err := parser.FromBackend(backend)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(-1)

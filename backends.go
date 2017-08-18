@@ -1,12 +1,12 @@
 package args
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
 const MAX_BACKOFF_WAIT = 2 * time.Second
@@ -58,7 +58,7 @@ type Backend interface {
 	Set(ctx context.Context, key Key, value string) error
 
 	// Watch monitors store for changes to key.
-	Watch(ctx context.Context, root string) <-chan *ChangeEvent
+	Watch(ctx context.Context, root string) (<-chan ChangeEvent, error)
 
 	// Return the root key used to store all other keys in the backend
 	GetRootKey() string
@@ -99,7 +99,8 @@ func (self *Parser) ParseBackend(backend Backend) (*Options, error) {
 		}
 		pair, err := backend.Get(ctx, key)
 		if err != nil {
-			self.info("args.ParseBackend(): Failed to fetch key '%s' - %s", key.Name, err.Error())
+			// This can be a normal occurrence, and probably shouldn't be logged
+			//self.info("args.ParseBackend(): Failed to fetch key '%s' - %s", key.Name, err.Error())
 			continue
 		}
 		values.Group(pair.Key.Group).Set(pair.Key.Name, pair.Value)
@@ -107,30 +108,31 @@ func (self *Parser) ParseBackend(backend Backend) (*Options, error) {
 	return values, nil
 }
 
-func (self *Parser) Watch(backend Backend, callBack func(*ChangeEvent, error)) WatchCancelFunc {
+func (self *Parser) Watch(backend Backend, callBack func(ChangeEvent, error)) WatchCancelFunc {
 	var isRunning sync.WaitGroup
 	var once sync.Once
 	done := make(chan struct{})
 
 	isRunning.Add(1)
 	go func() {
-		var event *ChangeEvent
-		var ok bool
 		for {
 			// Always attempt to watch, until the user tells us to stop
 			ctx, cancel := context.WithCancel(context.Background())
-
-			watchChan := backend.Watch(ctx, backend.GetRootKey())
+			watchChan, err := backend.Watch(ctx, backend.GetRootKey())
 			once.Do(func() { isRunning.Done() }) // Notify we are watching
+			if err != nil {
+				callBack(ChangeEvent{}, err)
+				goto Retry
+			}
 			for {
 				select {
-				case event, ok = <-watchChan:
+				case event, ok := <-watchChan:
 					if !ok {
 						goto Retry
 					}
 
 					if event.Err != nil {
-						callBack(nil, errors.Wrap(event.Err, "backends.Watch()"))
+						callBack(ChangeEvent{}, errors.Wrap(event.Err, "backends.Watch()"))
 						goto Retry
 					}
 
@@ -156,7 +158,11 @@ func (self *Parser) Watch(backend Backend, callBack func(*ChangeEvent, error)) W
 	// Wait until the go-routine is running before we return, this ensures any updates
 	// our application might need from the backend picked up by Watch()
 	isRunning.Wait()
-	return func() { close(done) }
+	return func() {
+		if done != nil {
+			close(done)
+		}
+	}
 }
 
 func (self *Parser) findRule(key Key) *Rule {

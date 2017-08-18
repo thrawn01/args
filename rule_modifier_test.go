@@ -113,31 +113,6 @@ var _ = Describe("RuleModifier", func() {
 			Expect(len(rule.Aliases)).To(Equal(0))
 		})
 	})
-	Describe("RuleModifier.AddConfigGroup()", func() {
-		iniFile := []byte(`
-		power-level=20000
-
-		[endpoints]
-		endpoint1=http://thrawn01.org/1
-		endpoint2=http://thrawn01.org/2
-		endpoint3=http://thrawn01.org/3
-		`)
-
-		It("Should add a new group", func() {
-			parser := args.NewParser()
-			parser.AddFlag("--power-level").IsInt()
-			parser.AddConfigGroup("endpoints").Help("List of http endpoints")
-			opt, err := parser.FromINI(iniFile)
-			Expect(err).To(BeNil())
-			Expect(opt.Int("power-level")).To(Equal(20000))
-			Expect(opt.Group("endpoints").ToMap()).To(Equal(map[string]interface{}{
-				"endpoint1": "http://thrawn01.org/1",
-				"endpoint2": "http://thrawn01.org/2",
-				"endpoint3": "http://thrawn01.org/3",
-			}))
-			Expect(opt.Group("endpoints").String("endpoint1")).To(Equal("http://thrawn01.org/1"))
-		})
-	})
 	Describe("RuleModifier.Count()", func() {
 		It("Should count one", func() {
 			parser := args.NewParser()

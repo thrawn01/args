@@ -6,9 +6,9 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/thrawn01/args"
+	"github.com/thrawn01/args/ini"
 )
 
 func main() {
@@ -80,21 +80,25 @@ func simple(parser *args.Parser) args.WatchCancelFunc {
 	appConf := parser.GetOpts()
 	configFile := appConf.String("config-file")
 
-	// Watch the file every time.Second and call func(err error){} when the file is modified
-	cancelWatch, err := args.WatchFile(configFile, time.Second, func(err error) {
-		if err != nil {
-			fmt.Printf("Watch Error %s\n", err.Error())
-			return
-		}
+	// Parse the ini file
+	backend, err := ini.NewBackendFromFile(configFile)
 
-		// You can safely ignore the returned Options{} object here.
-		// the next call to GetOpts() from within the handler will
-		// pick up the newly parsed config
-		appConf, err = parser.FromINIFile(configFile)
+	// Load the entire config
+	opts, err := parser.FromBackend(backend)
+	if err != nil {
+		fmt.Printf("Unable to start load '%s' -  %s", configFile, err.Error())
+	}
+
+	// Watch the file and report when fields have changed
+	cancelWatch := parser.Watch(backend, func(event args.ChangeEvent, err error) {
 		if err != nil {
-			fmt.Printf("Failed to load updated config - %s\n", err.Error())
+			fmt.Printf("While loading updated config - %s\n", err.Error())
 			return
 		}
+		fmt.Printf("Config: %s:%s changed to %s", event.Key.Group, event.Key.Name, event.Value)
+
+		// Apply the updated config change
+		parser.Apply(opts.FromChangeEvent(event))
 	})
 
 	if err != nil {
@@ -111,34 +115,27 @@ func complex(parser *args.Parser) args.WatchCancelFunc {
 	appConf := parser.GetOpts()
 	configFile := appConf.String("config-file")
 
-	// Watch the file every time.Second and call func(err error){} when the file is modified
-	cancelWatch, err := args.WatchFile(configFile, time.Second, func(err error) {
+	// Parse the ini file
+	backend, err := ini.NewBackendFromFile(configFile)
+
+	// Load the entire config
+	local, err := parser.FromBackend(backend)
+	if err != nil {
+		fmt.Printf("Unable to start load '%s' -  %s", configFile, err.Error())
+	}
+
+	// Watch the file and report when fields have changed
+	cancelWatch := parser.Watch(backend, func(event args.ChangeEvent, err error) {
 		if err != nil {
-			fmt.Printf("Watch Error %s\n", err.Error())
+			fmt.Printf("While loading updated config - %s\n", err.Error())
 			return
 		}
+		// Update local copy of the config
+		local = local.FromChangeEvent(event)
 
-		// load the file from disk
-		content, err := args.LoadFile(configFile)
-		if err != nil {
-			fmt.Printf("Failed to load config - %s\n", err.Error())
-		}
-
-		// Parse the file contents
-		newConfig, err := parser.ParseINI(content)
-		if err != nil {
-			fmt.Printf("Failed to update config - %s\n", err.Error())
-			return
-		}
-
-		// Only "Apply" the newConfig when the version changes
-		if appConf.Int("version") != newConfig.Int("version") {
-			// Apply the newConfig values to the parser rules
-			appConf, err = parser.Apply(newConfig)
-			if err != nil {
-				fmt.Printf("Probably a type cast error - %s\n", err.Error())
-				return
-			}
+		// Only apply the config if the version changed
+		if event.Key.Name == "version" {
+			appConf, err = parser.Apply(local.FromChangeEvent(event))
 		}
 	})
 	if err != nil {
