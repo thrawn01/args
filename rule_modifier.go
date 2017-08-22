@@ -93,7 +93,7 @@ func (self *RuleModifier) StoreStringSlice(dest *[]string) *RuleModifier {
 		// This should never happen if we validate the types
 		srcType := reflect.TypeOf(src)
 		if srcType.Kind() != reflect.Slice {
-			self.parser.GetLog().Printf("Attempted to store '%s' which is not a slice", srcType.Kind())
+			self.parser.log.Printf("Attempted to store '%s' which is not a slice", srcType.Kind())
 		}
 		for _, value := range src.([]string) {
 			*dest = append(*dest, value)

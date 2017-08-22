@@ -16,11 +16,19 @@ var _ = Describe("Parser", func() {
 	})
 
 	Describe("Parser.Parse(nil)", func() {
-		It("Should return error if AddOption() was never called", func() {
+		It("Should return error if AddFlag() or AddArgument() was never called", func() {
 			parser := args.NewParser().AddHelp(false)
 			_, err := parser.Parse(nil)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(Equal("Must create some options to match with before calling arg.Parse()"))
+		})
+		It("Should return error if duplicate flag or arguments defined", func() {
+			parser := args.NewParser().AddHelp(false)
+			parser.AddFlag("--time").Alias("-t")
+			parser.AddFlag("--trigger").Alias("-t")
+			_, err := parser.Parse(nil)
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Duplicate alias '-t' for 'time' redefined by 'trigger'"))
 		})
 		It("Should add Help option if none provided", func() {
 			parser := args.NewParser()
@@ -31,9 +39,11 @@ var _ = Describe("Parser", func() {
 		})
 	})
 	Describe("Parser.AddHelp()", func() {
-		It("Should return true on new parser", func() {
+		It("If set to false should not create a --help option", func() {
 			parser := args.NewParser()
-			Expect(parser.GetAddHelp()).To(Equal(true))
+			for _, rule := range parser.GetRules() {
+				Expect(rule.Name).To(Not(Equal("help")))
+			}
 		})
 	})
 	Describe("Parser.AddOption()", func() {
@@ -373,7 +383,6 @@ var _ = Describe("Parser", func() {
 			Expect(err).To(BeNil())
 			Expect(opt.String("first")).To(Equal("first"))
 			Expect(opt.String("second")).To(Equal("second"))
-			Expect(parser.GetPrefixChars()).To(Equal([]string{"+", "-"}))
 		})
 		It("Should return not allow invalid prefix characters", func() {
 			parser := args.NewParser().PrefixChars([]string{"_"})
@@ -595,8 +604,8 @@ var _ = Describe("Parser", func() {
 				Alias("-c").
 				Help(`Lorem ipsum dolor sit amet, consectetur
 			mollit anim id est laborum.`)
-			msg := parser.GenerateHelpSection(args.IsFlag)
-			Expect(msg).To(Equal("  -p, --power-level   Specify our power level" +
+			msg := parser.GenerateHelp()
+			Expect(msg).To(ContainSubstring("  -p, --power-level   Specify our power level" +
 				"\n  -c, --cat-level     Lorem ipsum dolor sit amet, consecteturmollit anim id est" +
 				"\n                      laborum.\n"))
 		})
@@ -609,7 +618,6 @@ var _ = Describe("Parser", func() {
 			Expect(msg).To(ContainSubstring("Usage:  [OPTIONS]"))
 			Expect(msg).To(ContainSubstring("Now with more magical cow powers"))
 			Expect(msg).To(ContainSubstring("-p, --power-level   Specify our power level"))
-			Expect(parser.GetEpilog()).To(Equal("Now with more magical cow powers"))
 		})
 	})
 	Describe("Parser.Usage()", func() {
@@ -619,8 +627,6 @@ var _ = Describe("Parser", func() {
 			msg := parser.GenerateHelp()
 			Expect(msg).To(ContainSubstring("Usage: -asdfbsx [ARGUMENT] -- [CONTAINER ARGS]..."))
 			Expect(msg).To(ContainSubstring("-p, --power-level   Specify our power level"))
-			Expect(parser.GetUsage()).To(Equal("-asdfbsx [ARGUMENT] -- [CONTAINER ARGS]..."))
-
 		})
 	})
 	Describe("Parser.GenerateHelp()", func() {
@@ -643,9 +649,6 @@ var _ = Describe("Parser", func() {
 			Expect(msg).To(ContainSubstring("-e, --environ       Default thing (Default=1, Env=APP_ENV)"))
 			Expect(msg).To(ContainSubstring("-d, --default       Default thing (Default=0)"))
 			Expect(msg).To(ContainSubstring("-p, --power-level   Specify our power level"))
-			Expect(parser.GetEnvPrefix()).To(Equal("APP_"))
-			Expect(parser.GetWordWrap()).To(Equal(80))
-			Expect(parser.GetName()).To(Equal("dragon-ball"))
 		})
 		It("Should generate formated description if flag is set", func() {
 			desc := `
@@ -662,7 +665,6 @@ var _ = Describe("Parser", func() {
 			msg := parser.GenerateHelp()
 			Expect(msg).To(ContainSubstring("Custom formated description --------------------" +
 				"--------------------------------------- over 80"))
-			Expect(parser.GetDesc()).To(ContainSubstring("Custom formated description"))
 		})
 	})
 	Describe("Parser.AddCommand()", func() {

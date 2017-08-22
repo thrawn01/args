@@ -57,11 +57,11 @@ func main() {
 	parser.AddFlag("--help").Alias("-h").IsTrue().Help("show this help message")
 
 	// Add Required arguments
-	parser.AddArg("the-question").Required().
+	parser.AddArgument("the-question").Required().
 		StoreStr(&conf.TheQuestion).Help("Before you have an answer")
 
 	// Add Optional arguments
-	parser.AddArg("the-answer").IsInt().Default("42").
+	parser.AddArgument("the-answer").IsInt().Default("42").
 		StoreInt(&conf.TheAnswer).Help("It must be 42")
 
 	// 'Conf' flags are not set via the command line but can be set

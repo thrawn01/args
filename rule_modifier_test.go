@@ -43,14 +43,14 @@ var _ = Describe("RuleModifier", func() {
 	Describe("RuleModifier.Flag()", func() {
 		It("Should allow the user add an abbreviations for the option", func() {
 			parser := args.NewParser()
-			parser.AddFlag("host").Short("h")
+			parser.AddFlag("host").Short("H")
 
 			cmdLine := []string{"--host", "google.com"}
 			opt, err := parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("host")).To(Equal("google.com"))
 
-			cmdLine = []string{"-h", "yahoo.com"}
+			cmdLine = []string{"-H", "yahoo.com"}
 			opt, err = parser.Parse(cmdLine)
 			Expect(err).To(BeNil())
 			Expect(opt.String("host")).To(Equal("yahoo.com"))

@@ -151,7 +151,7 @@ func (self *Parser) Watch(backend Backend, callBack func(ChangeEvent, error)) Wa
 		Retry:
 			// Cancel our current context and sleep
 			cancel()
-			self.Sleep()
+			self.sleep()
 		}
 	}()
 
@@ -180,12 +180,12 @@ func (self *Parser) findRule(key Key) *Rule {
 	return nil
 }
 
-func (self *Parser) Sleep() {
+func (self *Parser) sleep() {
 	self.attempts = self.attempts + 1
 	delay := time.Duration(self.attempts) * 2 * time.Millisecond
 	if delay > MAX_BACKOFF_WAIT {
 		delay = MAX_BACKOFF_WAIT
 	}
-	self.log.Printf("WatchEtcd Retry in %v ...", delay)
+	self.log.Printf("Backend Retry in %v ...", delay)
 	time.Sleep(delay)
 }

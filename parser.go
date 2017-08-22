@@ -98,17 +98,9 @@ func (self *Parser) Log(logger StdLogger) {
 	self.log = logger
 }
 
-func (self *Parser) GetLog() StdLogger {
-	return self.log
-}
-
 func (self *Parser) Name(value string) *Parser {
 	self.name = value
 	return self
-}
-
-func (self *Parser) GetName() string {
-	return self.name
 }
 
 func (self *Parser) Desc(value string, flags ...ParseFlag) *Parser {
@@ -119,17 +111,9 @@ func (self *Parser) Desc(value string, flags ...ParseFlag) *Parser {
 	return self
 }
 
-func (self *Parser) GetDesc() string {
-	return self.description
-}
-
 func (self *Parser) WordWrap(value int) *Parser {
 	self.wordWrapLen = value
 	return self
-}
-
-func (self *Parser) GetWordWrap() int {
-	return self.wordWrapLen
 }
 
 func (self *Parser) EnvPrefix(value string) *Parser {
@@ -137,17 +121,9 @@ func (self *Parser) EnvPrefix(value string) *Parser {
 	return self
 }
 
-func (self *Parser) GetEnvPrefix() string {
-	return self.envPrefix
-}
-
 func (self *Parser) AddHelp(value bool) *Parser {
 	self.addHelp = value
 	return self
-}
-
-func (self *Parser) GetAddHelp() bool {
-	return self.addHelp
 }
 
 func (self *Parser) Epilog(value string) *Parser {
@@ -155,17 +131,9 @@ func (self *Parser) Epilog(value string) *Parser {
 	return self
 }
 
-func (self *Parser) GetEpilog() string {
-	return self.epilog
-}
-
 func (self *Parser) Usage(value string) *Parser {
 	self.usage = value
 	return self
-}
-
-func (self *Parser) GetUsage() string {
-	return self.usage
 }
 
 func (self *Parser) PrefixChars(values []string) *Parser {
@@ -184,10 +152,6 @@ func (self *Parser) PrefixChars(values []string) *Parser {
 	return self
 }
 
-func (self *Parser) GetPrefixChars() []string {
-	return self.prefixChars
-}
-
 func (self *Parser) SetHelpIO(file *os.File) {
 	self.helpIO = file
 }
@@ -198,7 +162,7 @@ func (self *Parser) info(format string, args ...interface{}) {
 	}
 }
 
-func (self *Parser) ValidateRules() error {
+func (self *Parser) validateRules() error {
 	var greedyRule *Rule
 	for idx, rule := range self.rules {
 		// Duplicate rule check
@@ -206,6 +170,24 @@ func (self *Parser) ValidateRules() error {
 		if next < len(self.rules) {
 			for ; next < len(self.rules); next++ {
 				// If the name and groups are the same
+				if rule.Name == self.rules[next].Name && rule.Group == self.rules[next].Group {
+					return errors.Errorf("Duplicate argument or flag '%s' defined", rule.Name)
+				}
+				// If the alias is a duplicate
+				for _, alias := range self.rules[next].Aliases {
+					var duplicate string
+
+					// if rule.Aliases contains 'alias'
+					for _, item := range rule.Aliases {
+						if item == alias {
+							duplicate = alias
+						}
+					}
+					if len(duplicate) != 0 {
+						return errors.Errorf("Duplicate alias '%s' for '%s' redefined by '%s'",
+							duplicate, rule.Name, self.rules[next].Name)
+					}
+				}
 				if rule.Name == self.rules[next].Name && rule.Group == self.rules[next].Group {
 					return errors.Errorf("Duplicate argument or flag '%s' defined", rule.Name)
 				}
@@ -262,10 +244,6 @@ func (self *Parser) AddConfig(name string) *RuleModifier {
 	rule := newRule()
 	rule.SetFlag(IsConfig)
 	return self.addRule(name, newRuleModifier(rule, self))
-}
-
-func (self *Parser) AddArg(name string) *RuleModifier {
-	return self.AddArgument(name)
 }
 
 func (self *Parser) AddArgument(name string) *RuleModifier {
@@ -446,7 +424,7 @@ func (self *Parser) parseUntil(terminator string) (*Options, error) {
 		return nil, errors.New("Must create some options to match with before calling arg.Parse()")
 	}
 
-	if err := self.ValidateRules(); err != nil {
+	if err := self.validateRules(); err != nil {
 		return nil, err
 	}
 
@@ -545,7 +523,7 @@ func (self *Parser) Apply(values *Options) (*Options, error) {
 		}
 	}
 
-	self.SetOpts(results)
+	self.setOpts(results)
 	return self.GetOpts(), self.err
 }
 
@@ -570,7 +548,7 @@ func findSubParsers(parser *Parser, result *[]*Parser) {
 	findSubParsers(parser.parent, result)
 }
 
-func (self *Parser) SetOpts(options *Options) {
+func (self *Parser) setOpts(options *Options) {
 	commands := self.SubCommands()
 	options.SetSubCommands(commands)
 
@@ -639,8 +617,8 @@ func (self *Parser) GenerateHelp() string {
 		result.WriteString(fmt.Sprintf("Usage: %s\n", self.usage))
 	} else {
 		result.WriteString(fmt.Sprintf("Usage: %s %s %s\n", self.name,
-			self.GenerateUsage(IsFlag),
-			self.GenerateUsage(IsArgument)))
+			self.generateUsage(IsFlag),
+			self.generateUsage(IsArgument)))
 	}
 
 	if self.description != "" {
@@ -654,19 +632,19 @@ func (self *Parser) GenerateHelp() string {
 		result.WriteString("\n")
 	}
 
-	commands := self.GenerateHelpSection(IsCommand)
+	commands := self.generateHelpSection(IsCommand)
 	if commands != "" {
 		result.WriteString("\nCommands:\n")
 		result.WriteString(commands)
 	}
 
-	argument := self.GenerateHelpSection(IsArgument)
+	argument := self.generateHelpSection(IsArgument)
 	if argument != "" {
 		result.WriteString("\nArguments:\n")
 		result.WriteString(argument)
 	}
 
-	options := self.GenerateHelpSection(IsFlag)
+	options := self.generateHelpSection(IsFlag)
 	if options != "" {
 		result.WriteString("\nOptions:\n")
 		result.WriteString(options)
@@ -678,7 +656,7 @@ func (self *Parser) GenerateHelp() string {
 	return result.String()
 }
 
-func (self *Parser) GenerateUsage(flags RuleFlag) string {
+func (self *Parser) generateUsage(flags RuleFlag) string {
 	var result bytes.Buffer
 
 	// TODO: Should only return [OPTIONS] if there are too many options to display on a single line
@@ -700,7 +678,7 @@ type HelpMsg struct {
 	Message string
 }
 
-func (self *Parser) GenerateHelpSection(flags RuleFlag) string {
+func (self *Parser) generateHelpSection(flags RuleFlag) string {
 	var result bytes.Buffer
 	var options []HelpMsg
 

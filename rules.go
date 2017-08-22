@@ -80,6 +80,7 @@ func (self *Rule) AddAlias(name string, prefixes []string) string {
 					self.Aliases = append(self.Aliases, fmt.Sprintf("%s%s", prefix, name))
 				}
 			} else {
+				// TODO: If it's a short name, less than or equal 2 characters, assume a '-' prefix
 				// Apply default '--' prefix if none specified
 				self.Aliases = append(self.Aliases, fmt.Sprintf("--%s", name))
 			}
