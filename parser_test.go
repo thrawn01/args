@@ -23,12 +23,22 @@ var _ = Describe("Parser", func() {
 			Expect(err.Error()).To(Equal("Must create some options to match with before calling arg.Parse()"))
 		})
 		It("Should return error if duplicate flag or arguments defined", func() {
-			parser := args.NewParser().AddHelp(false)
-			parser.AddFlag("--time").Alias("-t")
-			parser.AddFlag("--trigger").Alias("-t")
-			_, err := parser.Parse(nil)
-			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(Equal("Duplicate alias '-t' for 'time' redefined by 'trigger'"))
+			Context("as alias", func() {
+				parser := args.NewParser().AddHelp(false)
+				parser.AddFlag("--time").Alias("-t")
+				parser.AddFlag("--trigger").Alias("-t")
+				_, err := parser.Parse(nil)
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(Equal("Duplicate alias '-t' for 'time' redefined by 'trigger'"))
+			})
+			Context("as name", func() {
+				parser := args.NewParser().AddHelp(false)
+				parser.AddFlag("--time")
+				parser.AddFlag("--time")
+				_, err := parser.Parse(nil)
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(Equal("Duplicate argument or flag 'time' defined"))
+			})
 		})
 		It("Should add Help option if none provided", func() {
 			parser := args.NewParser()
@@ -736,6 +746,25 @@ var _ = Describe("Parser", func() {
 			retCode, err := parser.ParseAndRun(cmdLine, nil)
 			Expect(err).To(BeNil())
 			Expect(retCode).To(Equal(0))
+			Expect(called).To(Equal(1))
+		})
+		It("Should not allow sub commands to duplicate a flag defined by the parent", func() {
+			parser := args.NewParser()
+			parser.AddFlag("example")
+			called := 0
+			parser.AddCommand("volume", func(parent *args.Parser, data interface{}) (int, error) {
+				parent.AddFlag("example")
+				retCode, err := parent.ParseAndRun(nil, nil)
+				Expect(err).To(Not(BeNil()))
+				Expect(err.Error()).To(Equal("Duplicate argument or flag 'example' defined"))
+				Expect(retCode).To(Equal(1))
+				called++
+				return retCode, nil
+			})
+			cmdLine := []string{"volume"}
+			retCode, err := parser.ParseAndRun(cmdLine, nil)
+			Expect(err).To(BeNil())
+			Expect(retCode).To(Equal(1))
 			Expect(called).To(Equal(1))
 		})
 		It("Should respect auto added help option in commands", func() {

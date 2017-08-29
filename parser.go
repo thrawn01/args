@@ -418,14 +418,15 @@ func (self *Parser) HasHelpFlag() bool {
 
 func (self *Parser) parseUntil(terminator string) (*Options, error) {
 	self.idx = 0
+	empty := self.NewOptions()
 
 	// Sanity Check
 	if len(self.rules) == 0 {
-		return nil, errors.New("Must create some options to match with before calling arg.Parse()")
+		return empty, errors.New("Must create some options to match with before calling arg.Parse()")
 	}
 
 	if err := self.validateRules(); err != nil {
-		return nil, err
+		return empty, err
 	}
 
 	// Sort the rules so positional rules are parsed last
@@ -446,7 +447,7 @@ func (self *Parser) parseUntil(terminator string) (*Options, error) {
 		if err != nil {
 			// errors here are cast and expected argument errors;
 			// users should never expect *Options to be nil
-			return self.NewOptions(), err
+			return empty, err
 		}
 		if rule == nil {
 			continue
