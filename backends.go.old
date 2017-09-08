@@ -40,19 +40,14 @@ func (s Key) Join(sep string) string {
 	return fmt.Sprintf("%s%s%s", s.Group, sep, s.Name)
 }
 
-type Pair struct {
-	Key   Key
-	Value string
-}
-
 type WatchCancelFunc func()
 
 type Backend interface {
 	// Get retrieves a value from a K/V store for the provided key.
-	Get(ctx context.Context, key Key) (Pair, error)
+	Get(ctx context.Context, key Key) (Value, error)
 
 	// List retrieves all keys and values under a provided key.
-	List(ctx context.Context, key Key) ([]Pair, error)
+	List(ctx context.Context, key Key) ([]Value, error)
 
 	// Set the provided key to value.
 	Set(ctx context.Context, key Key, value string) error
@@ -84,7 +79,7 @@ func (self *Parser) ParseBackend(backend Backend) (*Options, error) {
 	defer func() { cancel() }()
 	//
 	for _, rule := range self.rules {
-		key := rule.BackendKey()
+		key := rule.Key()
 		if rule.HasFlag(IsConfigGroup) {
 			pairs, err := backend.List(ctx, key)
 			if err != nil {

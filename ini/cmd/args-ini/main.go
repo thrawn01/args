@@ -40,7 +40,7 @@ func main() {
 
 	// Simple handler that prints out our config information
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		conf := appConf.GetOpts()
+		conf := parser.GetOpts()
 
 		db := conf.Group("database")
 		payload, err := json.Marshal(map[string]string{

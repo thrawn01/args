@@ -37,30 +37,30 @@ func NewBackend(input []byte, fileName string) (*Backend, error) {
 	return &Backend{cfg: cfg, fileName: fileName}, nil
 }
 
-func (s *Backend) Get(ctx context.Context, key args.Key) (args.Pair, error) {
+func (s *Backend) Get(ctx context.Context, key args.Key) (args.Value, error) {
 	group, err := s.cfg.GetSection(key.Group)
 	if err != nil {
-		return args.Pair{}, err
+		return args.Value{}, err
 	}
 
 	result, err := group.GetKey(key.Name)
 	if err != nil {
-		return args.Pair{}, err
+		return args.Value{}, err
 	}
 
-	return args.Pair{
+	return args.Value{
 		Key:   key,
 		Value: result.Value(),
 	}, nil
 }
 
-func (s *Backend) List(ctx context.Context, key args.Key) ([]args.Pair, error) {
+func (s *Backend) List(ctx context.Context, key args.Key) ([]args.Value, error) {
 	group, err := s.cfg.GetSection(key.Group)
 	if err != nil {
-		return []args.Pair{}, err
+		return []args.Value{}, err
 	}
 
-	var results []args.Pair
+	var results []args.Value
 	for _, item := range group.KeyStrings() {
 		value, err := s.Get(ctx, args.Key{Name: item, Group: key.Group})
 		if err != nil {

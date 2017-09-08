@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cast"
 )
 
-type Value interface {
+type Option interface {
 	ToString(...int) string
 	GetValue() interface{}
 	GetRule() *Rule
@@ -21,7 +21,7 @@ type Value interface {
 }
 
 type Options struct {
-	values map[string]Value
+	values map[string]Option
 	log    StdLogger
 	parser *Parser
 }
@@ -55,7 +55,7 @@ func (self *RawValue) Seen() bool {
 
 func (self *Parser) NewOptions() *Options {
 	return &Options{
-		values: make(map[string]Value),
+		values: make(map[string]Option),
 		log:    self.log,
 		parser: self,
 	}
@@ -382,7 +382,7 @@ func (self *Options) Get(key string) interface{} {
 	return nil
 }
 
-func (self *Options) InspectOpt(key string) Value {
+func (self *Options) InspectOpt(key string) Option {
 	if opt, ok := self.values[key]; ok {
 		return opt
 	}

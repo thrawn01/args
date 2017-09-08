@@ -13,17 +13,17 @@ import (
 var watchChan chan args.ChangeEvent
 
 type TestBackend struct {
-	keys  map[string]args.Pair
-	lists map[string][]args.Pair
+	keys  map[string]args.Value
+	lists map[string][]args.Value
 	close chan struct{}
 }
 
 func NewTestBackend() args.Backend {
 	return &TestBackend{
-		keys: map[string]args.Pair{
+		keys: map[string]args.Value{
 			"/root/bind": {Key: args.Key{Name: "bind"}, Value: "thrawn01.org:3366"}},
-		lists: map[string][]args.Pair{
-			"/root/endpoints": []args.Pair{
+		lists: map[string][]args.Value{
+			"/root/endpoints": []args.Value{
 				{
 					Key:   args.Key{Group: "endpoints", Name: "endpoint1"},
 					Value: "http://endpoint1.com:3366",
@@ -33,7 +33,7 @@ func NewTestBackend() args.Backend {
 					Value: `{ "host": "endpoint2", "port": "3366" }`,
 				},
 			},
-			"/root/watch": []args.Pair{
+			"/root/watch": []args.Value{
 				{
 					Key:   args.Key{Group: "watch", Name: "endpoint1"},
 					Value: "http://endpoint1.com:3366",
@@ -47,24 +47,24 @@ func fullKey(key args.Key) string {
 	return fmt.Sprintf("/root/%s", key.Join("/"))
 }
 
-func (self *TestBackend) Get(ctx context.Context, key args.Key) (args.Pair, error) {
+func (self *TestBackend) Get(ctx context.Context, key args.Key) (args.Value, error) {
 	pair, ok := self.keys[fullKey(key)]
 	if !ok {
-		return args.Pair{}, errors.New(fmt.Sprintf("'%s' not found", fullKey(key)))
+		return args.Value{}, errors.New(fmt.Sprintf("'%s' not found", fullKey(key)))
 	}
 	return pair, nil
 }
 
-func (self *TestBackend) List(ctx context.Context, key args.Key) ([]args.Pair, error) {
+func (self *TestBackend) List(ctx context.Context, key args.Key) ([]args.Value, error) {
 	pairs, ok := self.lists[fullKey(key)]
 	if !ok {
-		return []args.Pair{}, errors.New(fmt.Sprintf("'%s' not found", fullKey(key)))
+		return []args.Value{}, errors.New(fmt.Sprintf("'%s' not found", fullKey(key)))
 	}
 	return pairs, nil
 }
 
 func (self *TestBackend) Set(ctx context.Context, key args.Key, value string) error {
-	self.keys[fullKey(key)] = args.Pair{Key: key, Value: value}
+	self.keys[fullKey(key)] = args.Value{Key: key, Value: value}
 	return nil
 }
 

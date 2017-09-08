@@ -56,7 +56,7 @@ var _ = Describe("Parser", func() {
 			}
 		})
 	})
-	Describe("Parser.AddOption()", func() {
+	Describe("Parser.AddFlag()", func() {
 		cmdLine := []string{"--one", "-two", "++three", "+four", "--power-level"}
 
 		It("Should create optional rule --one", func() {

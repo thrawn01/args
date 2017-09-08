@@ -17,12 +17,10 @@ type ParseFlag int64
 
 const (
 	IsFormatted ParseFlag = 1 << iota
+	AddHelpFlag
 )
 
 var regexInValidPrefixChars = regexp.MustCompile(`[\w\s]`)
-var regexInValidRuleName = regexp.MustCompile(`[!"#$&'/()*;<>{|}\\\\~\s]`)
-
-type ParseModifier func(*Parser)
 
 type Parser struct {
 	stopParsingOnCommand bool
@@ -162,70 +160,6 @@ func (self *Parser) info(format string, args ...interface{}) {
 	}
 }
 
-func (self *Parser) validateRules() error {
-	var greedyRule *Rule
-	for idx, rule := range self.rules {
-		// Duplicate rule check
-		next := idx + 1
-		if next < len(self.rules) {
-			for ; next < len(self.rules); next++ {
-				// If the name and groups are the same
-				if rule.Name == self.rules[next].Name && rule.Group == self.rules[next].Group {
-					return errors.Errorf("Duplicate argument or flag '%s' defined", rule.Name)
-				}
-				// If the alias is a duplicate
-				for _, alias := range self.rules[next].Aliases {
-					var duplicate string
-
-					// if rule.Aliases contains 'alias'
-					for _, item := range rule.Aliases {
-						if item == alias {
-							duplicate = alias
-						}
-					}
-					if len(duplicate) != 0 {
-						return errors.Errorf("Duplicate alias '%s' for '%s' redefined by '%s'",
-							duplicate, rule.Name, self.rules[next].Name)
-					}
-				}
-				if rule.Name == self.rules[next].Name && rule.Group == self.rules[next].Group {
-					return errors.Errorf("Duplicate argument or flag '%s' defined", rule.Name)
-				}
-			}
-		}
-		// Ensure user didn't set a bad default value
-		if rule.Cast != nil && rule.Default != nil {
-			_, err := rule.Cast(rule.Name, nil, *rule.Default)
-			if err != nil {
-				return errors.Wrap(err, "Bad default value")
-			}
-		}
-		// Check for invalid option and argument names
-		if regexInValidRuleName.MatchString(rule.Name) {
-			if !strings.HasPrefix(rule.Name, "!cmd-") {
-				return errors.Errorf("Bad argument or flag '%s'; contains invalid characters",
-					rule.Name)
-			}
-		}
-
-		if !rule.HasFlag(IsArgument) {
-			continue
-		}
-		// If we already found a greedy rule, no other argument should follow
-		if greedyRule != nil {
-			return errors.Errorf("'%s' is ambiguous when following greedy argument '%s'",
-				rule.Name, greedyRule.Name)
-		}
-		// Check for ambiguous greedy arguments
-		if rule.HasFlag(IsGreedy) {
-			if greedyRule == nil {
-				greedyRule = rule
-			}
-		}
-	}
-	return nil
-}
-
 func (self *Parser) InGroup(group string) *RuleModifier {
 	return NewRuleModifier(self).InGroup(group)
 }
@@ -267,8 +201,6 @@ func (self *Parser) AddCommand(name string, cmdFunc CommandFunc) *RuleModifier {
 
 func (self *Parser) addRule(name string, modifier *RuleModifier) *RuleModifier {
 	rule := modifier.GetRule()
-	// Apply the Environment Prefix to all new rules
-	rule.EnvPrefix = self.envPrefix
 	// Add to the aliases we can match on the command line and return the name of the alias added
 	rule.Name = rule.AddAlias(name, self.prefixChars)
 	// Append the rule our list of rules
@@ -425,7 +357,7 @@ func (self *Parser) parseUntil(terminator string) (*Options, error) {
 		return empty, errors.New("Must create some options to match with before calling arg.Parse()")
 	}
 
-	if err := self.validateRules(); err != nil {
+	if err := self.rules.ValidateRules(); err != nil {
 		return empty, err
 	}
 

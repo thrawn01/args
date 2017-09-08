@@ -2,53 +2,51 @@ package args
 
 import "reflect"
 
-type RuleModifier struct {
+type PosRuleModifier struct {
 	rule   *Rule
-	parser *Parser
+	parser *PosParser
 }
 
-func NewRuleModifier(parser *Parser) *RuleModifier {
-	return &RuleModifier{newRule(), parser}
+// TODO: Delete
+func NewPosRuleModifier(parser *PosParser) *PosRuleModifier {
+	return &PosRuleModifier{newRule(), parser}
 }
 
-func newRuleModifier(rule *Rule, parser *Parser) *RuleModifier {
-	return &RuleModifier{rule, parser}
+// TODO: Delete
+func newPosRuleModifier(rule *Rule, parser *PosParser) *PosRuleModifier {
+	return &PosRuleModifier{rule, parser}
 }
 
-func (self *RuleModifier) GetRule() *Rule {
+func (self *PosRuleModifier) GetRule() *Rule {
 	return self.rule
 }
 
-func (self *RuleModifier) IsString() *RuleModifier {
+func (self *PosRuleModifier) IsString() *PosRuleModifier {
 	self.rule.SetFlag(IsExpectingValue)
 	self.rule.Cast = castString
 	return self
 }
 
 // If the option is seen on the command line, the value is 'true'
-func (self *RuleModifier) IsTrue() *RuleModifier {
+func (self *PosRuleModifier) IsTrue() *PosRuleModifier {
 	self.rule.ClearFlag(IsExpectingValue)
-	self.rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
-		rule.Value = true
-		return nil
-	}
 	self.rule.Cast = castBool
 	return self
 }
 
-func (self *RuleModifier) IsBool() *RuleModifier {
+func (self *PosRuleModifier) IsBool() *PosRuleModifier {
 	self.rule.SetFlag(IsExpectingValue)
 	self.rule.Cast = castBool
 	self.rule.Value = false
 	return self
 }
 
-func (self *RuleModifier) Default(value string) *RuleModifier {
+func (self *PosRuleModifier) Default(value string) *PosRuleModifier {
 	self.rule.Default = &value
 	return self
 }
 
-func (self *RuleModifier) StoreInt(dest *int) *RuleModifier {
+func (self *PosRuleModifier) StoreInt(dest *int) *PosRuleModifier {
 	// Implies IsInt()
 	self.rule.SetFlag(IsExpectingValue)
 	self.rule.Cast = castInt
@@ -58,17 +56,13 @@ func (self *RuleModifier) StoreInt(dest *int) *RuleModifier {
 	return self
 }
 
-func (self *RuleModifier) IsInt() *RuleModifier {
+func (self *PosRuleModifier) IsInt() *PosRuleModifier {
 	self.rule.SetFlag(IsExpectingValue)
 	self.rule.Cast = castInt
 	return self
 }
 
-func (self *RuleModifier) StoreTrue(dest *bool) *RuleModifier {
-	self.rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
-		rule.Value = true
-		return nil
-	}
+func (self *PosRuleModifier) StoreTrue(dest *bool) *PosRuleModifier {
 	self.rule.ClearFlag(IsExpectingValue)
 	self.rule.Cast = castBool
 	self.rule.StoreValue = func(value interface{}) {
@@ -77,14 +71,14 @@ func (self *RuleModifier) StoreTrue(dest *bool) *RuleModifier {
 	return self
 }
 
-func (self *RuleModifier) IsStringSlice() *RuleModifier {
+func (self *PosRuleModifier) IsStringSlice() *PosRuleModifier {
 	self.rule.SetFlag(IsExpectingValue)
 	self.rule.Cast = castStringSlice
 	self.rule.SetFlag(IsGreedy)
 	return self
 }
 
-func (self *RuleModifier) IsStringMap() *RuleModifier {
+func (self *PosRuleModifier) IsStringMap() *PosRuleModifier {
 	self.rule.SetFlag(IsExpectingValue)
 	self.rule.Cast = castStringMap
 	self.rule.SetFlag(IsGreedy)
@@ -93,7 +87,7 @@ func (self *RuleModifier) IsStringMap() *RuleModifier {
 
 // TODO: Make this less horribad, and use more reflection to make the interface simpler
 // It should also take more than just []string but also []int... etc...
-func (self *RuleModifier) StoreStringSlice(dest *[]string) *RuleModifier {
+func (self *PosRuleModifier) StoreStringSlice(dest *[]string) *PosRuleModifier {
 	self.rule.SetFlag(IsExpectingValue)
 	self.rule.Cast = castStringSlice
 	self.rule.StoreValue = func(src interface{}) {
@@ -111,7 +105,7 @@ func (self *RuleModifier) StoreStringSlice(dest *[]string) *RuleModifier {
 	return self
 }
 
-func (self *RuleModifier) StoreStringMap(dest *map[string]string) *RuleModifier {
+func (self *PosRuleModifier) StoreStringMap(dest *map[string]string) *PosRuleModifier {
 	self.rule.SetFlag(IsExpectingValue)
 	self.rule.Cast = castStringMap
 	self.rule.StoreValue = func(src interface{}) {
@@ -123,35 +117,35 @@ func (self *RuleModifier) StoreStringMap(dest *map[string]string) *RuleModifier 
 }
 
 // Indicates this option has an alias it can go by
-func (self *RuleModifier) Alias(name string) *RuleModifier {
+func (self *PosRuleModifier) Alias(name string) *PosRuleModifier {
 	self.rule.AddAlias(name, self.parser.prefixChars)
 	return self
 }
 
 // Add the abbreviated version of the option (-a, -b, -c, etc...)
-func (self *RuleModifier) Short(name string) *RuleModifier {
+func (self *PosRuleModifier) Short(name string) *PosRuleModifier {
 	self.rule.AddAlias(name, []string{"-"})
 	return self
 }
 
 // Makes this option or positional argument required
-func (self *RuleModifier) Required() *RuleModifier {
+func (self *PosRuleModifier) Required() *PosRuleModifier {
 	self.rule.SetFlag(IsRequired)
 	return self
 }
 
 // Value of this option can only be one of the provided choices; Required() is implied
-func (self *RuleModifier) Choices(choices []string) *RuleModifier {
+func (self *PosRuleModifier) Choices(choices []string) *PosRuleModifier {
 	self.rule.SetFlag(IsRequired)
 	self.rule.Choices = choices
 	return self
 }
 
-func (self *RuleModifier) StoreStr(dest *string) *RuleModifier {
+func (self *PosRuleModifier) StoreStr(dest *string) *PosRuleModifier {
 	return self.StoreString(dest)
 }
 
-func (self *RuleModifier) StoreString(dest *string) *RuleModifier {
+func (self *PosRuleModifier) StoreString(dest *string) *PosRuleModifier {
 	self.rule.SetFlag(IsExpectingValue)
 	// Implies IsString()
 	self.rule.Cast = castString
@@ -161,53 +155,50 @@ func (self *RuleModifier) StoreString(dest *string) *RuleModifier {
 	return self
 }
 
-func (self *RuleModifier) Count() *RuleModifier {
+func (self *PosRuleModifier) Count() *PosRuleModifier {
 	self.rule.ClearFlag(IsExpectingValue)
-	self.rule.Action = func(rule *Rule, alias string, args []string, idx *int) error {
-		// If user asked us to count the instances of this argument
-		rule.Count = rule.Count + 1
-		return nil
-	}
+	self.rule.SetFlag(IsCountFlag)
 	self.rule.Cast = castInt
 	return self
 }
 
-func (self *RuleModifier) Env(varName string) *RuleModifier {
+func (self *PosRuleModifier) Env(varName string) *PosRuleModifier {
 	//self.rule.EnvVars = append(self.rule.EnvVars, self.parser.envPrefix+varName)
 	return self
 }
 
-func (self *RuleModifier) Help(message string) *RuleModifier {
+func (self *PosRuleModifier) Help(message string) *PosRuleModifier {
 	self.rule.RuleDesc = message
 	return self
 }
 
-func (self *RuleModifier) InGroup(group string) *RuleModifier {
+func (self *PosRuleModifier) InGroup(group string) *PosRuleModifier {
 	self.rule.Group = group
 	return self
 }
 
-func (self *RuleModifier) AddConfigGroup(group string) *RuleModifier {
+// TODO: Add support for groups
+/*func (self *PosRuleModifier) AddConfigGroup(group string) *PosRuleModifier {
 	var newRule Rule
 	newRule = *self.rule
 	newRule.SetFlag(IsConfigGroup)
 	newRule.Group = group
-	// Make a new RuleModifier using self as the template
-	return self.parser.addRule(group, newRuleModifier(&newRule, self.parser))
+	// Make a new PosRuleModifier using self as the template
+	return self.parser.addRule(group, newPosRuleModifier(&newRule, self.parser))
 }
 
-func (self *RuleModifier) AddFlag(name string) *RuleModifier {
+func (self *PosRuleModifier) AddFlag(name string) *PosRuleModifier {
 	var newRule Rule
 	newRule = *self.rule
 	newRule.SetFlag(IsFlag)
-	// Make a new RuleModifier using self as the template
-	return self.parser.addRule(name, newRuleModifier(&newRule, self.parser))
+	// Make a new PosRuleModifier using self as the template
+	return self.parser.addRule(name, newPosRuleModifier(&newRule, self.parser))
 }
 
-func (self *RuleModifier) AddConfig(name string) *RuleModifier {
+func (self *PosRuleModifier) AddConfig(name string) *PosRuleModifier {
 	var newRule Rule
 	newRule = *self.rule
 	// Make a new Rule using self.rule as the template
 	newRule.SetFlag(IsConfig)
-	return self.parser.addRule(name, newRuleModifier(&newRule, self.parser))
-}
+	return self.parser.addRule(name, newPosRuleModifier(&newRule, self.parser))
+}*/
