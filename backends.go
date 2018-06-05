@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const MAX_BACKOFF_WAIT = 2 * time.Second
+const maxBackOffWait = 2 * time.Second
 
 // A ChangeEvent is a representation of an key=value update, delete or expire. Args attempts to match
 // a rule to the change and includes the matched rule in the ChangeEvent. If args is unable to match
@@ -67,28 +67,28 @@ type Backend interface {
 	Close()
 }
 
-func (self *Parser) FromBackend(backend Backend) (*Options, error) {
+func (p *Parser) FromBackend(backend Backend) (*Options, error) {
 
-	options, err := self.ParseBackend(backend)
+	options, err := p.ParseBackend(backend)
 	if err != nil {
 		return options, err
 	}
 	// Apply the etcd values to the commandline and environment variables
-	return self.Apply(options)
+	return p.Apply(options)
 }
 
-func (self *Parser) ParseBackend(backend Backend) (*Options, error) {
-	values := self.NewOptions()
+func (p *Parser) ParseBackend(backend Backend) (*Options, error) {
+	values := p.NewOptions()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer func() { cancel() }()
 	//
-	for _, rule := range self.rules {
+	for _, rule := range p.rules {
 		key := rule.BackendKey()
 		if rule.HasFlag(IsConfigGroup) {
 			pairs, err := backend.List(ctx, key)
 			if err != nil {
-				self.info("args.ParseBackend(): Failed to list '%s' - '%s'", key.Group, err.Error())
+				p.info("args.ParseBackend(): Failed to list '%s' - '%s'", key.Group, err.Error())
 				continue
 			}
 			// Iterate through all the key=values pairs for this group
@@ -100,7 +100,7 @@ func (self *Parser) ParseBackend(backend Backend) (*Options, error) {
 		pair, err := backend.Get(ctx, key)
 		if err != nil {
 			// This can be a normal occurrence, and probably shouldn't be logged
-			//self.info("args.ParseBackend(): Failed to fetch key '%s' - %s", key.Name, err.Error())
+			//p.info("args.ParseBackend(): Failed to fetch key '%s' - %s", key.Name, err.Error())
 			continue
 		}
 		values.Group(pair.Key.Group).Set(pair.Key.Name, pair.Value)
@@ -108,7 +108,7 @@ func (self *Parser) ParseBackend(backend Backend) (*Options, error) {
 	return values, nil
 }
 
-func (self *Parser) Watch(backend Backend, callBack func(ChangeEvent, error)) WatchCancelFunc {
+func (p *Parser) Watch(backend Backend, callBack func(ChangeEvent, error)) WatchCancelFunc {
 	var isRunning sync.WaitGroup
 	var once sync.Once
 	done := make(chan struct{})
@@ -137,7 +137,7 @@ func (self *Parser) Watch(backend Backend, callBack func(ChangeEvent, error)) Wa
 					}
 
 					// find the rule this key is for
-					rule := self.findRule(event.Key)
+					rule := p.findRule(event.Key)
 					if rule != nil {
 						event.Rule = rule
 					}
@@ -151,7 +151,7 @@ func (self *Parser) Watch(backend Backend, callBack func(ChangeEvent, error)) Wa
 		Retry:
 			// Cancel our current context and sleep
 			cancel()
-			self.sleep()
+			p.sleep()
 		}
 	}()
 
@@ -165,8 +165,8 @@ func (self *Parser) Watch(backend Backend, callBack func(ChangeEvent, error)) Wa
 	}
 }
 
-func (self *Parser) findRule(key Key) *Rule {
-	for _, rule := range self.rules {
+func (p *Parser) findRule(key Key) *Rule {
+	for _, rule := range p.rules {
 		if rule.HasFlag(IsConfigGroup) {
 			if rule.Group == key.Group {
 				return rule
@@ -180,12 +180,12 @@ func (self *Parser) findRule(key Key) *Rule {
 	return nil
 }
 
-func (self *Parser) sleep() {
-	self.attempts = self.attempts + 1
-	delay := time.Duration(self.attempts) * 2 * time.Millisecond
-	if delay > MAX_BACKOFF_WAIT {
-		delay = MAX_BACKOFF_WAIT
+func (p *Parser) sleep() {
+	p.attempts = p.attempts + 1
+	delay := time.Duration(p.attempts) * 2 * time.Millisecond
+	if delay > maxBackOffWait {
+		delay = maxBackOffWait
 	}
-	self.log.Printf("Backend Retry in %v ...", delay)
+	p.log.Printf("Backend Retry in %v ...", delay)
 	time.Sleep(delay)
 }

@@ -63,9 +63,9 @@ func NewParser() *Parser {
 
 // Takes the current parser and return a new parser
 // appropriate for use within a command function
-func (self *Parser) SubParser() *Parser {
+func (p *Parser) SubParser() *Parser {
 	parser := NewParser()
-	src := structs.New(self)
+	src := structs.New(p)
 	dest := structs.New(parser)
 
 	// Copy all the public values
@@ -75,12 +75,12 @@ func (self *Parser) SubParser() *Parser {
 		}
 	}
 
-	parser.addHelp = self.addHelp
-	parser.options = self.options
-	parser.rules = self.rules
-	parser.args = self.args
-	parser.parent = self
-	parser.log = self.log
+	parser.addHelp = p.addHelp
+	parser.options = p.options
+	parser.rules = p.rules
+	parser.args = p.args
+	parser.parent = p
+	parser.log = p.log
 
 	// Remove all Commands from our rules
 	for i := len(parser.rules) - 1; i >= 0; i-- {
@@ -94,87 +94,87 @@ func (self *Parser) SubParser() *Parser {
 	return parser
 }
 
-func (self *Parser) Log(logger StdLogger) {
-	self.log = logger
+func (p *Parser) Log(logger StdLogger) {
+	p.log = logger
 }
 
-func (self *Parser) Name(value string) *Parser {
-	self.name = value
-	return self
+func (p *Parser) Name(value string) *Parser {
+	p.name = value
+	return p
 }
 
-func (self *Parser) Desc(value string, flags ...ParseFlag) *Parser {
-	self.description = value
+func (p *Parser) Desc(value string, flags ...ParseFlag) *Parser {
+	p.description = value
 	for _, flag := range flags {
-		setFlags(&self.flags, flag)
+		setFlags(&p.flags, flag)
 	}
-	return self
+	return p
 }
 
-func (self *Parser) WordWrap(value int) *Parser {
-	self.wordWrapLen = value
-	return self
+func (p *Parser) WordWrap(value int) *Parser {
+	p.wordWrapLen = value
+	return p
 }
 
-func (self *Parser) EnvPrefix(value string) *Parser {
-	self.envPrefix = value
-	return self
+func (p *Parser) EnvPrefix(value string) *Parser {
+	p.envPrefix = value
+	return p
 }
 
-func (self *Parser) AddHelp(value bool) *Parser {
-	self.addHelp = value
-	return self
+func (p *Parser) AddHelp(value bool) *Parser {
+	p.addHelp = value
+	return p
 }
 
-func (self *Parser) Epilog(value string) *Parser {
-	self.epilog = value
-	return self
+func (p *Parser) Epilog(value string) *Parser {
+	p.epilog = value
+	return p
 }
 
-func (self *Parser) Usage(value string) *Parser {
-	self.usage = value
-	return self
+func (p *Parser) Usage(value string) *Parser {
+	p.usage = value
+	return p
 }
 
-func (self *Parser) PrefixChars(values []string) *Parser {
+func (p *Parser) PrefixChars(values []string) *Parser {
 
 	for _, prefix := range values {
 		if len(prefix) == 0 {
-			self.err = errors.New("invalid PrefixChars() prefix cannot be empty")
-			return self
+			p.err = errors.New("invalid PrefixChars() prefix cannot be empty")
+			return p
 		}
 		if regexInValidPrefixChars.MatchString(prefix) {
-			self.err = fmt.Errorf("invalid PrefixChars() '%s';"+
+			p.err = fmt.Errorf("invalid PrefixChars() '%s';"+
 				" alpha, underscore and whitespace not allowed", prefix)
 		}
 	}
-	self.prefixChars = values
-	return self
+	p.prefixChars = values
+	return p
 }
 
-func (self *Parser) SetHelpIO(file *os.File) {
-	self.helpIO = file
+func (p *Parser) SetHelpIO(file *os.File) {
+	p.helpIO = file
 }
 
-func (self *Parser) info(format string, args ...interface{}) {
-	if self.log != nil {
-		self.log.Printf(format, args...)
+func (p *Parser) info(format string, args ...interface{}) {
+	if p.log != nil {
+		p.log.Printf(format, args...)
 	}
 }
 
-func (self *Parser) validateRules() error {
+func (p *Parser) validateRules() error {
 	var greedyRule *Rule
-	for idx, rule := range self.rules {
+	for idx, rule := range p.rules {
 		// Duplicate rule check
 		next := idx + 1
-		if next < len(self.rules) {
-			for ; next < len(self.rules); next++ {
+		if next < len(p.rules) {
+			for ; next < len(p.rules); next++ {
 				// If the name and groups are the same
-				if rule.Name == self.rules[next].Name && rule.Group == self.rules[next].Group {
+				if rule.Name == p.rules[next].Name && rule.Group == p.rules[next].Group {
 					return errors.Errorf("Duplicate argument or flag '%s' defined", rule.Name)
 				}
 				// If the alias is a duplicate
-				for _, alias := range self.rules[next].Aliases {
+				for _, alias := range p.rules[next].Aliases {
 					var duplicate string
 
 					// if rule.Aliases contains 'alias'
@@ -185,10 +185,10 @@ func (self *Parser) validateRules() error {
 					}
 					if len(duplicate) != 0 {
 						return errors.Errorf("Duplicate alias '%s' for '%s' redefined by '%s'",
-							duplicate, rule.Name, self.rules[next].Name)
+							duplicate, rule.Name, p.rules[next].Name)
 					}
 				}
-				if rule.Name == self.rules[next].Name && rule.Group == self.rules[next].Group {
+				if rule.Name == p.rules[next].Name && rule.Group == p.rules[next].Group {
 					return errors.Errorf("Duplicate argument or flag '%s' defined", rule.Name)
 				}
 			}
@@ -226,35 +226,35 @@ func (self *Parser) validateRules() error {
 	return nil
 }
 
-func (self *Parser) InGroup(group string) *RuleModifier {
-	return NewRuleModifier(self).InGroup(group)
+func (p *Parser) InGroup(group string) *RuleModifier {
+	return NewRuleModifier(p).InGroup(group)
 }
 
-func (self *Parser) AddConfigGroup(group string) *RuleModifier {
-	return NewRuleModifier(self).AddConfigGroup(group)
+func (p *Parser) AddConfigGroup(group string) *RuleModifier {
+	return NewRuleModifier(p).AddConfigGroup(group)
 }
 
-func (self *Parser) AddFlag(name string) *RuleModifier {
+func (p *Parser) AddFlag(name string) *RuleModifier {
 	rule := newRule()
 	rule.SetFlag(IsFlag)
-	return self.addRule(name, newRuleModifier(rule, self))
+	return p.addRule(name, newRuleModifier(rule, p))
 }
 
-func (self *Parser) AddConfig(name string) *RuleModifier {
+func (p *Parser) AddConfig(name string) *RuleModifier {
 	rule := newRule()
 	rule.SetFlag(IsConfig)
-	return self.addRule(name, newRuleModifier(rule, self))
+	return p.addRule(name, newRuleModifier(rule, p))
 }
 
-func (self *Parser) AddArgument(name string) *RuleModifier {
+func (p *Parser) AddArgument(name string) *RuleModifier {
 	rule := newRule()
-	self.posCount++
-	rule.Order = self.posCount
+	p.posCount++
+	rule.Order = p.posCount
 	rule.SetFlag(IsArgument)
-	return self.addRule(name, newRuleModifier(rule, self))
+	return p.addRule(name, newRuleModifier(rule, p))
 }
 
-func (self *Parser) AddCommand(name string, cmdFunc CommandFunc) *RuleModifier {
+func (p *Parser) AddCommand(name string, cmdFunc CommandFunc) *RuleModifier {
 	rule := newRule()
 	rule.SetFlag(IsCommand)
 	rule.CommandFunc = cmdFunc
@@ -262,24 +262,24 @@ func (self *Parser) AddCommand(name string, cmdFunc CommandFunc) *RuleModifier {
 		return nil
 	}
 	// Make a new RuleModifier using self as the template
-	return self.addRule(name, newRuleModifier(rule, self))
+	return p.addRule(name, newRuleModifier(rule, p))
 }
 
-func (self *Parser) addRule(name string, modifier *RuleModifier) *RuleModifier {
+func (p *Parser) addRule(name string, modifier *RuleModifier) *RuleModifier {
 	rule := modifier.GetRule()
 	// Apply the Environment Prefix to all new rules
-	rule.EnvPrefix = self.envPrefix
+	rule.EnvPrefix = p.envPrefix
 	// Add to the aliases we can match on the command line and return the name of the alias added
-	rule.Name = rule.AddAlias(name, self.prefixChars)
+	rule.Name = rule.AddAlias(name, p.prefixChars)
 	// Append the rule our list of rules
-	self.rules = append(self.rules, rule)
+	p.rules = append(p.rules, rule)
 	return modifier
 }
 
 // Returns the current list of rules for this parser. If you want to modify a rule
 // use GetRule() instead.
-func (self *Parser) GetRules() Rules {
-	return self.rules
+func (p *Parser) GetRules() Rules {
+	return p.rules
 }
 
 // Allow the user to modify an existing parser rule
@@ -292,18 +292,18 @@ func (self *Parser) GetRules() Rules {
 //		parser.ModifyRule("endpoint").SetDefault("localhost:19091")
 //		opts = parser.ParseSimple(nil)
 //	}
-func (self *Parser) ModifyRule(name string) *RuleModifier {
-	for _, rule := range self.rules {
+func (p *Parser) ModifyRule(name string) *RuleModifier {
+	for _, rule := range p.rules {
 		if rule.Name == name {
-			return newRuleModifier(rule, self)
+			return newRuleModifier(rule, p)
 		}
 	}
 	return nil
 }
 
 // Allow the user to inspect a parser rule
-func (self *Parser) GetRule(name string) *Rule {
-	for _, rule := range self.rules {
+func (p *Parser) GetRule(name string) *Rule {
+	for _, rule := range p.rules {
 		if rule.Name == name {
 			return rule
 		}
@@ -311,8 +311,8 @@ func (self *Parser) GetRule(name string) *Rule {
 	return nil
 }
 
-func (self *Parser) ParseAndRun(args []string, data interface{}) (int, error) {
-	opts, err := self.Parse(args)
+func (p *Parser) ParseAndRun(args []string, data interface{}) (int, error) {
+	opts, err := p.Parse(args)
 
 	// NOTE: Always check for help before handling errors, the user should always
 	// be able ask for help regardless of validation or parse errors
@@ -321,7 +321,7 @@ func (self *Parser) ParseAndRun(args []string, data interface{}) (int, error) {
 	// If user asked for help without specifying a command
 	// print the root parsers help and exit
 	if opts.Bool("help") && len(opts.SubCommands()) == 0 {
-		self.PrintHelp()
+		p.PrintHelp()
 		return 0, nil
 	}
 
@@ -330,20 +330,20 @@ func (self *Parser) ParseAndRun(args []string, data interface{}) (int, error) {
 		return 1, err
 	}
 
-	return self.RunCommand(data)
+	return p.RunCommand(data)
 }
 
 // Run the command chosen via the command line, err != nil
 // if no command was found on the commandline
-func (self *Parser) RunCommand(data interface{}) (int, error) {
+func (p *Parser) RunCommand(data interface{}) (int, error) {
 	// If user didn't provide a command via the commandline
-	if self.command == nil {
-		self.PrintHelp()
+	if p.command == nil {
+		p.PrintHelp()
 		return 1, nil
 	}
 
-	parser := self.SubParser()
-	retCode, err := self.command.CommandFunc(parser, data)
+	parser := p.SubParser()
+	retCode, err := p.command.CommandFunc(parser, data)
 	return retCode, err
 }
 
@@ -354,13 +354,13 @@ func (self *Parser) RunCommand(data interface{}) (int, error) {
 //	if opts != nil {
 //		return 0, nil
 //	}
-func (self *Parser) ParseSimple(args []string) *Options {
-	opts, err := self.Parse(args)
+func (p *Parser) ParseSimple(args []string) *Options {
+	opts, err := p.Parse(args)
 
 	// If user asked for help without specifying a command
 	// print the root parsers help and exit
 	if opts.Bool("help") && len(opts.SubCommands()) == 0 {
-		self.PrintHelp()
+		p.PrintHelp()
 		return nil
 	}
 	// Print errors to stderr and include our help message
@@ -372,12 +372,12 @@ func (self *Parser) ParseSimple(args []string) *Options {
 }
 
 // Parse the commandline, but also print help and exit if the user asked for --help
-func (self *Parser) ParseOrExit(args []string) *Options {
-	opt, err := self.Parse(args)
+func (p *Parser) ParseOrExit(args []string) *Options {
+	opt, err := p.Parse(args)
 
 	// We could have a non critical error, in addition to the user asking for help
 	if opt != nil && opt.Bool("help") {
-		self.PrintHelp()
+		p.PrintHelp()
 		os.Exit(0)
 	}
 	// Print errors to stderr and include our help message
@@ -389,26 +389,26 @@ func (self *Parser) ParseOrExit(args []string) *Options {
 }
 
 // Parses command line arguments using os.Args if 'args' is nil
-func (self *Parser) Parse(args []string) (*Options, error) {
+func (p *Parser) Parse(args []string) (*Options, error) {
 	if args != nil {
 		// Make a copy of the args we are parsing
-		self.args = copyStringSlice(args)
-	} else if args == nil && self.parent == nil {
+		p.args = copyStringSlice(args)
+	} else if args == nil && p.parent == nil {
 		// If args is nil and we are not a sub parser
-		self.args = copyStringSlice(os.Args[1:])
+		p.args = copyStringSlice(os.Args[1:])
 	}
 
 	// If the user asked us to add 'help' flag and 'help' is not already defined by the user
-	if self.addHelp && !self.HasHelpFlag() {
+	if p.addHelp && !p.HasHelpFlag() {
 		// Add help flag if --help or -h are not already taken by other options
-		self.AddFlag("--help").Alias("-h").IsTrue().Help("Display this help message and exit")
+		p.AddFlag("--help").Alias("-h").IsTrue().Help("Display this help message and exit")
 	}
-	return self.parseUntil("--")
+	return p.parseUntil("--")
 }
 
 // Return true if the parser has the 'help' flag defined
-func (self *Parser) HasHelpFlag() bool {
-	for _, rule := range self.rules {
+func (p *Parser) HasHelpFlag() bool {
+	for _, rule := range p.rules {
 		if rule.Name == "help" {
 			return true
 		}
@@ -416,34 +416,34 @@ func (self *Parser) HasHelpFlag() bool {
 	return false
 }
 
-func (self *Parser) parseUntil(terminator string) (*Options, error) {
-	self.idx = 0
-	empty := self.NewOptions()
+func (p *Parser) parseUntil(terminator string) (*Options, error) {
+	p.idx = 0
+	empty := p.NewOptions()
 
 	// Sanity Check
-	if len(self.rules) == 0 {
+	if len(p.rules) == 0 {
 		return empty, errors.New("Must create some options to match with before calling arg.Parse()")
 	}
 
-	if err := self.validateRules(); err != nil {
+	if err := p.validateRules(); err != nil {
 		return empty, err
 	}
 
 	// Sort the rules so positional rules are parsed last
-	sort.Sort(self.rules)
+	sort.Sort(p.rules)
 
 	// Process command line arguments until we find our terminator
-	for ; self.idx < len(self.args); self.idx++ {
+	for ; p.idx < len(p.args); p.idx++ {
 
-		if self.args[self.idx] == terminator {
+		if p.args[p.idx] == terminator {
 			goto Apply
 		}
 		// Match our arguments with rules expected
-		//fmt.Printf("====== Attempting to match: %d:%s - ", self.idx, self.args[self.idx])
+		//fmt.Printf("====== Attempting to match: %d:%s - ", p.idx, p.args[p.idx])
 
 		// Some options have arguments, this is the idx of the option if it matches
-		startIdx := self.idx
-		rule, err := self.matchRules(self.rules)
+		startIdx := p.idx
+		rule, err := p.matchRules(p.rules)
 		if err != nil {
 			// errors here are cast and expected argument errors;
 			// users should never expect *Options to be nil
@@ -458,43 +458,43 @@ func (self *Parser) parseUntil(terminator string) (*Options, error) {
 		// Remove the argument so a sub parser won't parse it again, this avoids confusing behavior
 		// for sub parsers. IE: [prog -o option sub-command -o option] the first -o will not
 		// be confused with the second -o since we remove it from args here
-		self.args = append(self.args[:startIdx], self.args[self.idx+1:]...)
-		self.idx += startIdx - (self.idx + 1)
+		p.args = append(p.args[:startIdx], p.args[p.idx+1:]...)
+		p.idx += startIdx - (p.idx + 1)
 
 		// If we matched a command
 		if rule.HasFlag(IsCommand) {
 			// If we already found a command token on the commandline
-			if self.command != nil {
+			if p.command != nil {
 				// Ignore this match, it must be a sub command or a positional argument
 				rule.ClearFlag(WasSeenInArgv)
 			}
-			self.command = rule
+			p.command = rule
 			// If user asked us to stop parsing arguments after finding a command
 			// This might be useful if the user wants arguments found before the command
 			// to apply only to the parent processor
-			if self.stopParsingOnCommand {
+			if p.stopParsingOnCommand {
 				goto Apply
 			}
 		}
 	}
 Apply:
-	opts, err := self.Apply(nil)
+	opts, err := p.Apply(nil)
 	// TODO: Wrap post parsing validation stuff into a method
 	// TODO: This should include the isRequired check
-	// return self.PostValidation(self.Apply(nil))
+	// return p.PostValidation(p.Apply(nil))
 	return opts, err
 }
 
 // Gather all the values from our rules, then apply the passed in options to any rules that don't have a computed value.
-func (self *Parser) Apply(values *Options) (*Options, error) {
-	results := self.NewOptions()
+func (p *Parser) Apply(values *Options) (*Options, error) {
+	results := p.NewOptions()
 
 	// for each of the rules
-	for _, rule := range self.rules {
+	for _, rule := range p.rules {
 		// Get the computed value
 		value, err := rule.ComputedValue(values)
 		if err != nil {
-			self.err = err
+			p.err = err
 			continue
 		}
 
@@ -524,19 +524,19 @@ func (self *Parser) Apply(values *Options) (*Options, error) {
 		}
 	}
 
-	self.setOpts(results)
-	return self.GetOpts(), self.err
+	p.setOpts(results)
+	return p.GetOpts(), p.err
 }
 
 // Return the parent parser if there is one, else return nil
-func (self *Parser) Parent() *Parser {
-	return self.parent
+func (p *Parser) Parent() *Parser {
+	return p.parent
 }
 
 // Build a list of parent parsers for this sub parser, return empty list if this parser is the root parser
-func (self *Parser) Parents() []*Parser {
+func (p *Parser) Parents() []*Parser {
 	result := make([]*Parser, 0)
-	findSubParsers(self, &result)
+	findSubParsers(p, &result)
 	return result
 }
 
@@ -549,20 +549,20 @@ func findSubParsers(parser *Parser, result *[]*Parser) {
 	findSubParsers(parser.parent, result)
 }
 
-func (self *Parser) setOpts(options *Options) {
-	commands := self.SubCommands()
+func (p *Parser) setOpts(options *Options) {
+	commands := p.SubCommands()
 	options.SetSubCommands(commands)
 
-	self.mutex.Lock()
-	self.options = options
-	self.mutex.Unlock()
+	p.mutex.Lock()
+	p.options = options
+	p.mutex.Unlock()
 }
 
 // Build a list of sub commands that the user provided to reach this sub parser;
 // return an empty list if this parser has no sub commands associated with it
-func (self *Parser) SubCommands() []string {
+func (p *Parser) SubCommands() []string {
 	var results []string
-	for _, parser := range self.Parents() {
+	for _, parser := range p.Parents() {
 		if parser.command == nil {
 			return results
 		}
@@ -572,24 +572,24 @@ func (self *Parser) SubCommands() []string {
 	return results
 }
 
-func (self *Parser) GetOpts() *Options {
-	self.mutex.Lock()
+func (p *Parser) GetOpts() *Options {
+	p.mutex.Lock()
 	defer func() {
-		self.mutex.Unlock()
+		p.mutex.Unlock()
 	}()
-	return self.options
+	return p.options
 }
 
 // Return the un-parsed portion of the argument array. These are arguments that where not
 // matched by any AddOption() or AddArgument() rules defined by the user.
-func (self *Parser) GetArgs() []string {
-	return copyStringSlice(self.args)
+func (p *Parser) GetArgs() []string {
+	return copyStringSlice(p.args)
 }
 
-func (self *Parser) matchRules(rules Rules) (*Rule, error) {
+func (p *Parser) matchRules(rules Rules) (*Rule, error) {
 	// Find a Rule that matches this argument
 	for _, rule := range rules {
-		matched, err := rule.Match(self.args, &self.idx)
+		matched, err := rule.Match(p.args, &p.idx)
 		// If no rule was matched
 		if !matched {
 			continue
@@ -600,64 +600,64 @@ func (self *Parser) matchRules(rules Rules) (*Rule, error) {
 	return nil, nil
 }
 
-func (self *Parser) PrintRules() {
-	for _, rule := range self.rules {
+func (p *Parser) PrintRules() {
+	for _, rule := range p.rules {
 		fmt.Printf("Rule: %s - '%+v'\n", rule.Name, rule)
 	}
 }
 
-func (self *Parser) PrintHelp() {
-	fmt.Fprintln(self.helpIO, self.GenerateHelp())
+func (p *Parser) PrintHelp() {
+	fmt.Fprintln(p.helpIO, p.GenerateHelp())
 }
 
-func (self *Parser) GenerateHelp() string {
+func (p *Parser) GenerateHelp() string {
 	var result bytes.Buffer
 	// TODO: Improve this once we have arguments
 	// Super generic usage message
-	if self.usage != "" {
-		result.WriteString(fmt.Sprintf("Usage: %s\n", self.usage))
+	if p.usage != "" {
+		result.WriteString(fmt.Sprintf("Usage: %s\n", p.usage))
 	} else {
-		result.WriteString(fmt.Sprintf("Usage: %s %s %s\n", self.name,
-			self.generateUsage(IsFlag),
-			self.generateUsage(IsArgument)))
+		result.WriteString(fmt.Sprintf("Usage: %s %s %s\n", p.name,
+			p.generateUsage(IsFlag),
+			p.generateUsage(IsArgument)))
 	}
 
-	if self.description != "" {
+	if p.description != "" {
 		result.WriteString("\n")
 
-		if hasFlags(self.flags, IsFormatted) {
-			result.WriteString(self.description)
+		if hasFlags(p.flags, IsFormatted) {
+			result.WriteString(p.description)
 		} else {
-			result.WriteString(WordWrap(self.description, 0, 80))
+			result.WriteString(WordWrap(p.description, 0, 80))
 		}
 		result.WriteString("\n")
 	}
 
-	commands := self.generateHelpSection(IsCommand)
+	commands := p.generateHelpSection(IsCommand)
 	if commands != "" {
 		result.WriteString("\nCommands:\n")
 		result.WriteString(commands)
 	}
 
-	argument := self.generateHelpSection(IsArgument)
+	argument := p.generateHelpSection(IsArgument)
 	if argument != "" {
 		result.WriteString("\nArguments:\n")
 		result.WriteString(argument)
 	}
 
-	options := self.generateHelpSection(IsFlag)
+	options := p.generateHelpSection(IsFlag)
 	if options != "" {
 		result.WriteString("\nOptions:\n")
 		result.WriteString(options)
 	}
 
-	if self.epilog != "" {
-		result.WriteString(self.epilog)
+	if p.epilog != "" {
+		result.WriteString(p.epilog)
 	}
 	return result.String()
 }
 
-func (self *Parser) generateUsage(flags RuleFlag) string {
+func (p *Parser) generateUsage(flags RuleFlag) string {
 	var result bytes.Buffer
 
 	// TODO: Should only return [OPTIONS] if there are too many options to display on a single line
@@ -665,7 +665,7 @@ func (self *Parser) generateUsage(flags RuleFlag) string {
 		return "[OPTIONS]"
 	}
 
-	for _, rule := range self.rules {
+	for _, rule := range p.rules {
 		if !rule.HasFlag(flags) {
 			continue
 		}
@@ -679,13 +679,13 @@ type HelpMsg struct {
 	Message string
 }
 
-func (self *Parser) generateHelpSection(flags RuleFlag) string {
+func (p *Parser) generateHelpSection(flags RuleFlag) string {
 	var result bytes.Buffer
 	var options []HelpMsg
 
 	// Ask each rule to generate a Help message for the options
 	maxLen := 0
-	for _, rule := range self.rules {
+	for _, rule := range p.rules {
 		if !rule.HasFlag(flags) {
 			continue
 		}
@@ -701,7 +701,7 @@ func (self *Parser) generateHelpSection(flags RuleFlag) string {
 	flagFmt := fmt.Sprintf("%%-%ds%%s\n", indent)
 
 	for _, opt := range options {
-		message := WordWrap(opt.Message, indent, self.wordWrapLen)
+		message := WordWrap(opt.Message, indent, p.wordWrapLen)
 		result.WriteString(fmt.Sprintf(flagFmt, opt.Flags, message))
 	}
 	return result.String()

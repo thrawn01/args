@@ -11,8 +11,8 @@ type Options struct {
 	values OptValues
 }
 
-func (self *Options) Get(key string) string {
-	return self.values[key]
+func (o *Options) Get(key string) string {
+	return o.values[key]
 }
 
 type ArgParser interface {
@@ -24,14 +24,14 @@ type Api struct {
 	Parser ArgParser
 }
 
-func (self *Api) NewServer() http.Handler {
+func (s *Api) NewServer() http.Handler {
 	router := http.NewServeMux()
-	router.HandleFunc("/", self.Index)
+	router.HandleFunc("/", s.Index)
 	return router
 }
 
-func (self *Api) Index(resp http.ResponseWriter, req *http.Request) {
-	opts := self.Parser.GetOpts()
+func (s *Api) Index(resp http.ResponseWriter, req *http.Request) {
+	opts := s.Parser.GetOpts()
 	fmt.Fprintf(resp, "TestValue: %s", opts.Get("test-value"))
 }
 
@@ -47,12 +47,12 @@ func NewParserBench(values OptValues) *ParserBench {
 	return parser
 }
 
-func (self *ParserBench) SetOpts(values OptValues) {
-	self.opts = &Options{values}
+func (pb *ParserBench) SetOpts(values OptValues) {
+	pb.opts = &Options{values}
 }
 
-func (self *ParserBench) GetOpts() *Options {
-	return self.opts
+func (pb *ParserBench) GetOpts() *Options {
+	return pb.opts
 }
 
 type ParserBenchMutex struct {
@@ -67,18 +67,18 @@ func NewParserBenchMutex(values OptValues) *ParserBenchMutex {
 	return parser
 }
 
-func (self *ParserBenchMutex) SetOpts(values OptValues) {
-	self.mutex.Lock()
-	self.opts = &Options{values}
-	self.mutex.Unlock()
+func (pbm *ParserBenchMutex) SetOpts(values OptValues) {
+	pbm.mutex.Lock()
+	pbm.opts = &Options{values}
+	pbm.mutex.Unlock()
 }
 
-func (self *ParserBenchMutex) GetOpts() *Options {
-	self.mutex.Lock()
+func (pbm *ParserBenchMutex) GetOpts() *Options {
+	pbm.mutex.Lock()
 	defer func() {
-		self.mutex.Unlock()
+		pbm.mutex.Unlock()
 	}()
-	return self.opts
+	return pbm.opts
 }
 
 // =================================================================
@@ -93,18 +93,18 @@ func NewParserBenchRWMutex(values OptValues) *ParserBenchRWMutex {
 	return parser
 }
 
-func (self *ParserBenchRWMutex) SetOpts(values OptValues) {
-	self.mutex.Lock()
-	self.opts = &Options{values}
-	self.mutex.Unlock()
+func (pbmr *ParserBenchRWMutex) SetOpts(values OptValues) {
+	pbmr.mutex.Lock()
+	pbmr.opts = &Options{values}
+	pbmr.mutex.Unlock()
 }
 
-func (self *ParserBenchRWMutex) GetOpts() *Options {
-	self.mutex.Lock()
+func (pbmr *ParserBenchRWMutex) GetOpts() *Options {
+	pbmr.mutex.Lock()
 	defer func() {
-		self.mutex.Unlock()
+		pbmr.mutex.Unlock()
 	}()
-	return self.opts
+	return pbmr.opts
 }
 
 // =================================================================
@@ -122,33 +122,33 @@ func NewParserBenchChannel(values OptValues) *ParserBenchChannel {
 	return parser
 }
 
-func (self *ParserBenchChannel) Open() {
+func (pbc *ParserBenchChannel) Open() {
 	go func() {
 		defer func() {
-			close(self.get)
-			close(self.set)
-			close(self.done)
+			close(pbc.get)
+			close(pbc.set)
+			close(pbc.done)
 		}()
 		for {
 			select {
-			case self.get <- self.opts:
-			case value := <-self.set:
-				self.opts = value
-			case <-self.done:
+			case pbc.get <- pbc.opts:
+			case value := <-pbc.set:
+				pbc.opts = value
+			case <-pbc.done:
 				return
 			}
 		}
 	}()
 }
 
-func (self *ParserBenchChannel) Close() {
-	self.done <- true
+func (pbc *ParserBenchChannel) Close() {
+	pbc.done <- true
 }
 
-func (self *ParserBenchChannel) SetOpts(values OptValues) {
-	self.set <- &Options{values}
+func (pbc *ParserBenchChannel) SetOpts(values OptValues) {
+	pbc.set <- &Options{values}
 }
 
-func (self *ParserBenchChannel) GetOpts() *Options {
-	return <-self.get
+func (pbc *ParserBenchChannel) GetOpts() *Options {
+	return <-pbc.get
 }

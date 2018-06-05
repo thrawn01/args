@@ -31,44 +31,44 @@ type RawValue struct {
 	Rule  *Rule
 }
 
-func (self *RawValue) ToString(indent ...int) string {
-	return fmt.Sprintf("%v", self.Value)
+func (rv *RawValue) ToString(indent ...int) string {
+	return fmt.Sprintf("%v", rv.Value)
 }
 
-func (self *RawValue) GetValue() interface{} {
-	return self.Value
+func (rv *RawValue) GetValue() interface{} {
+	return rv.Value
 }
 
-func (self *RawValue) GetRule() *Rule {
-	return self.Rule
+func (rv *RawValue) GetRule() *Rule {
+	return rv.Rule
 }
 
-func (self *RawValue) Seen() bool {
-	if self.Rule == nil {
+func (rv *RawValue) Seen() bool {
+	if rv.Rule == nil {
 		return false
 	}
-	if self.Rule.Flags&WasSeenInArgv != 0 {
+	if rv.Rule.Flags&WasSeenInArgv != 0 {
 		return true
 	}
 	return false
 }
 
-func (self *Parser) NewOptions() *Options {
+func (p *Parser) NewOptions() *Options {
 	return &Options{
 		values: make(map[string]Value),
-		log:    self.log,
-		parser: self,
+		log:    p.log,
+		parser: p,
 	}
 }
 
-func (self *Parser) NewOptionsFromMap(values map[string]interface{}) *Options {
-	options := self.NewOptions()
+func (p *Parser) NewOptionsFromMap(values map[string]interface{}) *Options {
+	options := p.NewOptions()
 	for key, value := range values {
 		// If the value is a map of interfaces
 		obj, ok := value.(map[string]interface{})
 		if ok {
 			// Convert them to options
-			options.SetWithOptions(key, self.NewOptionsFromMap(obj))
+			options.SetWithOptions(key, p.NewOptionsFromMap(obj))
 		} else {
 			// Else set the value
 			options.Set(key, value)
@@ -77,19 +77,19 @@ func (self *Parser) NewOptionsFromMap(values map[string]interface{}) *Options {
 	return options
 }
 
-func (self *Options) GetOpts() *Options {
-	return self.parser.GetOpts()
+func (o *Options) GetOpts() *Options {
+	return o.parser.GetOpts()
 }
 
-func (self *Options) GetValue() interface{} {
-	return self
+func (o *Options) GetValue() interface{} {
+	return o
 }
 
-func (self *Options) GetRule() *Rule {
+func (o *Options) GetRule() *Rule {
 	return nil
 }
 
-func (self *Options) ToString(indented ...int) string {
+func (o *Options) ToString(indented ...int) string {
 	var buffer bytes.Buffer
 	indent := 2
 	if len(indented) != 0 {
@@ -101,38 +101,38 @@ func (self *Options) ToString(indented ...int) string {
 
 	// Sort the values so testing is consistent
 	var keys []string
-	for key := range self.values {
+	for key := range o.values {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 
 	for _, key := range keys {
-		buffer.WriteString(fmt.Sprintf("%s'%s' = %s\n", pad, key, self.values[key].ToString(indent+2)))
+		buffer.WriteString(fmt.Sprintf("%s'%s' = %s\n", pad, key, o.values[key].ToString(indent+2)))
 	}
 	buffer.WriteString(pad[2:] + "}")
 	return buffer.String()
 }
 
-func (self *Options) Group(key string) *Options {
+func (o *Options) Group(key string) *Options {
 	// "" is not a valid group
 	if key == "" {
-		return self
+		return o
 	}
 
-	group, ok := self.values[key]
+	group, ok := o.values[key]
 	// If group doesn't exist; always create it
 	if !ok {
-		group = self.parser.NewOptions()
-		self.values[key] = group
+		group = o.parser.NewOptions()
+		o.values[key] = group
 	}
 	// If user called Group() on this value, it *should* be an
 	// *Option, map[string]string or map[string]interface{}
-	options := self.ToOption(group.GetValue())
+	options := o.ToOption(group.GetValue())
 	if options == nil {
-		self.log.Printf("Attempted to call Group(%s) on non *Option or map[string]interface type %s",
+		o.log.Printf("Attempted to call Group(%s) on non *Option or map[string]interface type %s",
 			key, reflect.TypeOf(group.GetValue()))
 		// Do this so we don't panic if we can't cast this group
-		options = self.parser.NewOptions()
+		options = o.parser.NewOptions()
 	}
 	return options
 }
@@ -140,7 +140,7 @@ func (self *Options) Group(key string) *Options {
 // Given an interface of map[string]string or map[string]string
 // or *Option return an *Options with the same content.
 // return nil if un-successful
-func (self *Options) ToOption(from interface{}) *Options {
+func (o *Options) ToOption(from interface{}) *Options {
 	if options, ok := from.(*Options); ok {
 		return options
 	}
@@ -149,18 +149,18 @@ func (self *Options) ToOption(from interface{}) *Options {
 		for key, value := range stringMap {
 			result[key] = value
 		}
-		return self.parser.NewOptionsFromMap(result)
+		return o.parser.NewOptionsFromMap(result)
 	}
 
 	if interfaceMap, ok := from.(map[string]interface{}); ok {
-		return self.parser.NewOptionsFromMap(interfaceMap)
+		return o.parser.NewOptionsFromMap(interfaceMap)
 	}
 	return nil
 }
 
-func (self *Options) ToMap() map[string]interface{} {
+func (o *Options) ToMap() map[string]interface{} {
 	result := make(map[string]interface{})
-	for key, value := range self.values {
+	for key, value := range o.values {
 		// If the value is an *Option
 		options, ok := value.(*Options)
 		if ok {
@@ -172,48 +172,48 @@ func (self *Options) ToMap() map[string]interface{} {
 	return result
 }
 
-func (self *Options) Keys() []string {
-	keys := make([]string, 0, len(self.values))
-	for key := range self.values {
+func (o *Options) Keys() []string {
+	keys := make([]string, 0, len(o.values))
+	for key := range o.values {
 		keys = append(keys, key)
 	}
 	return keys
 }
 
-func (self *Options) Del(key string) *Options {
-	delete(self.values, key)
-	return self
+func (o *Options) Del(key string) *Options {
+	delete(o.values, key)
+	return o
 }
 
-func (self *Options) SetWithOptions(key string, value *Options) *Options {
-	self.values[key] = value
-	return self
+func (o *Options) SetWithOptions(key string, value *Options) *Options {
+	o.values[key] = value
+	return o
 }
 
 // Just like Set() but also record the matching rule flags
-func (self *Options) SetWithRule(key string, value interface{}, rule *Rule) *Options {
-	self.values[key] = &RawValue{value, rule}
-	return self
+func (o *Options) SetWithRule(key string, value interface{}, rule *Rule) *Options {
+	o.values[key] = &RawValue{value, rule}
+	return o
 }
 
 // Set an option with a key and value
-func (self *Options) Set(key string, value interface{}) *Options {
-	return self.SetWithRule(key, value, nil)
+func (o *Options) Set(key string, value interface{}) *Options {
+	return o.SetWithRule(key, value, nil)
 }
 
 // Set the sub command list returned by `SubCommands()`
-func (self *Options) SetSubCommands(values []string) {
-	self.Set("!sub-commands", values)
+func (o *Options) SetSubCommands(values []string) {
+	o.Set("!sub-commands", values)
 }
 
 // Return a list of sub commands that the user provided to reach the sub parser these options are for
-func (self *Options) SubCommands() []string {
-	return self.Get("!sub-commands").([]string)
+func (o *Options) SubCommands() []string {
+	return o.Get("!sub-commands").([]string)
 }
 
 // Return true if any of the values in this Option object were seen on the command line
-func (self *Options) Seen() bool {
-	for _, opt := range self.values {
+func (o *Options) Seen() bool {
+	for _, opt := range o.values {
 		if opt.Seen() {
 			return true
 		}
@@ -230,31 +230,31 @@ func (self *Options) Seen() bool {
 		os.Exit(-1)
 	}
 */
-func (self *Options) NoArgs() bool {
-	return !self.Seen()
+func (o *Options) NoArgs() bool {
+	return !o.Seen()
 }
 
-func (self *Options) Int(key string) int {
-	value, err := cast.ToIntE(self.Interface(key))
+func (o *Options) Int(key string) int {
+	value, err := cast.ToIntE(o.Interface(key))
 	if err != nil {
-		self.log.Printf("%s for key '%s'", err.Error(), key)
+		o.log.Printf("%s for key '%s'", err.Error(), key)
 	}
 	return value
 }
 
-func (self *Options) String(key string) string {
-	value, err := cast.ToStringE(self.Interface(key))
+func (o *Options) String(key string) string {
+	value, err := cast.ToStringE(o.Interface(key))
 	if err != nil {
-		self.log.Printf("%s for key '%s'", err.Error(), key)
+		o.log.Printf("%s for key '%s'", err.Error(), key)
 	}
 	return value
 }
 
 // Assumes the option is a string path and performs tilde '~' expansion if necessary
-func (self *Options) FilePath(key string) string {
-	path, err := cast.ToStringE(self.Interface(key))
+func (o *Options) FilePath(key string) string {
+	path, err := cast.ToStringE(o.Interface(key))
 	if err != nil {
-		self.log.Printf("%s for key '%s'", err.Error(), key)
+		o.log.Printf("%s for key '%s'", err.Error(), key)
 	}
 
 	if len(path) == 0 || path[0] != '~' {
@@ -263,30 +263,30 @@ func (self *Options) FilePath(key string) string {
 
 	usr, err := user.Current()
 	if err != nil {
-		self.log.Printf("'%s': while determining user for '%s' expansion: %s", key, path, err)
+		o.log.Printf("'%s': while determining user for '%s' expansion: %s", key, path, err)
 		return path
 	}
 	return filepath.Join(usr.HomeDir, path[1:])
 }
 
-func (self *Options) Bool(key string) bool {
-	value, err := cast.ToBoolE(self.Interface(key))
+func (o *Options) Bool(key string) bool {
+	value, err := cast.ToBoolE(o.Interface(key))
 	if err != nil {
-		self.log.Printf("%s for key '%s'", err.Error(), key)
+		o.log.Printf("%s for key '%s'", err.Error(), key)
 	}
 	return value
 }
 
-func (self *Options) StringSlice(key string) []string {
-	value, err := cast.ToStringSliceE(self.Interface(key))
+func (o *Options) StringSlice(key string) []string {
+	value, err := cast.ToStringSliceE(o.Interface(key))
 	if err != nil {
-		self.log.Printf("%s for key '%s'", err.Error(), key)
+		o.log.Printf("%s for key '%s'", err.Error(), key)
 	}
 	return value
 }
 
-func (self *Options) StringMap(key string) map[string]string {
-	group := self.Group(key)
+func (o *Options) StringMap(key string) map[string]string {
+	group := o.Group(key)
 
 	result := make(map[string]string)
 	for _, key := range group.Keys() {
@@ -295,14 +295,14 @@ func (self *Options) StringMap(key string) map[string]string {
 	return result
 }
 
-func (self *Options) KeySlice(key string) []string {
-	return self.Group(key).Keys()
+func (o *Options) KeySlice(key string) []string {
+	return o.Group(key).Keys()
 }
 
 // Returns true if the argument value is set.
 // Use IsDefault(), IsEnv(), IsArg() to determine how the parser set the value
-func (self *Options) IsSet(key string) bool {
-	if opt, ok := self.values[key]; ok {
+func (o *Options) IsSet(key string) bool {
+	if opt, ok := o.values[key]; ok {
 		rule := opt.GetRule()
 		if rule == nil {
 			return false
@@ -313,44 +313,44 @@ func (self *Options) IsSet(key string) bool {
 }
 
 // Returns true if this argument is set via the environment
-func (self *Options) IsEnv(key string) bool {
-	if opt, ok := self.values[key]; ok {
+func (o *Options) IsEnv(key string) bool {
+	if opt, ok := o.values[key]; ok {
 		rule := opt.GetRule()
 		if rule == nil {
 			return false
 		}
-		return (rule.Flags&IsEnvValue != 0)
+		return rule.Flags&IsEnvValue != 0
 	}
 	return false
 }
 
 // Returns true if this argument is set via the command line
-func (self *Options) IsArg(key string) bool {
-	if opt, ok := self.values[key]; ok {
+func (o *Options) IsArg(key string) bool {
+	if opt, ok := o.values[key]; ok {
 		rule := opt.GetRule()
 		if rule == nil {
 			return false
 		}
-		return (rule.Flags&WasSeenInArgv != 0)
+		return rule.Flags&WasSeenInArgv != 0
 	}
 	return false
 }
 
 // Returns true if this argument is set via the default value
-func (self *Options) IsDefault(key string) bool {
-	if opt, ok := self.values[key]; ok {
+func (o *Options) IsDefault(key string) bool {
+	if opt, ok := o.values[key]; ok {
 		rule := opt.GetRule()
 		if rule == nil {
 			return false
 		}
-		return (rule.Flags&IsDefaultValue != 0)
+		return rule.Flags&IsDefaultValue != 0
 	}
 	return false
 }
 
 // Returns true if this argument was set via the command line or was set by an environment variable
-func (self *Options) WasSeen(key string) bool {
-	if opt, ok := self.values[key]; ok {
+func (o *Options) WasSeen(key string) bool {
+	if opt, ok := o.values[key]; ok {
 		rule := opt.GetRule()
 		if rule == nil {
 			return false
@@ -361,48 +361,48 @@ func (self *Options) WasSeen(key string) bool {
 }
 
 // Returns true only if all of the keys given have values set
-func (self *Options) Required(keys []string) error {
+func (o *Options) Required(keys []string) error {
 	for _, key := range keys {
-		if !self.IsSet(key) {
+		if !o.IsSet(key) {
 			return errors.New(key)
 		}
 	}
 	return nil
 }
 
-func (self *Options) HasKey(key string) bool {
-	_, ok := self.values[key]
+func (o *Options) HasKey(key string) bool {
+	_, ok := o.values[key]
 	return ok
 }
 
-func (self *Options) Get(key string) interface{} {
-	if opt, ok := self.values[key]; ok {
+func (o *Options) Get(key string) interface{} {
+	if opt, ok := o.values[key]; ok {
 		return opt.GetValue()
 	}
 	return nil
 }
 
-func (self *Options) InspectOpt(key string) Value {
-	if opt, ok := self.values[key]; ok {
+func (o *Options) InspectOpt(key string) Value {
+	if opt, ok := o.values[key]; ok {
 		return opt
 	}
 	return nil
 }
 
-func (self *Options) Interface(key string) interface{} {
-	if opt, ok := self.values[key]; ok {
+func (o *Options) Interface(key string) interface{} {
+	if opt, ok := o.values[key]; ok {
 		return opt.GetValue()
 	}
 	return nil
 }
 
-func (self *Options) FromChangeEvent(event ChangeEvent) *Options {
+func (o *Options) FromChangeEvent(event ChangeEvent) *Options {
 	if event.Deleted {
-		self.Group(event.Key.Group).Del(event.Key.Name)
+		o.Group(event.Key.Group).Del(event.Key.Name)
 	} else {
-		self.Group(event.Key.Group).Set(event.Key.Name, event.Value)
+		o.Group(event.Key.Group).Set(event.Key.Name, event.Value)
 	}
-	return self
+	return o
 }
 
 // TODO: Add these getters

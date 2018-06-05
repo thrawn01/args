@@ -23,20 +23,20 @@ func NewTestLogger() *TestLogger {
 	return &TestLogger{""}
 }
 
-func (self *TestLogger) Print(stuff ...interface{}) {
-	self.result = self.result + fmt.Sprint(stuff...) + "|"
+func (tl *TestLogger) Print(stuff ...interface{}) {
+	tl.result = tl.result + fmt.Sprint(stuff...) + "|"
 }
 
-func (self *TestLogger) Printf(format string, stuff ...interface{}) {
-	self.result = self.result + fmt.Sprintf(format, stuff...) + "|"
+func (tl *TestLogger) Printf(format string, stuff ...interface{}) {
+	tl.result = tl.result + fmt.Sprintf(format, stuff...) + "|"
 }
 
-func (self *TestLogger) Println(stuff ...interface{}) {
-	self.result = self.result + fmt.Sprintln(stuff...) + "|"
+func (tl *TestLogger) Println(stuff ...interface{}) {
+	tl.result = tl.result + fmt.Sprintln(stuff...) + "|"
 }
 
-func (self *TestLogger) GetEntry() string {
-	return self.result
+func (tl *TestLogger) GetEntry() string {
+	return tl.result
 }
 
 var _ = Describe("args", func() {

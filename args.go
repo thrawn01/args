@@ -26,9 +26,9 @@ type StdLogger interface {
 
 type NullLogger struct{}
 
-func (self *NullLogger) Print(...interface{})          {}
-func (self *NullLogger) Printf(string, ...interface{}) {}
-func (self *NullLogger) Println(...interface{})        {}
+func (nl *NullLogger) Print(...interface{})          {}
+func (nl *NullLogger) Printf(string, ...interface{}) {}
+func (nl *NullLogger) Println(...interface{})        {}
 
 // ***********************************************
 // Public Word Formatting Functions

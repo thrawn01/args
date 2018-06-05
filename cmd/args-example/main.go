@@ -34,8 +34,11 @@ func main() {
 
 	// Command line flags can begin with -name, --name or even ++name
 	// Most non word characters are supported
-	parser.AddFlag("++config-file").Alias("+c").IsString().
-		Default("/path/to/config").Help("path to config file")
+	parser.AddFlag("++config-file").
+		Help("path to config file").
+		Default("/path/to/config").
+		Alias("+c").
+		IsString()
 
 	// Use the args.Env() function to define an environment variable
 	// NOTE: Since the parser was passed args.EnvPrefix("APP_") the actual

@@ -23,7 +23,7 @@ func NewTestBackend() args.Backend {
 		keys: map[string]args.Pair{
 			"/root/bind": {Key: args.Key{Name: "bind"}, Value: "thrawn01.org:3366"}},
 		lists: map[string][]args.Pair{
-			"/root/endpoints": []args.Pair{
+			"/root/endpoints": {
 				{
 					Key:   args.Key{Group: "endpoints", Name: "endpoint1"},
 					Value: "http://endpoint1.com:3366",
@@ -33,7 +33,7 @@ func NewTestBackend() args.Backend {
 					Value: `{ "host": "endpoint2", "port": "3366" }`,
 				},
 			},
-			"/root/watch": []args.Pair{
+			"/root/watch": {
 				{
 					Key:   args.Key{Group: "watch", Name: "endpoint1"},
 					Value: "http://endpoint1.com:3366",
@@ -47,29 +47,29 @@ func fullKey(key args.Key) string {
 	return fmt.Sprintf("/root/%s", key.Join("/"))
 }
 
-func (self *TestBackend) Get(ctx context.Context, key args.Key) (args.Pair, error) {
-	pair, ok := self.keys[fullKey(key)]
+func (tb *TestBackend) Get(ctx context.Context, key args.Key) (args.Pair, error) {
+	pair, ok := tb.keys[fullKey(key)]
 	if !ok {
 		return args.Pair{}, errors.New(fmt.Sprintf("'%s' not found", fullKey(key)))
 	}
 	return pair, nil
 }
 
-func (self *TestBackend) List(ctx context.Context, key args.Key) ([]args.Pair, error) {
-	pairs, ok := self.lists[fullKey(key)]
+func (tb *TestBackend) List(ctx context.Context, key args.Key) ([]args.Pair, error) {
+	pairs, ok := tb.lists[fullKey(key)]
 	if !ok {
 		return []args.Pair{}, errors.New(fmt.Sprintf("'%s' not found", fullKey(key)))
 	}
 	return pairs, nil
 }
 
-func (self *TestBackend) Set(ctx context.Context, key args.Key, value string) error {
-	self.keys[fullKey(key)] = args.Pair{Key: key, Value: value}
+func (tb *TestBackend) Set(ctx context.Context, key args.Key, value string) error {
+	tb.keys[fullKey(key)] = args.Pair{Key: key, Value: value}
 	return nil
 }
 
 // Watch monitors store for changes to key.
-func (self *TestBackend) Watch(ctx context.Context, key string) (<-chan args.ChangeEvent, error) {
+func (tb *TestBackend) Watch(ctx context.Context, key string) (<-chan args.ChangeEvent, error) {
 	changeChan := make(chan args.ChangeEvent, 2)
 
 	go func() {
@@ -77,7 +77,7 @@ func (self *TestBackend) Watch(ctx context.Context, key string) (<-chan args.Cha
 		select {
 		case event = <-watchChan:
 			changeChan <- event
-		case <-self.close:
+		case <-tb.close:
 			close(changeChan)
 			return
 		}
@@ -85,13 +85,13 @@ func (self *TestBackend) Watch(ctx context.Context, key string) (<-chan args.Cha
 	return changeChan, nil
 }
 
-func (self *TestBackend) Close() {
-	if self.close != nil {
-		close(self.close)
+func (tb *TestBackend) Close() {
+	if tb.close != nil {
+		close(tb.close)
 	}
 }
 
-func (self *TestBackend) GetRootKey() string {
+func (tb *TestBackend) GetRootKey() string {
 	return "/root"
 }
 

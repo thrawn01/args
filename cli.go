@@ -49,7 +49,7 @@ func hasFlags(src, flag ParseFlag) bool {
 
 // Sets all the flags given on dest
 func setFlags(dest *ParseFlag, flag ParseFlag) {
-	*dest = (*dest | flag)
+	*dest = *dest | flag
 }
 
 // Returns a curl command representation of the passed http.Request
