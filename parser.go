@@ -254,7 +254,7 @@ func (p *Parser) AddArgument(name string) *RuleModifier {
 	return p.addRule(name, newRuleModifier(rule, p))
 }
 
-func (p *Parser) AddCommand(name string, cmdFunc CommandFunc) *RuleModifier {
+func (p *Parser) AddCommand(name string, cmdFunc commandFunc) *RuleModifier {
 	rule := newRule()
 	rule.SetFlag(IsCommand)
 	rule.CommandFunc = cmdFunc
@@ -706,3 +706,14 @@ func (p *Parser) generateHelpSection(flags RuleFlag) string {
 	}
 	return result.String()
 }
+
+// Returns true if the flags given are set on src
+func hasFlags(src, flag ParseFlag) bool {
+	return src&flag != 0
+}
+
+// Sets all the flags given on dest
+func setFlags(dest *ParseFlag, flag ParseFlag) {
+	*dest = *dest | flag
+}
+

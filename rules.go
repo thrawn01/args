@@ -16,10 +16,10 @@ var regexHasPrefix = regexp.MustCompile(`^(\W+)([\w|-]*)$`)
 // Rule Object
 // ***********************************************
 
-type CastFunc func(string, interface{}, interface{}) (interface{}, error)
-type ActionFunc func(*Rule, string, []string, *int) error
-type StoreFunc func(interface{})
-type CommandFunc func(*Parser, interface{}) (int, error)
+type castFunc func(string, interface{}, interface{}) (interface{}, error)
+type actionFunc func(*Rule, string, []string, *int) error
+type storeFunc func(interface{})
+type commandFunc func(*Parser, interface{}) (int, error)
 
 type RuleFlag int64
 
@@ -48,10 +48,10 @@ type Rule struct {
 	EnvVars     []string
 	Choices     []string
 	EnvPrefix   string
-	Cast        CastFunc
-	Action      ActionFunc
-	StoreValue  StoreFunc
-	CommandFunc CommandFunc
+	Cast        castFunc
+	Action      actionFunc
+	StoreValue  storeFunc
+	CommandFunc commandFunc
 	Group       string
 	NotGreedy   bool
 	Flags       RuleFlag
