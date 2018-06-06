@@ -674,14 +674,14 @@ func (p *Parser) generateUsage(flags RuleFlag) string {
 	return result.String()
 }
 
-type HelpMsg struct {
+type helpMsg struct {
 	Flags   string
 	Message string
 }
 
 func (p *Parser) generateHelpSection(flags RuleFlag) string {
 	var result bytes.Buffer
-	var options []HelpMsg
+	var options []helpMsg
 
 	// Ask each rule to generate a Help message for the options
 	maxLen := 0
@@ -693,7 +693,7 @@ func (p *Parser) generateHelpSection(flags RuleFlag) string {
 		if len(flags) > maxLen {
 			maxLen = len(flags)
 		}
-		options = append(options, HelpMsg{flags, message})
+		options = append(options, helpMsg{flags, message})
 	}
 
 	// Set our indent length

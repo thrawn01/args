@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/thrawn01/args"
+	"log"
 )
 
 var watchChan chan args.ChangeEvent
@@ -197,3 +198,36 @@ var _ = Describe("backend", func() {
 		})
 	})
 })
+
+func ExampleParser_FromBackend() {
+	// Simple backend, usually an INI, YAML, ETCD, or CONSOL backend
+	backend := args.NewHasMapBackend(map[string]string {
+		"/root/foo": "bar",
+		"/root/kit": "kat",
+	}, "/root/")
+
+	parser := args.NewParser()
+	parser.AddFlag("foo")
+	parser.AddFlag("kit")
+
+	// Parse our command line args first
+	_, err := parser.Parse([]string{"--foo", "bash"})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Now apply our backend values, any existing values from the
+	// command line always take precedence
+	opts, err := parser.FromBackend(backend)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("foo = %s\n", opts.String("foo"))
+	fmt.Printf("kit = %s\n", opts.String("kit"))
+
+	// Output:
+	// foo = bash
+	// kit = kat
+}
+
