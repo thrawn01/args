@@ -26,24 +26,24 @@ type Options struct {
 	parser *Parser
 }
 
-type RawValue struct {
+type rawValue struct {
 	Value interface{}
 	Rule  *Rule
 }
 
-func (rv *RawValue) ToString(indent ...int) string {
+func (rv *rawValue) ToString(indent ...int) string {
 	return fmt.Sprintf("%v", rv.Value)
 }
 
-func (rv *RawValue) GetValue() interface{} {
+func (rv *rawValue) GetValue() interface{} {
 	return rv.Value
 }
 
-func (rv *RawValue) GetRule() *Rule {
+func (rv *rawValue) GetRule() *Rule {
 	return rv.Rule
 }
 
-func (rv *RawValue) Seen() bool {
+func (rv *rawValue) Seen() bool {
 	if rv.Rule == nil {
 		return false
 	}
@@ -192,7 +192,7 @@ func (o *Options) SetWithOptions(key string, value *Options) *Options {
 
 // Just like Set() but also record the matching rule flags
 func (o *Options) SetWithRule(key string, value interface{}, rule *Rule) *Options {
-	o.values[key] = &RawValue{value, rule}
+	o.values[key] = &rawValue{value, rule}
 	return o
 }
 

@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"log"
+
+	"strings"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/thrawn01/args"
-	"log"
 )
 
 var watchChan chan args.ChangeEvent
@@ -199,9 +202,97 @@ var _ = Describe("backend", func() {
 	})
 })
 
+// Instantiate a backend example implementation. See `parser.FromBackend()` for example usage.
+func newHashMapBackend(data map[string]string, rootKey string) *hashMapBackend {
+	return &hashMapBackend{
+		rootKey: rootKey,
+		data:    data,
+	}
+}
+
+// Example usage of implementing the backend interface
+type hashMapBackend struct {
+	watchChan chan args.ChangeEvent
+	data      map[string]string
+	done      chan struct{}
+	rootKey   string
+}
+
+// Get retrieves a value from a K/V store for the provided key.
+func (hmb *hashMapBackend) Get(ctx context.Context, key args.Key) (args.Pair, error) {
+	fullKey := hmb.rootKey + key.Join("/")
+	value, ok := hmb.data[fullKey]
+	if !ok {
+		return args.Pair{}, errors.New(fmt.Sprintf("'%s' not found", fullKey))
+	}
+	return args.Pair{Key: key, Value: value}, nil
+}
+
+// List retrieves all keys and values that match the `Key.Group` given.
+func (hmb *hashMapBackend) List(ctx context.Context, key args.Key) ([]args.Pair, error) {
+	var results []args.Pair
+	for key := range hmb.data {
+		parts := strings.Split(key, "/")
+		pair, err := hmb.Get(ctx, args.Key{Name: parts[2], Group: parts[1]})
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, pair)
+	}
+	return results, nil
+}
+
+// Set the provided key to value.
+func (hmb *hashMapBackend) Set(ctx context.Context, key args.Key, value string) error {
+	fullKey := hmb.rootKey + key.Join("/")
+	hmb.data[fullKey] = value
+
+	// If someone is watching, let them know the value changed.
+
+	// Normally this change would come from the backend and no
+	// in the Set() function but for our example case this works.
+	if hmb.done != nil {
+		hmb.watchChan <- args.ChangeEvent{Key: key, Value: value}
+	}
+	return nil
+}
+
+// Watch monitors store for changes to key.
+func (hmb *hashMapBackend) Watch(ctx context.Context, root string) (<-chan args.ChangeEvent, error) {
+	changeChan := make(chan args.ChangeEvent, 2)
+	hmb.watchChan = make(chan args.ChangeEvent)
+	hmb.done = make(chan struct{})
+
+	go func() {
+		var event args.ChangeEvent
+		select {
+		case event = <-hmb.watchChan:
+			changeChan <- event
+		case <-hmb.done:
+			close(changeChan)
+			return
+		}
+	}()
+	return changeChan, nil
+}
+
+// Return the root key used to store all other keys in the backend.
+// If your implementation doesn't have a root key you can just return empty string
+func (hmb *hashMapBackend) GetRootKey() string {
+	return hmb.rootKey
+}
+
+// Closes the connection to the backend and cancels all watches
+func (hmb *hashMapBackend) Close() {
+	// We have no backend to close, just stop any watchers
+	if hmb.done != nil {
+		close(hmb.done)
+	}
+}
+
 func ExampleParser_FromBackend() {
 	// Simple backend, usually an INI, YAML, ETCD, or CONSOL backend
-	backend := args.NewHasMapBackend(map[string]string {
+	backend := newHashMapBackend(map[string]string{
 		"/root/foo": "bar",
 		"/root/kit": "kat",
 	}, "/root/")
@@ -230,4 +321,3 @@ func ExampleParser_FromBackend() {
 	// foo = bash
 	// kit = kat
 }
-

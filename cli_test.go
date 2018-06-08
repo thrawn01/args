@@ -1,20 +1,97 @@
 package args_test
 
-
 import (
-	"net/http"
 	"bytes"
-	"log"
-	"fmt"
-	"github.com/thrawn01/args"
 	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
 	"strings"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	"github.com/thrawn01/args"
 )
+
+var _ = Describe("args.StringToMap()", func() {
+
+	Context("Given a single key=value pair", func() {
+		It("Should return a map of the key=value", func() {
+			kv, err := args.StringToMap("key=value")
+			Expect(err).To(BeNil())
+
+			Expect(kv).To(Equal(map[string]string{
+				"key": "value",
+			}))
+		})
+	})
+	Context("Given multiple key=value pairs", func() {
+		It("Should return multiple map of the key=value", func() {
+			kv, err := args.StringToMap("key=value,key2=value2")
+			Expect(err).To(BeNil())
+
+			Expect(kv).To(Equal(map[string]string{
+				"key":  "value",
+				"key2": "value2",
+			}))
+		})
+	})
+	Context("Given multiple key=value pairs with prefix and suffix space", func() {
+		It("Should return multiple map of the key=value", func() {
+			kv, err := args.StringToMap("key =value , key2= value2")
+			Expect(err).To(BeNil())
+
+			Expect(kv).To(Equal(map[string]string{
+				"key":  "value",
+				"key2": "value2",
+			}))
+		})
+	})
+	Context(`Given an escaped delimiter key\==value`, func() {
+		It("Should respect the escaped delimiter", func() {
+			kv, err := args.StringToMap(`http\=ip=value\=`)
+			Expect(err).To(BeNil())
+
+			Expect(kv).To(Equal(map[string]string{
+				"http=ip": "value=",
+			}))
+		})
+	})
+	Context("Given malformed buffer", func() {
+		It("Should return an error", func() {
+			_, err := args.StringToMap("value")
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Expected '=' after 'value' but found ''; map values should be 'key=value' separated by commas"))
+
+			_, err = args.StringToMap(",")
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Expected '=' after ',' but found ''; map values should be 'key=value' separated by commas"))
+
+			_, err = args.StringToMap("=")
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Expected '=' after '=' but found ''; map values should be 'key=value' separated by commas"))
+
+			_, err = args.StringToMap("=,")
+			Expect(err).ToNot(BeNil())
+			Expect(err.Error()).To(Equal("Expected '=' after '=' but found ','; map values should be 'key=value' separated by commas"))
+		})
+	})
+	Context("Given JSON", func() {
+		It("Should return multiple map of the key=value", func() {
+			kv, err := args.StringToMap(`{"blue":"bell"}`)
+			Expect(err).To(BeNil())
+
+			Expect(kv).To(Equal(map[string]string{
+				"blue": "bell",
+			}))
+		})
+	})
+})
 
 func ExampleCurlString() {
 	// Payload
 	payload, err := json.Marshal(map[string]string{
-		"stuff":     "junk",
+		"stuff": "junk",
 	})
 
 	// Create the new Request
@@ -54,9 +131,9 @@ func ExampleDedent() {
 	fmt.Println(desc)
 	// Output:
 	// Example is a fast and flexible thingy
-    //
+	//
 	// Complete documentation is available at http://thingy.com
-    //
+	//
 	// Example Usage:
 	//     $ example-cli some-argument
 	//     Hello World!
@@ -71,7 +148,7 @@ func ExampleWordWrap() {
 	// Output:
 	// No code is the best way to write secure and reliable applications.Write
 	//    nothing; deploy nowhere. This is just an example application, but imagine
-    //    it doing anything you want.
+	//    it doing anything you want.
 }
 
 func ExampleStringToSlice() {
@@ -79,10 +156,10 @@ func ExampleStringToSlice() {
 	fmt.Println(args.StringToSlice("one"))
 
 	// Returns []string{"one", "two", "three"}
- 	fmt.Println(args.StringToSlice("one, two, three", strings.TrimSpace))
+	fmt.Println(args.StringToSlice("one, two, three", strings.TrimSpace))
 
 	//  Returns []string{"ONE", "TWO", "THREE"}
- 	fmt.Println(args.StringToSlice("one,two,three", strings.ToUpper, strings.TrimSpace))
+	fmt.Println(args.StringToSlice("one,two,three", strings.ToUpper, strings.TrimSpace))
 
 	// Output:
 	// [one]

@@ -9,8 +9,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pkg/errors"
+	"encoding/json"
 	"regexp"
+
+	"github.com/pkg/errors"
 )
 
 // A collection of CLI build helpers
@@ -156,7 +158,7 @@ func StringToSlice(value string, modifiers ...func(s string) string) []string {
 // Return a map of key values as strings, Also excepts JSON for more complex
 // quoted or escaped data.
 func StringToMap(value string) (map[string]string, error) {
-	tokenizer := NewKeyValueTokenizer(value)
+	tokenizer := newKeyValueTokenizer(value)
 	result := make(map[string]string)
 
 	var lvalue, rvalue, expression string
@@ -168,7 +170,7 @@ func StringToMap(value string) (map[string]string, error) {
 		}
 		if strings.HasPrefix(lvalue, "{") {
 			// Assume this is JSON format and attempt to un-marshal
-			return JSONToMap(value)
+			return jsonToMap(value)
 		}
 
 		expression = tokenizer.Next()
@@ -197,3 +199,15 @@ func StringToMap(value string) (map[string]string, error) {
 	}
 	return result, nil
 }
+
+func jsonToMap(value string) (map[string]string, error) {
+	result := make(map[string]string)
+	err := json.Unmarshal([]byte(value), &result)
+	if err != nil {
+		return result, errors.New(fmt.Sprintf("JSON map decoding for '%s' failed with '%s'; "+
+			`JSON map values should be in form '{"key":"value", "foo":"bar"}'`, value, err))
+	}
+	return result, nil
+}
+
+// TODO: Add SetDefault

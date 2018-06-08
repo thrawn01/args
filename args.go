@@ -1,7 +1,6 @@
 package args
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -10,11 +9,11 @@ import (
 )
 
 const (
-	DefaultTerminator  string = "--"
+	//DefaultTerminator  string = "--"
 	DefaultOptionGroup string = ""
 )
 
-var DefaultLogger *NullLogger = &NullLogger{}
+var DefaultLogger = &NullLogger{}
 
 // We only need part of the standard logging functions
 type StdLogger interface {
@@ -23,6 +22,7 @@ type StdLogger interface {
 	Println(...interface{})
 }
 
+// Default logger that logs nothing
 type NullLogger struct{}
 
 func (nl *NullLogger) Print(...interface{})          {}
@@ -210,15 +210,5 @@ func copyStringSlice(src []string) (dest []string) {
 		dest[idx] = value
 	}
 	return
-}
-
-func JSONToMap(value string) (map[string]string, error) {
-	result := make(map[string]string)
-	err := json.Unmarshal([]byte(value), &result)
-	if err != nil {
-		return result, errors.New(fmt.Sprintf("JSON map decoding for '%s' failed with '%s'; "+
-			`JSON map values should be in form '{"key":"value", "foo":"bar"}'`, value, err))
-	}
-	return result, nil
 }
 

@@ -1,24 +1,26 @@
 package args
 
-import "strings"
+import (
+	"strings"
+)
 
 // Given a string a `key=value,key=value` and
 // successive calls to Next() will return `key` then `=`
 // then `value` then `,` etc, etc....
-type KeyValueTokenizer struct {
+type keyValueTokenizer struct {
 	Buffer   string
 	Pos      int
 	nextRune rune
 }
 
-func NewKeyValueTokenizer(source string) *KeyValueTokenizer {
-	return &KeyValueTokenizer{
+func newKeyValueTokenizer(source string) *keyValueTokenizer {
+	return &keyValueTokenizer{
 		Buffer: source,
 	}
 }
 
 // Return the next token found
-func (t *KeyValueTokenizer) Next() string {
+func (t *keyValueTokenizer) Next() string {
 	// No more tokens to find
 	if t.Pos >= len(t.Buffer) {
 		return ""
