@@ -20,6 +20,8 @@ type Value interface {
 	Seen() bool
 }
 
+// Contains the values of the parsed arguments as returned by
+// `parser.Parse()` or `parser.ParseSimple()`
 type Options struct {
 	values map[string]Value
 	log    StdLogger
@@ -89,6 +91,7 @@ func (o *Options) GetRule() *Rule {
 	return nil
 }
 
+// Outputs a pretty form of the keys and values
 func (o *Options) ToString(indented ...int) string {
 	var buffer bytes.Buffer
 	indent := 2
@@ -269,6 +272,7 @@ func (o *Options) FilePath(key string) string {
 	return filepath.Join(usr.HomeDir, path[1:])
 }
 
+// Returns the value as a boolean
 func (o *Options) Bool(key string) bool {
 	value, err := cast.ToBoolE(o.Interface(key))
 	if err != nil {
@@ -277,6 +281,7 @@ func (o *Options) Bool(key string) bool {
 	return value
 }
 
+// Returns the value as a string slice
 func (o *Options) StringSlice(key string) []string {
 	value, err := cast.ToStringSliceE(o.Interface(key))
 	if err != nil {

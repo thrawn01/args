@@ -51,7 +51,7 @@ type Pair struct {
 type WatchCancelFunc func()
 
 // Struct's that implement this interface can be passed to the parser via `parser.FromBackend()`
-// this allows users to source values for arguments from sources other than argv.
+// this allows users to source values for arguments from sources other than `os.Args`.
 // See `parser.FromBackend()` for example
 type Backend interface {
 	// Get retrieves a value from a K/V store for the provided key.
